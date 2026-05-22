@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JumpMarkers — Your Tube memories, organized</title>
+  <meta name="description" content="Mark any YouTube moment with one key. Organize with folders, tags & subtopics. Jump back instantly. Global hotkeys work on any tab."/>
+  <meta property="og:title" content="JumpMarkers — Your Tube memories, organized"/>
+  <meta property="og:description" content="Mark any YouTube moment with one key. Jump back instantly."/>
+  <meta property="og:url" content="https://jumpmarkers.com"/>
+  <link rel="icon" href="favicon.ico"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Josefin+Sans:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+  <style>
+  /* ─── ROOT ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:        #0d1130;
+    --bg2:       #0a0e25;
+    --surface:   #161d45;
+    --surface2:  #1c2554;
+    --input:     #111736;
+    --border:    #232d5e;
+    --border2:   #2a3570;
+    --text:      #e8eaf6;
+    --muted:     #6c7ab8;
+    --gold:      #deb887;
+    --gold-lt:   #e8c99e;
+    --gold-bg:   rgba(222,184,135,.12);
+    --pink:      #e8437a;
+    --pink-bg:   rgba(232,67,122,.1);
+    --accent2:   #00e5ff;
+    --radius:    8px;
+    --mono:      'DM Mono', monospace;
+    --display:   'Josefin Sans', sans-serif;
+    --body:      'Inter', system-ui, sans-serif;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ─── NAV ───────────────────────────────────────────── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 5vw;
+    height: 58px;
+    background: rgba(13,17,48,.92);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: var(--display);
+    font-size: 17px; font-weight: 700;
+    letter-spacing: .5px;
+    color: var(--text);
+  }
+  .nav-logo em { font-style: normal; color: var(--gold); }
+  .nav-links { display: flex; gap: 28px; }
+  .nav-links a {
+    font-size: 13px; color: var(--muted);
+    transition: color .15s; letter-spacing: .2px;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    background: var(--gold);
+    color: #0d1130;
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    padding: 8px 20px; border-radius: 6px;
+    transition: background .15s, transform .1s;
+    letter-spacing: .3px;
+  }
+  .nav-cta:hover { background: var(--gold-lt); transform: translateY(-1px); }
+
+  /* ─── HERO ──────────────────────────────────────────── */
+  #hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 110px 5vw 70px;
+    position: relative; overflow: hidden;
+  }
+
+  /* layered background glow */
+  #hero::before {
+    content: '';
+    position: absolute; bottom: -100px; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 500px;
+    background: radial-gradient(ellipse at 50% 100%,
+      rgba(222,184,135,.13) 0%,
+      rgba(13,17,48,0) 65%);
+    pointer-events: none;
+  }
+  #hero::after {
+    content: '';
+    position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 300px;
+    background: radial-gradient(ellipse,
+      rgba(232,67,122,.07) 0%,
+      transparent 70%);
+    pointer-events: none;
+  }
+
+  /* logo mark */
+  .hero-logo-wrap {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 28px;
+    box-shadow: 0 0 0 10px rgba(222,184,135,.08), 0 12px 40px rgba(0,0,0,.5);
+  }
+  .hero-logo-wrap img {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    display: block;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2.4rem, 6.5vw, 4.8rem);
+    font-weight: 700; line-height: 1.06;
+    letter-spacing: -1px;
+    max-width: 820px;
+    margin-bottom: 22px;
+    color: #fff;
+    transition: opacity .55s ease;
+  }
+  h1.fading { opacity: 0; }
+  h1 strong {
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 0 48px rgba(222,184,135,.4);
+  }
+
+  .hero-sub {
+    font-size: clamp(.95rem, 1.8vw, 1.1rem);
+    color: var(--muted);
+    max-width: 520px; margin-bottom: 40px;
+    line-height: 1.7;
+  }
+
+  .hero-btns {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 56px;
+  }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--gold); color: #0d1130;
+    font-family: var(--mono); font-size: 13px; font-weight: 500;
+    padding: 14px 32px; border-radius: var(--radius);
+    transition: background .15s, transform .12s, box-shadow .2s;
+    letter-spacing: .4px;
+  }
+  .btn-primary:hover {
+    background: var(--gold-lt); transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(222,184,135,.3);
+  }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 14px 28px; border-radius: var(--radius);
+    border: 1px solid var(--border2);
+    transition: border-color .15s, transform .12s;
+    letter-spacing: .3px;
+  }
+  .btn-secondary:hover { border-color: var(--gold); transform: translateY(-2px); color: var(--gold); }
+
+  /* hotkey pills row */
+  .hero-pills {
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+  }
+  .pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 14px;
+    font-size: 12px; color: var(--muted);
+  }
+  .pill-key {
+    background: var(--input); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 2px 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--gold);
+    box-shadow: 0 2px 0 var(--border2);
+  }
+
+  /* ─── MOCK UI strip ─────────────────────────────────── */
+  .mock-strip {
+    width: 100%; max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    margin: 48px auto 0;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,.55);
+  }
+  .mock-topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mock-title {
+    flex: 1; text-align: center;
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .mock-tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .mock-tab {
+    flex: 1; text-align: center;
+    padding: 9px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color .15s;
+  }
+  .mock-tab.active { color: var(--text); border-bottom-color: var(--pink); }
+  .mock-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .mock-time {
+    background: var(--input); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 14px;
+    font-family: var(--mono); font-size: 13px; color: var(--gold);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mock-label { font-size: 9px; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 4px; }
+  .mock-field {
+    background: var(--input); border: 1px solid var(--border);
+    border-radius: 6px; padding: 9px 12px;
+    font-family: var(--mono); font-size: 11px; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mock-field.placeholder { color: var(--muted); }
+  .mock-save {
+    background: var(--gold); color: #0d1130;
+    border-radius: 6px; padding: 11px;
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    text-align: center; letter-spacing: .5px;
+    margin-top: 4px;
+  }
+
+  /* ─── SECTION SHARED ────────────────────────────────── */
+  section { padding: 88px 5vw; }
+  .section-tag {
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--gold);
+    background: var(--gold-bg); border: 1px solid rgba(222,184,135,.25);
+    border-radius: 4px; padding: 3px 10px;
+    margin-bottom: 18px;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(1.8rem, 4vw, 2.7rem);
+    font-weight: 700; letter-spacing: -.5px; line-height: 1.1;
+    margin-bottom: 14px; color: #fff;
+  }
+  .sec-sub {
+    font-size: .95rem; color: var(--muted); max-width: 500px; line-height: 1.7;
+    margin-bottom: 52px;
+  }
+  .centered { text-align: center; }
+  .centered .sec-sub { margin-left: auto; margin-right: auto; }
+
+  /* ─── FEATURES ──────────────────────────────────────── */
+  #features { background: var(--bg); }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .feat {
+    background: var(--bg);
+    padding: 28px 24px;
+    transition: background .15s;
+  }
+  .feat:hover { background: var(--surface); }
+  .feat-icon { font-size: 24px; margin-bottom: 12px; }
+  .feat h3 {
+    font-family: var(--display);
+    font-size: .95rem; font-weight: 700;
+    margin-bottom: 7px; color: #fff;
+    letter-spacing: .2px;
+  }
+  .feat p { font-size: .84rem; color: var(--muted); line-height: 1.6; }
+  .feat strong { color: var(--gold); font-weight: 500; }
+
+  /* ─── HOW IT WORKS ──────────────────────────────────── */
+  #how {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .step {
+    padding: 32px 24px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .step:last-child { border-right: none; }
+  .step:hover { background: var(--surface2); }
+  .step-n {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--pink); letter-spacing: 1px;
+    margin-bottom: 16px;
+  }
+  .step h3 {
+    font-family: var(--display); font-size: .95rem; font-weight: 700;
+    color: #fff; margin-bottom: 9px; letter-spacing: .2px;
+  }
+  .step p { font-size: .84rem; color: var(--muted); line-height: 1.6; }
+  .k {
+    display: inline-block;
+    background: var(--input); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 1px 7px;
+    font-family: var(--mono); font-size: 11px; color: var(--gold);
+    box-shadow: 0 2px 0 var(--border); margin: 0 1px;
+  }
+
+  /* ─── PRICING ───────────────────────────────────────── */
+  #pricing { background: var(--bg); }
+  .pricing-wrap {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 2px; max-width: 780px; margin: 0 auto;
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  }
+  .plan { background: var(--surface); padding: 36px 30px; position: relative; }
+  .plan.featured {
+    background: var(--surface2);
+    outline: 2px solid var(--gold);
+    outline-offset: -2px;
+  }
+  .plan-badge {
+    position: absolute; top: 0; right: 24px;
+    background: var(--gold); color: #0d1130;
+    font-family: var(--mono); font-size: 9px; font-weight: 500;
+    padding: 3px 10px; border-radius: 0 0 7px 7px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .plan-tier {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .plan-price {
+    font-family: var(--display); font-size: 2.8rem; font-weight: 700;
+    letter-spacing: -1px; color: #fff; margin-bottom: 4px;
+  }
+  .plan-price sub { font-family: var(--body); font-size: .9rem; color: var(--muted); font-weight: 400; }
+  .plan-note { font-size: .8rem; color: var(--muted); margin-bottom: 26px; }
+  .plan-list { list-style: none; margin-bottom: 28px; }
+  .plan-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: .84rem; padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .plan-list li:last-child { border-bottom: none; }
+  .plan-list li.on { color: var(--text); }
+  .ic-yes { color: var(--gold); font-size: 12px; margin-top: 3px; flex-shrink: 0; }
+  .ic-no  { color: #2a3570;  font-size: 12px; margin-top: 3px; flex-shrink: 0; }
+  .btn-get {
+    display: block; width: 100%; text-align: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    padding: 12px; border-radius: 7px;
+    letter-spacing: .4px; transition: all .15s;
+  }
+  .btn-get-free {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+  .btn-get-free:hover { border-color: var(--muted); color: var(--text); }
+  .btn-get-prem {
+    background: var(--gold); color: #0d1130;
+    box-shadow: 0 4px 20px rgba(222,184,135,.25);
+  }
+  .btn-get-prem:hover {
+    background: var(--gold-lt); transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(222,184,135,.35);
+  }
+  .pricing-foot {
+    text-align: center; margin-top: 18px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+
+  /* ─── FAQ ───────────────────────────────────────────── */
+  #faq {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+  }
+  .faq-wrap { max-width: 660px; margin: 0 auto; }
+  details {
+    border-bottom: 1px solid var(--border);
+  }
+  details:first-child { border-top: 1px solid var(--border); }
+  summary {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 2px;
+    font-size: .92rem; font-weight: 500; color: var(--text);
+    cursor: pointer; list-style: none; transition: color .15s;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { color: var(--gold); }
+  summary::after {
+    content: '+'; font-size: 22px; font-weight: 300;
+    color: var(--muted); flex-shrink: 0; margin-left: 16px;
+    transition: transform .2s;
+  }
+  details[open] summary::after { transform: rotate(45deg); color: var(--gold); }
+  .faq-ans {
+    padding: 0 2px 18px;
+    font-size: .875rem; color: var(--muted); line-height: 1.7;
+  }
+  .faq-ans code {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 6px;
+    font-family: var(--mono); font-size: .8rem; color: var(--gold);
+  }
+  .faq-ans a { color: var(--gold); text-decoration: underline; }
+
+  /* ─── FOOTER ────────────────────────────────────────── */
+  footer {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 32px 5vw;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+  }
+  .foot-logo { font-family: var(--display); font-size: 14px; font-weight: 700; }
+  .foot-logo em { font-style: normal; color: var(--gold); }
+  .foot-links { display: flex; gap: 22px; }
+  .foot-links a { font-size: 12px; color: var(--muted); transition: color .15s; }
+  .foot-links a:hover { color: var(--gold); }
+  .foot-copy { font-family: var(--mono); font-size: 10px; color: var(--border2); }
+
+  /* ─── RESPONSIVE ────────────────────────────────────── */
+  @media (max-width: 680px) {
+    .nav-links { display: none; }
+    .pricing-wrap { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .step { border-right: none; border-bottom: 1px solid var(--border); }
+    .step:last-child { border-bottom: none; }
+    .plan.featured { outline: none; border: 2px solid var(--gold); }
+    footer { flex-direction: column; align-items: flex-start; }
+  }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Jump<em>Markers</em></div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a class="nav-cta" href="https://chromewebstore.google.com/detail/jumpmarkers/EXTENSION_ID" target="_blank">
+    Add to Chrome — Free
+  </a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+
+  <!-- logo mark -->
+  <div class="hero-logo-wrap">
+    <img src="icon128.png" alt="JumpMarkers logo"/>
+  </div>
+
+  <h1 id="hero-h1">Never lose the <strong>good part.</strong></h1>
+
+  <p class="hero-sub">
+    Save any moment with one keystroke. Organize with folders, tags &amp; subtopics.
+    Navigate your markers without ever switching tabs.
+  </p>
+
+  <div class="hero-btns">
+    <a class="btn-primary" href="https://chromewebstore.google.com/detail/jumpmarkers/EXTENSION_ID" target="_blank">
+      ⬇&ensp;Add to Chrome — Free
+    </a>
+    <a class="btn-secondary" href="#pricing">
+      View Premium → $5 lifetime
+    </a>
+  </div>
+
+  <div class="hero-pills">
+    <div class="pill"><span class="pill-key">Q</span> Quick marker</div>
+    <div class="pill"><span class="pill-key">A</span> Previous</div>
+    <div class="pill"><span class="pill-key">S</span> Next</div>
+    <div class="pill"><span class="pill-key">← →</span> Seek ±N sec</div>
+  </div>
+
+  <!-- mini mock UI -->
+  <div class="mock-strip">
+    <div class="mock-topbar">
+      <div class="mock-dot" style="background:#e84060"></div>
+      <div class="mock-dot" style="background:#deb887;margin-left:4px"></div>
+      <div class="mock-dot" style="background:#3a5;margin-left:4px"></div>
+      <div class="mock-title">Rain Sounds on Window · Heavy Rain for Sleep…</div>
+    </div>
+    <div class="mock-tabs">
+      <div class="mock-tab">+ ADD</div>
+      <div class="mock-tab active">BROWSE</div>
+      <div class="mock-tab">📁 FOLDERS</div>
+    </div>
+    <div class="mock-body">
+      <div class="mock-time">
+        <span style="font-size:10px;color:var(--muted)">Current Time</span>
+        <span>6:47:32</span>
+      </div>
+      <div>
+        <div class="mock-label">MARKER NAME</div>
+        <div class="mock-field">Rain Sounds on Window — Heavy Rain for Sleep, Study…</div>
+      </div>
+      <div>
+        <div class="mock-label">FOLDERS</div>
+        <div class="mock-field placeholder">Type to search or create folder…</div>
+      </div>
+      <div class="mock-save">Save Marker</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <p class="sec-sub centered" style="margin-bottom:36px">Built for people who learn, research, and revisit content on YouTube every single day.</p>
+  <div class="features-grid">
+    <div class="feat">
+      <div class="feat-icon">🔖</div>
+      <h3>Instant Markers</h3>
+      <p>Press <strong>Q</strong> on any YouTube video to save the exact moment — auto-named from the video title, with your current tags and folder already applied.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📁</div>
+      <h3>Folders &amp; Subtopics</h3>
+      <p>Organize into nested folders, subtopics and tags. Drag &amp; drop to reorder. Multi-select with Ctrl+click for bulk actions.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">⚡</div>
+      <h3>Global Hotkeys</h3>
+      <p><strong>Q, A, S</strong> work on <em>any</em> browser tab — no need to switch to YouTube. The extension finds your active video and acts on it instantly.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📍</div>
+      <h3>Timeline Indicators</h3>
+      <p>Every marker shows as a <strong style="color:var(--accent2)">cyan line</strong> on YouTube's progress bar. Hover for the name, click to seek instantly.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🔍</div>
+      <h3>Powerful Filtering</h3>
+      <p>Search by name, tag, subtopic or folder. Combine multiple filters. Sort by time, A→Z, or creation date. The sidebar stays always visible.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📋</div>
+      <h3>Copy Transcript</h3>
+      <p>One click to extract the full video transcript with timestamps to your clipboard — perfect for notes, summaries and AI prompts.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🎬</div>
+      <h3>Playback Controls</h3>
+      <p>Play/pause, seek ±N seconds, change speed — all from the popup. Configure your own seek step in Settings. Never leave the extension.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📱</div>
+      <h3>YouTube Shorts</h3>
+      <p>Mark and organize YouTube Shorts just like regular videos. Premium feature — included in the $5 lifetime plan.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="centered">
+    <div class="section-tag">How it works</div>
+    <h2>Three steps to never<br/>lose a moment again.</h2>
+    <p class="sec-sub">Works on top of YouTube — no account, no login, no upload. Your data stays on your device.</p>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">01 — CAPTURE</div>
+      <h3>Press <span class="k">Q</span> on any video</h3>
+      <p>JumpMarkers saves the exact timestamp. Named automatically. Works from any browser tab — YouTube doesn't even need to be in focus.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">02 — ORGANIZE</div>
+      <h3>Assign folders &amp; tags</h3>
+      <p>Use sticky settings to auto-tag every marker. Or open Browse and drag markers into folders. Multi-select for bulk moves.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">03 — NAVIGATE</div>
+      <h3>Jump with <span class="k">A</span> and <span class="k">S</span></h3>
+      <p>Navigate between markers in the active video using hotkeys. Or click any cyan line on the YouTube progress bar to seek instantly.</p>
+    </div>
+    <div class="step">
+      <div class="step-n">04 — REVIEW</div>
+      <h3>Browse &amp; search everything</h3>
+      <p>Open the popup to see all markers across every video. Filter, sort, edit, export — in one compact always-on-top window.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="centered">
+    <div class="section-tag">Pricing</div>
+    <h2>Start free.<br/>Own it forever.</h2>
+    <p class="sec-sub">No subscription. No recurring fees. Pay once, keep forever — including all future updates.</p>
+  </div>
+
+  <div class="pricing-wrap">
+    <div class="plan">
+      <div class="plan-tier">Free</div>
+      <div class="plan-price">$0</div>
+      <div class="plan-note">Includes a full 7-day Premium trial on install.</div>
+      <ul class="plan-list">
+        <li class="on"><span class="ic-yes">✓</span> Up to 150 markers</li>
+        <li class="on"><span class="ic-yes">✓</span> Up to 3 folders</li>
+        <li class="on"><span class="ic-yes">✓</span> 50 subtopics · 30 tags</li>
+        <li class="on"><span class="ic-yes">✓</span> Global hotkeys (Q / A / S)</li>
+        <li class="on"><span class="ic-yes">✓</span> Timeline indicators</li>
+        <li class="on"><span class="ic-yes">✓</span> 4 themes included</li>
+        <li><span class="ic-no">✕</span> YouTube Shorts markers</li>
+        <li><span class="ic-no">✕</span> Custom theme editor</li>
+        <li><span class="ic-no">✕</span> Unlimited markers &amp; folders</li>
+      </ul>
+      <a class="btn-get btn-get-free" href="https://chromewebstore.google.com/detail/jumpmarkers/EXTENSION_ID" target="_blank">
+        Add to Chrome — Free
+      </a>
+    </div>
+
+    <div class="plan featured">
+      <div class="plan-badge">BEST VALUE</div>
+      <div class="plan-tier">Premium</div>
+      <div class="plan-price">$5 <sub>one-time</sub></div>
+      <div class="plan-note">Lifetime license. All future features included.</div>
+      <ul class="plan-list">
+        <li class="on"><span class="ic-yes">✓</span> <strong>Unlimited</strong> markers</li>
+        <li class="on"><span class="ic-yes">✓</span> <strong>Unlimited</strong> folders &amp; nesting</li>
+        <li class="on"><span class="ic-yes">✓</span> Unlimited subtopics &amp; tags</li>
+        <li class="on"><span class="ic-yes">✓</span> Global hotkeys (Q / A / S)</li>
+        <li class="on"><span class="ic-yes">✓</span> Timeline indicators</li>
+        <li class="on"><span class="ic-yes">✓</span> All themes + Custom Theme Editor</li>
+        <li class="on"><span class="ic-yes">✓</span> YouTube Shorts markers</li>
+        <li class="on"><span class="ic-yes">✓</span> Copy Transcript</li>
+        <li class="on"><span class="ic-yes">✓</span> Priority support</li>
+      </ul>
+      <a class="btn-get btn-get-prem" href="https://YOURSTORE.lemonsqueezy.com/buy/PRODUCT_ID" target="_blank">
+        Get Premium — $5 lifetime
+      </a>
+    </div>
+  </div>
+  <p class="pricing-foot">🔒 Secure payment via Lemon Squeezy · Instant license key delivery by email</p>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="centered">
+    <div class="section-tag">FAQ</div>
+    <h2>Common questions.</h2>
+    <p class="sec-sub">Anything else? Write to <a href="mailto:jumpmarkers@gmail.com" style="color:var(--gold)">jumpmarkers@gmail.com</a></p>
+  </div>
+
+  <div class="faq-wrap">
+    <details open>
+      <summary>Is my data stored in the cloud?</summary>
+      <div class="faq-ans">No. All markers and folders live in Chrome's local storage — on your device only. Nothing is sent to any server. Your data stays yours.</div>
+    </details>
+    <details>
+      <summary>How do I activate my Premium license?</summary>
+      <div class="faq-ans">After purchase you receive a key by email in the format <code>JM-PREMIUM-XXXX-XXXX</code>. Open JumpMarkers → ⚙️ Settings → paste the key in the License field → Activate. Done instantly.</div>
+    </details>
+    <details>
+      <summary>Does it work on YouTube Shorts?</summary>
+      <div class="faq-ans">Yes — YouTube Shorts markers are supported in the Premium plan. On the free plan you can still browse Shorts, but saving markers on Shorts requires Premium.</div>
+    </details>
+    <details>
+      <summary>What happens to my data when the trial ends?</summary>
+      <div class="faq-ans">Nothing is deleted or hidden. All existing markers remain fully accessible. Only <em>creating new</em> content beyond the free limits is restricted. You can export everything from Settings at any time.</div>
+    </details>
+    <details>
+      <summary>Which browsers are supported?</summary>
+      <div class="faq-ans">Chrome, Edge, Brave and any Chromium-based browser that supports Manifest V3 extensions. Firefox is not supported at this time.</div>
+    </details>
+    <details>
+      <summary>Can I use my license on multiple computers?</summary>
+      <div class="faq-ans">Yes. Enter your license key in Settings on any browser. Your markers sync automatically if you're signed into Chrome sync.</div>
+    </details>
+    <details>
+      <summary>Do future updates cost extra?</summary>
+      <div class="faq-ans">No. The $5 is a true lifetime license — all future features and updates are included at no extra cost, forever.</div>
+    </details>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-logo">Jump<em>Markers</em> &nbsp;<span style="font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:400">by JumpMarkers</span></div>
+  <div class="foot-links">
+    <a href="mailto:jumpmarkers@gmail.com">Contact</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms</a>
+    <a href="https://chromewebstore.google.com/detail/jumpmarkers/EXTENSION_ID" target="_blank">Chrome Web Store</a>
+  </div>
+  <div class="foot-copy">© 2025 jumpmarkers.com</div>
+</footer>
+
+<script>
+// ── Rotating h1 slogan (20 s) ────────────────────────
+(function(){
+  const slogans = [
+    'Never lose the <strong>good part.</strong>',
+    'Your Tube memories, <strong>organized.</strong>',
+    'Mark it. Keep it. <strong>Find it.</strong>',
+    'Your videos, your markers, <strong>your way.</strong>'
+  ];
+  const h1 = document.getElementById('hero-h1');
+  let cur = 0;
+  setInterval(() => {
+    h1.classList.add('fading');
+    setTimeout(() => {
+      cur = (cur + 1) % slogans.length;
+      h1.innerHTML = slogans[cur];
+      h1.classList.remove('fading');
+    }, 560);
+  }, 20000);
+})();
+</script>
+</body>
+</html>
