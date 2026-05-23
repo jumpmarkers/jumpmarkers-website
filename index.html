@@ -309,6 +309,37 @@
     100% { transform: translateX(-50%); }
   }
 
+  /* ─── LIGHTBOX ───────────────────────────────────────── */
+  .lightbox {
+    display: none;
+    position: fixed; inset: 0; z-index: 999;
+    background: rgba(0,0,0,.85);
+    backdrop-filter: blur(8px);
+    align-items: center; justify-content: center;
+    cursor: zoom-out;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img {
+    max-height: 82vh;
+    max-width: 56vw;
+    border-radius: 12px;
+    border: 1px solid var(--border2);
+    box-shadow: 0 32px 80px rgba(0,0,0,.8);
+    animation: lb-in .2s ease;
+    cursor: default;
+  }
+  .lightbox-close {
+    position: absolute; top: 20px; right: 28px;
+    font-size: 28px; color: var(--muted); cursor: pointer;
+    transition: color .15s; line-height: 1;
+  }
+  .lightbox-close:hover { color: #fff; }
+  @keyframes lb-in {
+    from { opacity: 0; transform: scale(.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .marquee-inner img { cursor: zoom-in; }
+
   /* ─── FEATURES ──────────────────────────────────────── */
   #features { background: var(--bg); }
   .features-grid {
@@ -784,7 +815,29 @@
   <div class="foot-copy">© 2025 jumpmarkers.com</div>
 </footer>
 
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+  <span class="lightbox-close" id="lb-close">✕</span>
+  <img id="lb-img" src="" alt=""/>
+</div>
+
 <script>
+// ── Lightbox ──────────────────────────────────────────
+(function(){
+  const lb    = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lb-img');
+  document.querySelectorAll('.marquee-inner img').forEach(img => {
+    img.addEventListener('click', () => {
+      lbImg.src = img.src;
+      lbImg.alt = img.alt;
+      lb.classList.add('open');
+    });
+  });
+  document.getElementById('lb-close').addEventListener('click', () => lb.classList.remove('open'));
+  lb.addEventListener('click', e => { if(e.target === lb) lb.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') lb.classList.remove('open'); });
+})();
+
 // ── Rotating h1 slogan (20 s) ────────────────────────
 (function(){
   const slogans = [
