@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy — JumpMarkers</title>
+  <link rel="icon" href="favicon.ico"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Josefin+Sans:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1130; --surface: #161d45; --border: #232d5e;
+      --text: #e8eaf6; --muted: #6c7ab8; --gold: #deb887;
+      --display: 'Josefin Sans', sans-serif;
+      --body: 'Inter', system-ui, sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.7; }
+    a { color: var(--gold); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5vw; height: 58px;
+      background: rgba(13,17,48,.95); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text); }
+    .nav-logo em { font-style: normal; color: var(--gold); }
+    .nav-back { font-family: var(--mono); font-size: 12px; color: var(--muted); transition: color .15s; }
+    .nav-back:hover { color: var(--gold); text-decoration: none; }
+
+    .page { max-width: 720px; margin: 0 auto; padding: 100px 5vw 80px; }
+
+    .page-tag {
+      display: inline-block; font-family: var(--mono); font-size: 10px;
+      letter-spacing: 2px; text-transform: uppercase; color: var(--gold);
+      background: rgba(222,184,135,.1); border: 1px solid rgba(222,184,135,.25);
+      border-radius: 4px; padding: 3px 10px; margin-bottom: 18px;
+    }
+    h1 { font-family: var(--display); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .updated { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 48px; }
+
+    h2 { font-family: var(--display); font-size: 1.1rem; font-weight: 700; color: var(--gold); margin: 36px 0 10px; }
+    p { color: var(--muted); margin-bottom: 14px; }
+    ul { color: var(--muted); padding-left: 20px; margin-bottom: 14px; }
+    ul li { margin-bottom: 6px; }
+    strong { color: var(--text); font-weight: 600; }
+
+    footer {
+      border-top: 1px solid var(--border); padding: 28px 5vw;
+      text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted);
+    }
+    footer a { color: var(--muted); margin: 0 10px; }
+    footer a:hover { color: var(--gold); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Jump<em>Markers</em></div>
+  <a class="nav-back" href="/">← Back to home</a>
+</nav>
+
+<div class="page">
+  <div class="page-tag">Legal</div>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: May 2025</p>
+
+  <p>JumpMarkers ("we", "our", or "the extension") is a Chrome browser extension that allows users to bookmark YouTube timestamps. We take your privacy seriously. This policy explains what data we collect, how we use it, and your rights.</p>
+
+  <h2>1. Data We Collect</h2>
+  <p><strong>We collect no personal data.</strong> JumpMarkers stores all your markers, folders, tags, and preferences exclusively in your browser's local storage (<code>chrome.storage.local</code>). This data never leaves your device and is never transmitted to any server.</p>
+
+  <h2>2. What Is Stored Locally</h2>
+  <ul>
+    <li>Your YouTube timestamp markers (title, time, video URL)</li>
+    <li>Folder and tag names you create</li>
+    <li>Extension preferences (theme, hotkeys, seek step, etc.)</li>
+    <li>Premium license key (stored locally to validate your purchase)</li>
+  </ul>
+  <p>None of this information is shared with us or any third party.</p>
+
+  <h2>3. Premium License</h2>
+  <p>If you purchase a Premium license, the transaction is processed by <strong>Lemon Squeezy</strong> (our payment provider). We receive only a license key to activate your account. We do not receive or store your payment card details. Please refer to <a href="https://www.lemonsqueezy.com/privacy" target="_blank">Lemon Squeezy's Privacy Policy</a> for details on how they handle payment data.</p>
+
+  <h2>4. Analytics & Tracking</h2>
+  <p>JumpMarkers does <strong>not</strong> use any analytics, telemetry, crash reporting, or tracking of any kind. We have no visibility into how you use the extension.</p>
+
+  <h2>5. Permissions</h2>
+  <p>JumpMarkers requests the following Chrome permissions:</p>
+  <ul>
+    <li><strong>storage</strong> — to save your markers and settings locally</li>
+    <li><strong>activeTab / tabs</strong> — to detect the currently open YouTube video</li>
+    <li><strong>scripting</strong> — to inject the timeline marker indicators on YouTube's progress bar</li>
+  </ul>
+  <p>No permission is used to collect or transmit personal data.</p>
+
+  <h2>6. Children's Privacy</h2>
+  <p>JumpMarkers is not directed at children under 13. We do not knowingly collect any data from children.</p>
+
+  <h2>7. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy occasionally. Any changes will be reflected on this page with an updated date. Continued use of the extension constitutes acceptance of the updated policy.</p>
+
+  <h2>8. Contact</h2>
+  <p>If you have any questions about this Privacy Policy, please contact us at <a href="mailto:jumpmarkers@gmail.com">jumpmarkers@gmail.com</a>.</p>
+</div>
+
+<footer>
+  <a href="/">Home</a>
+  <a href="/privacy.html">Privacy</a>
+  <a href="/terms.html">Terms & Refund</a>
+  <span style="margin-left:10px">© 2025 jumpmarkers.com</span>
+</footer>
+
+</body>
+</html>
