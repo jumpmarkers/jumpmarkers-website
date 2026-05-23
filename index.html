@@ -275,6 +275,40 @@
   .centered { text-align: center; }
   .centered .sec-sub { margin-left: auto; margin-right: auto; }
 
+  /* ─── SCREENSHOTS MARQUEE ───────────────────────────── */
+  .marquee-section {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 0;
+    overflow: hidden;
+  }
+  .marquee-track { overflow: hidden; width: 100%; }
+  .marquee-inner {
+    display: flex;
+    gap: 20px;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+  }
+  .marquee-inner:hover { animation-play-state: paused; }
+  .marquee-inner img {
+    height: 340px;
+    width: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border2);
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    flex-shrink: 0;
+    transition: transform .3s, box-shadow .3s;
+  }
+  .marquee-inner img:hover {
+    transform: scale(1.03) translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0,0,0,.7);
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
   /* ─── FEATURES ──────────────────────────────────────── */
   #features { background: var(--bg); }
   .features-grid {
@@ -544,6 +578,27 @@
     </div>
   </div>
 </section>
+
+<!-- SCREENSHOTS MARQUEE -->
+<div class="marquee-section">
+  <div class="marquee-track">
+    <div class="marquee-inner">
+      <img src="screenshots/screen1.png" alt="JumpMarkers Browse view"/>
+      <img src="screenshots/screen2.png" alt="JumpMarkers Folders view"/>
+      <img src="screenshots/screen3.png" alt="JumpMarkers Tags view"/>
+      <img src="screenshots/screen4.png" alt="JumpMarkers Settings"/>
+      <img src="screenshots/screen5.png" alt="JumpMarkers Search"/>
+      <img src="screenshots/screen6.png" alt="JumpMarkers Fancy theme"/>
+      <!-- duplicadas para loop infinito -->
+      <img src="screenshots/screen1.png" alt="JumpMarkers Browse view"/>
+      <img src="screenshots/screen2.png" alt="JumpMarkers Folders view"/>
+      <img src="screenshots/screen3.png" alt="JumpMarkers Tags view"/>
+      <img src="screenshots/screen4.png" alt="JumpMarkers Settings"/>
+      <img src="screenshots/screen5.png" alt="JumpMarkers Search"/>
+      <img src="screenshots/screen6.png" alt="JumpMarkers Fancy theme"/>
+    </div>
+  </div>
+</div>
 
 <!-- FEATURES -->
 <section id="features">
