@@ -357,7 +357,7 @@
     font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1.5px;
   }
   /* Marquee drag */
-  .marquee-track { cursor: grab; }
+  .marquee-track { cursor: grab; user-select: none; }
   .marquee-track.is-dragging { cursor: grabbing; }
   .marquee-track.is-dragging .marquee-inner img { pointer-events: none; }
 
@@ -888,54 +888,115 @@
     if (e.key === 'ArrowRight') show(cur + 1);
   });
 
-  // ── Marquee drag-to-scroll ────────────────────────
-  const DUR = 40; // must match CSS animation duration (seconds)
-  let dragging = false, dragStartX = 0, dragX = 0;
+  // ── Marquee drag-to-scroll + momentum ────────────────
+  // Drag is lazy (activates only after DRAG_THRESHOLD px) so plain clicks
+  // always reach the image and open the lightbox normally.
+  // On release, inertia carries the strip and decelerates with friction.
+  const DUR = 40;            // must match CSS animation-duration (seconds)
+  const DRAG_THRESHOLD = 6;  // px before drag activates
+  const FRICTION = 0.97;     // velocity multiplier per 16 ms frame (lower = stops faster)
+  const MIN_VEL  = 0.02;     // px/ms — below this momentum stops and CSS anim resumes
+  let touching = false, dragActive = false, dragStartX = 0, prevX = 0, dragX = 0;
+  let velHistory = [];       // [{x, t}] rolling window for velocity sampling
+  let momentumRAF = null;
 
   function getTranslateX() {
     return new DOMMatrix(getComputedStyle(inner).transform).m41;
   }
-  function startDrag(clientX) {
-    hasDragged = false;
-    dragging = true;
-    dragStartX = clientX;
-    dragX = getTranslateX();
-    inner.style.animation = 'none';
-    inner.style.transform = `translateX(${dragX}px)`;
-    track.classList.add('is-dragging');
+  function wrapX() {
+    // Keep dragX in the loop range [-halfW, 0] so content never goes blank
+    const hw = inner.scrollWidth / 2;
+    dragX = dragX % hw;
+    if (dragX > 0) dragX -= hw;
   }
-  function onDrag(clientX) {
-    if (!dragging) return;
-    const delta = clientX - dragStartX;
-    if (Math.abs(delta) > 4) hasDragged = true;
-    dragStartX = clientX;
-    dragX += delta;
+  function resumeCSS() {
+    wrapX();
+    const hw = inner.scrollWidth / 2;
+    const delay = -((- dragX) / hw) * DUR;
     inner.style.transform = `translateX(${dragX}px)`;
-  }
-  function endDrag() {
-    if (!dragging) return;
-    dragging = false;
-    track.classList.remove('is-dragging');
-    // Normalize position to [-halfW, 0] and resume animation seamlessly
-    const halfW = inner.scrollWidth / 2;
-    let x = dragX % halfW;
-    if (x > 0) x -= halfW; // dragged right past origin → wrap
-    const progress = (-x) / halfW;           // 0–1 through the loop
-    const delay = -(progress * DUR);          // negative delay = start mid-animation
-    inner.style.transform = `translateX(${x}px)`;
-    inner.offsetWidth;                         // force reflow before re-adding animation
+    inner.offsetWidth; // force reflow
     inner.style.animation = `marquee-scroll ${DUR}s linear ${delay}s infinite`;
+  }
+  function cancelMomentum() {
+    if (momentumRAF) { cancelAnimationFrame(momentumRAF); momentumRAF = null; }
+  }
+  function getVelocity() {
+    // Average velocity over the last 100 ms of pointer movement
+    const now = performance.now();
+    const pts = velHistory.filter(p => now - p.t < 100);
+    if (pts.length < 2) return 0;
+    const dt = pts[pts.length - 1].t - pts[0].t;
+    return dt > 0 ? (pts[pts.length - 1].x - pts[0].x) / dt : 0;
+  }
+  function applyMomentum(vel) {
+    let lastT = performance.now();
+    function frame(now) {
+      const dt = Math.min(now - lastT, 32); // cap to avoid jumps after tab switch
+      lastT = now;
+      vel *= Math.pow(FRICTION, dt / 16);   // normalise friction to 60 fps
+      if (Math.abs(vel) < MIN_VEL) { resumeCSS(); return; }
+      dragX += vel * dt;
+      wrapX();
+      inner.style.transform = `translateX(${dragX}px)`;
+      momentumRAF = requestAnimationFrame(frame);
+    }
+    momentumRAF = requestAnimationFrame(frame);
+  }
+
+  function onPointerDown(clientX) {
+    cancelMomentum();           // stop any running inertia
+    hasDragged = false;
+    touching   = true;
+    dragActive = false;
+    dragStartX = clientX;
+    prevX      = clientX;
+    velHistory = [];
+  }
+  function onPointerMove(clientX) {
+    if (!touching) return;
+    if (!dragActive) {
+      if (Math.abs(clientX - dragStartX) <= DRAG_THRESHOLD) return;
+      // Threshold crossed — freeze animation and start drag
+      dragActive = true;
+      hasDragged = true;
+      dragX = getTranslateX();
+      inner.style.animation = 'none';
+      inner.style.transform  = `translateX(${dragX}px)`;
+      track.classList.add('is-dragging');
+      prevX      = clientX;
+      velHistory = [];
+    }
+    velHistory.push({ x: clientX, t: performance.now() });
+    if (velHistory.length > 12) velHistory.shift();
+    const delta = clientX - prevX;
+    prevX  = clientX;
+    dragX += delta;
+    wrapX();
+    inner.style.transform = `translateX(${dragX}px)`;
+  }
+  function onPointerUp() {
+    if (!touching) return;
+    touching = false;
+    if (!dragActive) return;   // plain click — leave animation untouched
+    dragActive = false;
+    track.classList.remove('is-dragging');
+    const vel = getVelocity();
+    if (Math.abs(vel) > 0.1) {
+      applyMomentum(vel);      // launch inertia scroll
+    } else {
+      resumeCSS();             // too slow — just resume CSS animation
+    }
   }
 
   // Mouse
-  track.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX); });
-  document.addEventListener('mousemove', e => onDrag(e.clientX));
-  document.addEventListener('mouseup', endDrag);
+  track.addEventListener('mousedown', e => onPointerDown(e.clientX));
+  document.addEventListener('mousemove', e => onPointerMove(e.clientX));
+  document.addEventListener('mouseup', onPointerUp);
 
   // Touch
-  track.addEventListener('touchstart', e => startDrag(e.touches[0].clientX), { passive: true });
-  document.addEventListener('touchmove',  e => { if (dragging) onDrag(e.touches[0].clientX); }, { passive: true });
-  document.addEventListener('touchend', endDrag);
+  track.addEventListener('touchstart', e => onPointerDown(e.touches[0].clientX), { passive: true });
+  document.addEventListener('touchmove', e => { if (touching) onPointerMove(e.touches[0].clientX); }, { passive: true });
+  document.addEventListener('touchend', onPointerUp);
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
