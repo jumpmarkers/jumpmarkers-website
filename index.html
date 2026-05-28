@@ -340,6 +340,27 @@
   }
   .marquee-inner img { cursor: zoom-in; }
 
+  /* Lightbox arrows */
+  .lb-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(13,17,48,.8); border: 1px solid var(--border2);
+    color: var(--text); width: 50px; height: 50px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; cursor: pointer; transition: background .15s, color .15s, transform .15s;
+    z-index: 10; user-select: none; line-height: 1;
+  }
+  .lb-arrow:hover { background: rgba(222,184,135,.2); color: var(--gold); transform: translateY(-50%) scale(1.1); }
+  #lb-prev { left: 24px; }
+  #lb-next { right: 24px; }
+  .lb-counter {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1.5px;
+  }
+  /* Marquee drag */
+  .marquee-track { cursor: grab; }
+  .marquee-track.is-dragging { cursor: grabbing; }
+  .marquee-track.is-dragging .marquee-inner img { pointer-events: none; }
+
   /* ─── FEATURES ──────────────────────────────────────── */
   #features { background: var(--bg); }
   .features-grid {
@@ -651,7 +672,7 @@
     <div class="feat">
       <div class="feat-icon">⚡</div>
       <h3>Global Hotkeys</h3>
-      <p><strong>Q, A, S</strong> work on <em>any</em> browser tab — no need to switch to YouTube. The extension finds your active video and acts on it instantly.</p>
+      <p><strong>Q, A, S</strong> work on <em>any</em> browser tab — no need to switch to YouTube. The extension finds your active video and acts on it instantly. Press <strong>E</strong> to instantly toggle between normal speed and your last-used playback speed.</p>
     </div>
     <div class="feat">
       <div class="feat-icon">📍</div>
@@ -750,7 +771,7 @@
       <div class="plan-badge">BEST VALUE</div>
       <div class="plan-tier">Premium</div>
       <div class="plan-price">$5 <sub>one-time</sub></div>
-      <div class="plan-note">Lifetime license. All future features included.</div>
+      <div class="plan-note">Lifetime license. Pay once, keep forever.</div>
       <ul class="plan-list">
         <li class="on"><span class="ic-yes">✓</span> <strong>Unlimited</strong> markers</li>
         <li class="on"><span class="ic-yes">✓</span> <strong>Unlimited</strong> folders &amp; nesting</li>
@@ -803,10 +824,6 @@
       <summary>Can I use my license on multiple computers?</summary>
       <div class="faq-ans">Yes. Enter your license key in Settings on any browser. Your markers sync automatically if you're signed into Chrome sync.</div>
     </details>
-    <details>
-      <summary>Do future updates cost extra?</summary>
-      <div class="faq-ans">No. The $5 is a true lifetime license — all future features and updates are included at no extra cost, forever.</div>
-    </details>
   </div>
 </section>
 
@@ -825,24 +842,100 @@
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox">
   <span class="lightbox-close" id="lb-close">✕</span>
+  <button class="lb-arrow" id="lb-prev">&#8592;</button>
   <img id="lb-img" src="" alt=""/>
+  <button class="lb-arrow" id="lb-next">&#8594;</button>
+  <div class="lb-counter" id="lb-counter">1 / 6</div>
 </div>
 
 <script>
-// ── Lightbox ──────────────────────────────────────────
+// ── Lightbox + Marquee drag ───────────────────────────
 (function(){
-  const lb    = document.getElementById('lightbox');
-  const lbImg = document.getElementById('lb-img');
-  document.querySelectorAll('.marquee-inner img').forEach(img => {
-    img.addEventListener('click', () => {
-      lbImg.src = img.src;
-      lbImg.alt = img.alt;
-      lb.classList.add('open');
-    });
+  const TOTAL   = 6; // unique screenshots (duplicated for infinite loop)
+  const lb      = document.getElementById('lightbox');
+  const lbImg   = document.getElementById('lb-img');
+  const lbCount = document.getElementById('lb-counter');
+  const inner   = document.querySelector('.marquee-inner');
+  const track   = document.querySelector('.marquee-track');
+  const allImgs = Array.from(document.querySelectorAll('.marquee-inner img'));
+  let cur = 0, hasDragged = false;
+
+  // ── Lightbox ──────────────────────────────────────
+  function show(idx) {
+    cur = ((idx % TOTAL) + TOTAL) % TOTAL;
+    lbImg.style.animation = 'none';          // reset animation for re-trigger
+    lbImg.offsetWidth;                        // force reflow
+    lbImg.src = allImgs[cur].src;
+    lbImg.alt = allImgs[cur].alt;
+    lbImg.style.animation = '';
+    lbCount.textContent = `${cur + 1} / ${TOTAL}`;
+    lb.classList.add('open');
+  }
+  function closeLb() { lb.classList.remove('open'); }
+
+  allImgs.forEach((img, i) => img.addEventListener('click', () => {
+    if (hasDragged) return;
+    show(i % TOTAL);
+  }));
+  document.getElementById('lb-close').addEventListener('click', closeLb);
+  document.getElementById('lb-prev').addEventListener('click', e => { e.stopPropagation(); show(cur - 1); });
+  document.getElementById('lb-next').addEventListener('click', e => { e.stopPropagation(); show(cur + 1); });
+  lb.addEventListener('click', e => { if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', e => {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape')     closeLb();
+    if (e.key === 'ArrowLeft')  show(cur - 1);
+    if (e.key === 'ArrowRight') show(cur + 1);
   });
-  document.getElementById('lb-close').addEventListener('click', () => lb.classList.remove('open'));
-  lb.addEventListener('click', e => { if(e.target === lb) lb.classList.remove('open'); });
-  document.addEventListener('keydown', e => { if(e.key === 'Escape') lb.classList.remove('open'); });
+
+  // ── Marquee drag-to-scroll ────────────────────────
+  const DUR = 40; // must match CSS animation duration (seconds)
+  let dragging = false, dragStartX = 0, dragX = 0;
+
+  function getTranslateX() {
+    return new DOMMatrix(getComputedStyle(inner).transform).m41;
+  }
+  function startDrag(clientX) {
+    hasDragged = false;
+    dragging = true;
+    dragStartX = clientX;
+    dragX = getTranslateX();
+    inner.style.animation = 'none';
+    inner.style.transform = `translateX(${dragX}px)`;
+    track.classList.add('is-dragging');
+  }
+  function onDrag(clientX) {
+    if (!dragging) return;
+    const delta = clientX - dragStartX;
+    if (Math.abs(delta) > 4) hasDragged = true;
+    dragStartX = clientX;
+    dragX += delta;
+    inner.style.transform = `translateX(${dragX}px)`;
+  }
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('is-dragging');
+    // Normalize position to [-halfW, 0] and resume animation seamlessly
+    const halfW = inner.scrollWidth / 2;
+    let x = dragX % halfW;
+    if (x > 0) x -= halfW; // dragged right past origin → wrap
+    const progress = (-x) / halfW;           // 0–1 through the loop
+    const delay = -(progress * DUR);          // negative delay = start mid-animation
+    inner.style.transform = `translateX(${x}px)`;
+    inner.offsetWidth;                         // force reflow before re-adding animation
+    inner.style.animation = `marquee-scroll ${DUR}s linear ${delay}s infinite`;
+  }
+
+  // Mouse
+  track.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX); });
+  document.addEventListener('mousemove', e => onDrag(e.clientX));
+  document.addEventListener('mouseup', endDrag);
+
+  // Touch
+  track.addEventListener('touchstart', e => startDrag(e.touches[0].clientX), { passive: true });
+  document.addEventListener('touchmove',  e => { if (dragging) onDrag(e.touches[0].clientX); }, { passive: true });
+  document.addEventListener('touchend', endDrag);
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
