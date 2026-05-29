@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <title>JumpMarkers – Folder Cleanup Modal Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Josefin+Sans:wght@100;300;400&family=Inter:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Lobster&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0d0d0f;--surface:#16161a;--surface2:#1e1e24;--surface3:#252530;
+      --border:#2a2a33;--accent:#5c9d5f;--accent2:#ff6b35;--accent3:#7c6bff;
+      --text:#cbcbcb;--muted:#6b6b7a;--radius:8px;
+      --fd:"Syne",sans-serif;--fm:"DM Mono",monospace;
+    }
+    html,body{margin:0;padding:0;width:100%;min-height:100vh;background:var(--bg);font-family:var(--fm);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+
+    /* ── Demo backdrop ── */
+    .demo-bg{width:420px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px}
+    .demo-title{font-family:var(--fd);font-weight:800;font-size:18px;color:var(--accent);text-align:center;letter-spacing:1px}
+    .demo-desc{font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+    .demo-scenario{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--muted);line-height:1.7}
+    .demo-scenario strong{color:var(--text)}
+    .demo-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .demo-btn{padding:8px 18px;background:var(--accent);color:#000;font-family:var(--fd);font-weight:700;font-size:11px;border:none;border-radius:6px;cursor:pointer;transition:opacity .15s}
+    .demo-btn:hover{opacity:.85}
+    .demo-btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .demo-btn.secondary:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* ── Shared modal ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:none;align-items:center;justify-content:center}
+    .modal-overlay.show{display:flex}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;min-width:240px;display:flex;flex-direction:column;gap:10px}
+    .modal-title{font-family:var(--fd);font-weight:700;font-size:13px;color:var(--text)}
+    .modal-btns{display:flex;gap:6px;justify-content:flex-end}
+    .btn-modal-ok{padding:6px 14px;background:var(--accent);color:#000;font-family:var(--fd);font-weight:700;font-size:11px;border:none;border-radius:5px;cursor:pointer;transition:opacity .15s}
+    .btn-modal-ok:hover{opacity:.85}
+    .btn-modal-cancel{padding:6px 14px;background:var(--surface2);color:var(--text);font-family:var(--fd);font-weight:700;font-size:11px;border:1px solid var(--border);border-radius:5px;cursor:pointer;transition:border-color .15s,color .15s}
+    .btn-modal-cancel:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* ── Folder Cleanup Modal ── */
+    .fc-modal-box{min-width:300px;max-width:380px}
+    .fc-summary{font-size:11px;color:var(--muted);margin:2px 0 6px}
+    .fc-info{font-size:10px;color:var(--accent);background:rgba(92,157,95,.08);border:1px solid rgba(92,157,95,.22);border-radius:5px;padding:6px 9px;line-height:1.5;margin-bottom:4px}
+    .fc-folder-list{max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin:4px 0 8px;padding-right:2px}
+    .fc-folder-item{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:5px;cursor:pointer;transition:background .12s}
+    .fc-folder-item:hover{background:var(--surface2)}
+    .fc-folder-item input[type=checkbox]{accent-color:var(--accent);cursor:pointer;flex-shrink:0;width:13px;height:13px}
+    .fc-folder-name{font-size:11px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fc-folder-count{font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+    .fc-folder-over .fc-folder-name{color:var(--accent2)}
+    .fc-btns{flex-wrap:wrap;gap:5px}
+    .fc-premium-btn{color:var(--accent) !important;border-color:var(--accent) !important}
+    .fc-label{font-size:9px;letter-spacing:.7px;font-family:var(--fd);font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:3px;background:rgba(255,107,53,.15);color:var(--accent2);flex-shrink:0}
+    .fc-label.ok{background:rgba(92,157,95,.15);color:var(--accent)}
+
+    /* ── Folder list (result panel) ── */
+    .result-panel{background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--muted);line-height:1.8;display:none}
+    .result-panel.show{display:block}
+    .result-panel strong{color:var(--accent)}
+    .result-panel .deleted{color:var(--accent2);text-decoration:line-through}
+
+    /* ── Go Premium stub ── */
+    .gp-modal-box{min-width:300px;max-width:360px;padding:20px;text-align:center}
+    .gp-title{font-family:'Lobster',cursive;font-size:26px;color:var(--accent);margin-bottom:6px}
+    .gp-subtitle{font-size:11px;color:var(--muted);margin-bottom:12px}
+    .gp-features{list-style:none;text-align:left;font-size:11px;color:var(--text);display:flex;flex-direction:column;gap:5px;margin-bottom:16px}
+    .gp-features li::before{content:"✓ ";color:var(--accent)}
+    .gp-checkout-btn{display:block;width:100%;padding:11px;background:var(--accent);color:#000;font-family:'Lobster',cursive;font-weight:400;font-size:17px;border:none;border-radius:7px;cursor:pointer;text-decoration:none;text-align:center;letter-spacing:.3px;transition:opacity .15s}
+    .gp-checkout-btn:hover{opacity:.85}
+    .gp-or{font-size:10px;color:var(--muted);text-align:center;margin:8px 0 4px}
+    .gp-close-stub{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;text-align:center;display:block}
+
+    /* ── Toast ── */
+    #demo-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);z-index:9999;padding:7px 16px;border-radius:7px;font-family:var(--fm);font-size:11px;font-weight:700;pointer-events:none;opacity:0;transition:opacity .2s,transform .2s;white-space:nowrap;background:var(--surface);border:1px solid var(--accent);color:var(--accent)}
+    #demo-toast.err{border-color:var(--accent2);color:var(--accent2)}
+    #demo-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  </style>
+</head>
+<body>
+
+<div class="demo-bg">
+  <div class="demo-title">📁 Folder Cleanup Modal</div>
+  <div class="demo-desc">Así es como se ve cuando el trial expira y el usuario tiene más de 5 carpetas.</div>
+
+  <div class="demo-scenario">
+    <strong>Escenario:</strong> el trial terminó. El usuario creó <strong>8 carpetas</strong> durante el trial (límite free = 5).<br>
+    Al abrir la extensión, aparece este modal automáticamente.<br>
+    <br>
+    Prueba los tres botones para ver cada comportamiento:
+  </div>
+
+  <div class="demo-btns">
+    <button class="demo-btn" onclick="launchCleanup(8)">🚀 Mostrar modal (8 carpetas)</button>
+    <button class="demo-btn secondary" onclick="launchCleanup(6)">6 carpetas</button>
+    <button class="demo-btn secondary" onclick="launchCleanup(5)">Exactamente 5 (no aparece)</button>
+  </div>
+
+  <div class="result-panel" id="result-panel">
+    Aquí aparecerá el resultado después de eliminar carpetas.
+  </div>
+</div>
+
+<!-- ── FOLDER CLEANUP MODAL ── -->
+<div class="modal-overlay" id="folder-cleanup-modal">
+  <div class="modal-box fc-modal-box">
+    <div class="modal-title">📁 Free plan includes 5 folders</div>
+    <div class="fc-summary" id="fc-summary"></div>
+    <div class="fc-info">✓ <strong>Your saved markers are safe.</strong> Only the folders themselves will be removed — any markers inside them will simply become unassigned, and you can re-organize them anytime.</div>
+    <div class="fc-folder-list" id="fc-folder-list"></div>
+    <div class="modal-btns fc-btns">
+      <button class="btn-modal-cancel" id="fc-later-btn">Later</button>
+      <button class="btn-modal-cancel fc-premium-btn" id="fc-premium-btn">✨ Keep all (Go Premium)</button>
+      <button class="btn-modal-ok" id="fc-delete-btn">Delete selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── GO PREMIUM STUB MODAL ── -->
+<div class="modal-overlay" id="go-premium-modal">
+  <div class="modal-box gp-modal-box">
+    <div class="gp-title">go Premium ✨</div>
+    <div class="gp-subtitle">JumpMarkers Lifetime · $5</div>
+    <ul class="gp-features">
+      <li>Unlimited markers, folders, subtopics &amp; tags</li>
+      <li>10 premium themes (Neon, Fancy, Watermelon…)</li>
+      <li>YouTube Shorts support</li>
+      <li>Subfolders</li>
+      <li>One-time payment, lifetime access</li>
+    </ul>
+    <a class="gp-checkout-btn" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/5579f948-679c-4b0d-b187-26b5bb498d55" target="_blank">Buy Premium · $5 Lifetime</a>
+    <div class="gp-or">or activate existing license</div>
+    <span class="gp-close-stub" onclick="closeGoPremiumModal()">← Back to cleanup</span>
+  </div>
+</div>
+
+<div id="demo-toast"></div>
+
+<script>
+  const FREE_LIMIT = 5;
+
+  // Mock folder data — name, color, marker count
+  const FOLDER_COLORS = {
+    none:'#7c6bff', red:'#ff4444', yellow:'#ffcc00', green:'#22cc66',
+    blue:'#3399ff', white:'#ffffff', grey:'#9e9e9e', pink:'#ee82a8', 'pale-orange':'#e8874a'
+  };
+
+  const MOCK_FOLDERS = [
+    { id:'f1', name:'Guitar Theory',    color:'blue',         markers: 12 },
+    { id:'f2', name:'Bass Lines',       color:'green',        markers: 7  },
+    { id:'f3', name:'Drum Patterns',    color:'red',          markers: 21 },
+    { id:'f4', name:'Piano Chords',     color:'yellow',       markers: 5  },
+    { id:'f5', name:'Ear Training',     color:'none',         markers: 3  },
+    { id:'f6', name:'Transcriptions',   color:'pink',         markers: 0  },
+    { id:'f7', name:'Favorite Solos',   color:'pale-orange',  markers: 9  },
+    { id:'f8', name:'Practice Queue',   color:'grey',         markers: 1  },
+  ];
+
+  // Track which folders still exist in this demo session
+  let currentFolders = [...MOCK_FOLDERS];
+
+  function folderSVG(color, size=13){
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size*.85)}" viewBox="0 0 13 11"><path d="M0 2.5A1.5 1.5 0 0 1 1.5 1H5l1.5 1.5H11.5A1.5 1.5 0 0 1 13 4v5.5A1.5 1.5 0 0 1 11.5 11h-10A1.5 1.5 0 0 1 0 9.5z" fill="${color}"/></svg>`;
+  }
+
+  function toast(msg, err=false){
+    const t = document.getElementById('demo-toast');
+    t.textContent = msg;
+    t.className = err ? 'err show' : 'show';
+    clearTimeout(t._tmr);
+    t._tmr = setTimeout(()=>{ t.className = err ? 'err' : ''; }, 2400);
+  }
+
+  function launchCleanup(count){
+    // Slice mock folders to simulate "count" folders
+    currentFolders = MOCK_FOLDERS.slice(0, count);
+    const excess = count - FREE_LIMIT;
+
+    if (excess <= 0){
+      toast('✓ Under the 5-folder limit — modal won\'t appear.');
+      document.getElementById('result-panel').classList.remove('show');
+      return;
+    }
+
+    showFolderCleanupPrompt();
+  }
+
+  function showFolderCleanupPrompt(){
+    const total = currentFolders.length;
+    const excess = total - FREE_LIMIT;
+
+    // Summary
+    document.getElementById('fc-summary').textContent =
+      `You have ${total} folders. Select at least ${excess} to delete — the free plan includes ${FREE_LIMIT}.`;
+
+    // Build list
+    const list = document.getElementById('fc-folder-list');
+    list.innerHTML = '';
+
+    currentFolders.forEach((folder, idx) => {
+      const item = document.createElement('label');
+      item.className = 'fc-folder-item' + (idx >= FREE_LIMIT ? ' fc-folder-over' : '');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = folder.id;
+      cb.checked = idx >= FREE_LIMIT; // pre-check excess folders
+
+      const iconSpan = document.createElement('span');
+      iconSpan.innerHTML = folderSVG(FOLDER_COLORS[folder.color] || '#7c6bff', 13);
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'fc-folder-name';
+      nameSpan.textContent = folder.name;
+
+      const countSpan = document.createElement('span');
+      countSpan.className = 'fc-folder-count';
+      countSpan.textContent = folder.markers > 0
+        ? `${folder.markers} marker${folder.markers !== 1 ? 's' : ''}`
+        : 'empty';
+
+      // Badge: mark folders beyond limit
+      if (idx >= FREE_LIMIT) {
+        const badge = document.createElement('span');
+        badge.className = 'fc-label';
+        badge.textContent = 'over limit';
+        item.appendChild(cb);
+        item.appendChild(iconSpan);
+        item.appendChild(nameSpan);
+        item.appendChild(badge);
+        item.appendChild(countSpan);
+      } else {
+        item.appendChild(cb);
+        item.appendChild(iconSpan);
+        item.appendChild(nameSpan);
+        item.appendChild(countSpan);
+      }
+
+      list.appendChild(item);
+    });
+
+    document.getElementById('folder-cleanup-modal').classList.add('show');
+  }
+
+  function closeCleanupModal(){
+    document.getElementById('folder-cleanup-modal').classList.remove('show');
+  }
+
+  function openGoPremiumModal(){
+    closeCleanupModal();
+    document.getElementById('go-premium-modal').classList.add('show');
+  }
+
+  function closeGoPremiumModal(){
+    document.getElementById('go-premium-modal').classList.remove('show');
+    // Re-open cleanup modal
+    showFolderCleanupPrompt();
+  }
+
+  // ── Button wiring ──
+  document.getElementById('fc-later-btn').addEventListener('click', () => {
+    closeCleanupModal();
+    toast('⏱ Snoozeado 24 horas — el modal volverá mañana.');
+    document.getElementById('result-panel').classList.remove('show');
+  });
+
+  document.getElementById('fc-premium-btn').addEventListener('click', () => {
+    openGoPremiumModal();
+  });
+
+  document.getElementById('fc-delete-btn').addEventListener('click', () => {
+    const checked = [...document.querySelectorAll('#fc-folder-list input[type="checkbox"]:checked')]
+      .map(cb => cb.value);
+
+    if (!checked.length){
+      const list = document.getElementById('fc-folder-list');
+      list.style.outline = '1px solid #ff6b35';
+      setTimeout(() => { list.style.outline = ''; }, 1400);
+      toast('Selecciona al menos una carpeta para eliminar.', true);
+      return;
+    }
+
+    const remaining = currentFolders.length - checked.length;
+    if (remaining > FREE_LIMIT){
+      const stillOver = remaining - FREE_LIMIT;
+      toast(`Selecciona ${stillOver} carpeta${stillOver !== 1 ? 's' : ''} más para eliminar.`, true);
+      return;
+    }
+
+    const toDeleteSet = new Set(checked);
+    const deleted  = currentFolders.filter(f => toDeleteSet.has(f.id));
+    const kept     = currentFolders.filter(f => !toDeleteSet.has(f.id));
+    const freedMarkers = deleted.reduce((sum, f) => sum + f.markers, 0);
+
+    // Apply
+    currentFolders = kept;
+    closeCleanupModal();
+
+    // Show result
+    const panel = document.getElementById('result-panel');
+    const delNames = deleted.map(f => `<span class="deleted">${f.name}</span>`).join(', ');
+    const keptNames = kept.map(f => `<strong>${f.name}</strong>`).join(', ');
+    panel.innerHTML =
+      `✓ <strong>${deleted.length} folder${deleted.length!==1?'s':''} deleted:</strong> ${delNames}<br>` +
+      `📌 <strong>${freedMarkers} marker${freedMarkers!==1?'s':''}</strong> moved to Unassigned<br>` +
+      `✅ <strong>Remaining folders (${kept.length}):</strong> ${keptNames}`;
+    panel.classList.add('show');
+
+    toast(`✓ ${deleted.length} folder${deleted.length!==1?'s':''} deleted. Your markers are safe.`);
+  });
+</script>
+</body>
+</html>
