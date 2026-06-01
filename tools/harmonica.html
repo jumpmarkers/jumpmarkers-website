@@ -138,8 +138,8 @@
     .nc.arp-sblow { background: var(--sblow-arp); color: #1a0000; box-shadow: 0 0 14px rgba(255,109,0,0.6),  inset 0 1px 0 rgba(255,255,255,0.25); }
     .nc.arp-sdraw { background: var(--sdraw-arp); color: #1a0010; box-shadow: 0 0 14px rgba(255,64,129,0.6),  inset 0 1px 0 rgba(255,255,255,0.25); }
     .nc.dim-blow, .nc.dim-draw, .nc.dim-sblow, .nc.dim-sdraw {
-      background: #0d0d1a;
-      color: #3a3a60;
+      background: #1e1e3a;
+      color: #5a5a90;
     }
 
     /* ── Legend ── */
@@ -344,18 +344,55 @@ const ROWS = [
 ];
 
 const SCALES = {
-  major:         { intervals:[0,2,4,5,7,9,11],    arp5:[0,4,7,11,2] },
-  melodicMinor:  { intervals:[0,2,3,5,7,9,11],    arp5:[0,3,7,11,2] },
-  harmonicMinor: { intervals:[0,2,3,5,7,8,11],    arp5:[0,3,7,11,2] },
-  harmonicMajor: { intervals:[0,2,4,5,7,8,11],    arp5:[0,4,7,11,2] },
-  diminished:    { intervals:[0,2,3,5,6,8,9,11],  arp5:[0,3,6,9,2]  },
-  bebop:         { intervals:[0,2,4,5,7,9,10,11], arp5:[0,4,7,10,2] },
-  pentatonic:    { intervals:[0,2,4,7,9],          arp5:[0,4,7,9,2]  },
-  blues:         { intervals:[0,3,5,6,7,10],       arp5:[0,3,7,10,2] },
-  wholeTone:     { intervals:[0,2,4,6,8,10],       arp5:[0,4,8,10,2] },
-  chromatic:     { intervals:[0,1,2,3,4,5,6,7,8,9,10,11], arp5:[0,4,7,11,2] },
-  custom:        { intervals:[0,2,4,5,7,9,11], arp5:[0,4,7,11,2] },
+  // ── Major Scale Modes ──────────────────────────────────
+  major:        { intervals:[0,2,4,5,7,9,11],           arp5:[0,4,7,11,2] },
+  dorian:       { intervals:[0,2,3,5,7,9,10],           arp5:[0,3,7,10,2] },
+  phrygian:     { intervals:[0,1,3,5,7,8,10],           arp5:[0,3,7,10,1] },
+  lydian:       { intervals:[0,2,4,6,7,9,11],           arp5:[0,4,7,11,2] },
+  mixolydian:   { intervals:[0,2,4,5,7,9,10],           arp5:[0,4,7,10,2] },
+  aeolian:      { intervals:[0,2,3,5,7,8,10],           arp5:[0,3,7,10,2] },
+  locrian:      { intervals:[0,1,3,5,6,8,10],           arp5:[0,3,6,10,1] },
+  // ── Melodic Minor Modes ────────────────────────────────
+  melodicMinor: { intervals:[0,2,3,5,7,9,11],           arp5:[0,3,7,11,2] },
+  dorianb2:     { intervals:[0,1,3,5,7,9,10],           arp5:[0,3,7,10,1] },
+  lydianAug:    { intervals:[0,2,4,6,8,9,11],           arp5:[0,4,8,11,2] },
+  lydianDom:    { intervals:[0,2,4,6,7,9,10],           arp5:[0,4,7,10,2] },
+  hindu:        { intervals:[0,2,4,5,7,8,10],           arp5:[0,4,7,10,2] },
+  locrianN2:    { intervals:[0,2,3,5,6,8,10],           arp5:[0,3,6,10,2] },
+  altered:      { intervals:[0,1,3,4,6,8,10],           arp5:[0,3,6,10,1] },
+  // ── Harmonic Minor Modes ───────────────────────────────
+  harmonicMinor:{ intervals:[0,2,3,5,7,8,11],           arp5:[0,3,7,11,2] },
+  locrianN6:    { intervals:[0,1,3,5,6,9,10],           arp5:[0,3,6,10,1] },
+  ionianA5:     { intervals:[0,2,4,5,8,9,11],           arp5:[0,4,8,11,2] },
+  dorianN4:     { intervals:[0,2,3,6,7,9,10],           arp5:[0,3,7,10,2] },
+  phrygianDom:  { intervals:[0,1,4,5,7,8,10],           arp5:[0,4,7,10,1] },
+  lydianN2:     { intervals:[0,3,4,6,7,9,11],           arp5:[0,4,7,11,3] },
+  altDim:       { intervals:[0,1,3,4,6,8,9],            arp5:[0,3,6,9,1]  },
+  // ── Harmonic Major Modes ───────────────────────────────
+  harmonicMajor:{ intervals:[0,2,4,5,7,8,11],           arp5:[0,4,7,11,2] },
+  dorianb5:     { intervals:[0,2,3,5,6,9,10],           arp5:[0,3,6,10,2] },
+  phrygianb4:   { intervals:[0,1,3,4,7,8,10],           arp5:[0,3,7,10,1] },
+  lydianb3:     { intervals:[0,2,3,6,7,9,11],           arp5:[0,3,7,11,2] },
+  mixob2:       { intervals:[0,1,4,5,7,9,10],           arp5:[0,4,7,10,1] },
+  lydianAugN2:  { intervals:[0,3,4,6,8,9,11],           arp5:[0,4,8,11,3] },
+  locrianbb7:   { intervals:[0,1,3,5,6,8,9],            arp5:[0,3,6,9,1]  },
+  // ── Other ──────────────────────────────────────────────
+  diminished:   { intervals:[0,2,3,5,6,8,9,11],         arp5:[0,3,6,9,2]  },
+  bebop:        { intervals:[0,2,4,5,7,9,10,11],        arp5:[0,4,7,10,2] },
+  pentatonic:   { intervals:[0,2,4,7,9],                arp5:[0,4,7,9,2]  },
+  blues:        { intervals:[0,3,5,6,7,10],             arp5:[0,3,7,10,2] },
+  wholeTone:    { intervals:[0,2,4,6,8,10],             arp5:[0,4,8,10,2] },
+  chromatic:    { intervals:[0,1,2,3,4,5,6,7,8,9,10,11],arp5:[0,4,7,11,2] },
+  custom:       { intervals:[0,2,4,5,7,9,11],           arp5:[0,4,7,11,2] },
 };
+
+const SCALE_GROUPS = [
+  { id:'major_modes',  keys:['major','dorian','phrygian','lydian','mixolydian','aeolian','locrian'] },
+  { id:'mm_modes',     keys:['melodicMinor','dorianb2','lydianAug','lydianDom','hindu','locrianN2','altered'] },
+  { id:'hm_modes',     keys:['harmonicMinor','locrianN6','ionianA5','dorianN4','phrygianDom','lydianN2','altDim'] },
+  { id:'hmaj_modes',   keys:['harmonicMajor','dorianb5','phrygianb4','lydianb3','mixob2','lydianAugN2','locrianbb7'] },
+  { id:'other',        keys:['diminished','bebop','pentatonic','blues','wholeTone','chromatic','custom'] },
+];
 
 const ARP_MODES = [
   { id:'135',   label:'1, 3, 5',       count:3 },
@@ -381,9 +418,20 @@ const TRANSLATIONS = {
     octaveLabel: (n, f, t) => `Octava ${n}  ·  ${f}–${t}`,
     rowLabels: ['Slide + Blow', 'Blow', 'Draw', 'Slide + Draw'],
     scales: {
-      major:'Mayor', melodicMinor:'Menor Melódica', harmonicMinor:'Menor Armónica',
-      harmonicMajor:'Mayor Armónica', diminished:'Disminuida', bebop:'Bebop',
-      pentatonic:'Pentatónica Mayor', blues:'Blues', wholeTone:'Tonos Enteros', chromatic:'Cromática', custom:'Personalizada',
+      major:'Mayor (Jónico)', dorian:'Dórico', phrygian:'Frigio', lydian:'Lidio',
+      mixolydian:'Mixolidio', aeolian:'Eólico (Menor Natural)', locrian:'Locrio',
+      melodicMinor:'Menor Melódica', dorianb2:'Dórico b2', lydianAug:'Lidio Aumentado',
+      lydianDom:'Lidio Dominante', hindu:'Hindu (Mixolidio b6)', locrianN2:'Locrio #2', altered:'Alterada',
+      harmonicMinor:'Menor Armónica', locrianN6:'Locrio #6', ionianA5:'Jónico #5',
+      dorianN4:'Dórico #4', phrygianDom:'Frigio Dominante', lydianN2:'Lidio #2', altDim:'Disminuida Alterada',
+      harmonicMajor:'Mayor Armónica', dorianb5:'Dórico b5', phrygianb4:'Frigio b4',
+      lydianb3:'Lidio b3', mixob2:'Mixolidio b2', lydianAugN2:'Lidio Aug #2', locrianbb7:'Locrio bb7',
+      diminished:'Disminuida', bebop:'Bebop', pentatonic:'Pentatónica Mayor',
+      blues:'Blues', wholeTone:'Tonos Enteros', chromatic:'Cromática', custom:'Personalizada',
+    },
+    scaleGroups: {
+      major_modes:'Modos Escala Mayor', mm_modes:'Modos Menor Melódica',
+      hm_modes:'Modos Menor Armónica', hmaj_modes:'Modos Mayor Armónica', other:'Otras Escalas',
     },
     customPanelTitle: 'Escala Personalizada',
     customNotesLabel: 'Seleccionar Notas',
@@ -415,9 +463,20 @@ const TRANSLATIONS = {
     octaveLabel: (n, f, t) => `Octave ${n}  ·  ${f}–${t}`,
     rowLabels: ['Slide + Blow', 'Blow', 'Draw', 'Slide + Draw'],
     scales: {
-      major:'Major', melodicMinor:'Melodic Minor', harmonicMinor:'Harmonic Minor',
-      harmonicMajor:'Harmonic Major', diminished:'Diminished', bebop:'Bebop',
-      pentatonic:'Major Pentatonic', blues:'Blues', wholeTone:'Whole Tone', chromatic:'Chromatic', custom:'Custom',
+      major:'Major (Ionian)', dorian:'Dorian', phrygian:'Phrygian', lydian:'Lydian',
+      mixolydian:'Mixolydian', aeolian:'Aeolian (Natural Minor)', locrian:'Locrian',
+      melodicMinor:'Melodic Minor', dorianb2:'Dorian b2', lydianAug:'Lydian Augmented',
+      lydianDom:'Lydian Dominant', hindu:'Hindu (Mixolydian b6)', locrianN2:'Locrian #2', altered:'Altered',
+      harmonicMinor:'Harmonic Minor', locrianN6:'Locrian #6', ionianA5:'Ionian #5',
+      dorianN4:'Dorian #4', phrygianDom:'Phrygian Dominant', lydianN2:'Lydian #2', altDim:'Altered Diminished',
+      harmonicMajor:'Harmonic Major', dorianb5:'Dorian b5', phrygianb4:'Phrygian b4',
+      lydianb3:'Lydian b3', mixob2:'Mixolydian b2', lydianAugN2:'Lydian Aug #2', locrianbb7:'Locrian bb7',
+      diminished:'Diminished', bebop:'Bebop', pentatonic:'Major Pentatonic',
+      blues:'Blues', wholeTone:'Whole Tone', chromatic:'Chromatic', custom:'Custom',
+    },
+    scaleGroups: {
+      major_modes:'Major Scale Modes', mm_modes:'Melodic Minor Modes',
+      hm_modes:'Harmonic Minor Modes', hmaj_modes:'Harmonic Major Modes', other:'Other Scales',
     },
     customPanelTitle: 'Custom Scale',
     customNotesLabel: 'Select Notes',
@@ -613,6 +672,7 @@ function applyLang() {
   document.getElementById('modalHolesLabel').textContent = T.holesLabel;
   document.getElementById('modalLangLabel').textContent  = T.langLabel;
   [...document.getElementById('scaleSelect').options].forEach(o => { o.textContent = T.scales[o.value]; });
+  document.getElementById('scaleSelect').querySelectorAll('optgroup').forEach((og, i) => { og.label = T.scaleGroups[SCALE_GROUPS[i].id]; });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -942,7 +1002,9 @@ function deletePreset(idx) {
 function initControls() {
   // Scale select
   const sel = document.getElementById('scaleSelect');
-  sel.innerHTML = Object.keys(SCALES).map(id=>`<option value="${id}">${T.scales[id]}</option>`).join('');
+  sel.innerHTML = SCALE_GROUPS.map(g =>
+    `<optgroup label="${T.scaleGroups[g.id]}">${g.keys.map(id=>`<option value="${id}">${T.scales[id]}</option>`).join('')}</optgroup>`
+  ).join('');
   sel.value = state.scaleId;
   sel.addEventListener('change', e=>{ state.scaleId=e.target.value; state.pathVariant=0; render(); });
 
