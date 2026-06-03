@@ -533,7 +533,7 @@ function mkBoard(opts = {}) {
     tonic:         opts.tonic !== undefined ? opts.tonic : null,
     sticker:       opts.sticker || '',
     stickerStyle:  opts.stickerStyle || 'cassette',
-    visibleNotes:  new Set(opts.visibleNotes !== undefined ? opts.visibleNotes : [0,1,2,3,4,5,6,7,8,9,10,11]),
+    visibleNotes:  new Set(opts.visibleNotes !== undefined ? opts.visibleNotes : []),
     selectedNotes: new Set(opts.selectedNotes || []),
   };
 }
@@ -898,23 +898,6 @@ function buildCard(b) {
   stickerEl.addEventListener('click', e => e.stopPropagation());
   hdr.appendChild(stickerEl);
 
-  // Style swatches
-  const picker = document.createElement('div');
-  picker.className = 'sticker-picker';
-  ['parchment','neon','metal','chalkboard','cassette','minimal'].forEach(s => {
-    const sw = document.createElement('div');
-    sw.className = `sticker-swatch swatch-${s}` + (b.stickerStyle === s ? ' picked' : '');
-    sw.title = s.charAt(0).toUpperCase() + s.slice(1);
-    sw.addEventListener('click', e => {
-      e.stopPropagation();
-      b.stickerStyle = s;
-      stickerEl.className = `fret-sticker sticker-${s}`;
-      picker.querySelectorAll('.sticker-swatch').forEach(el => el.classList.remove('picked'));
-      sw.classList.add('picked');
-    });
-    picker.appendChild(sw);
-  });
-  hdr.appendChild(picker);
 
   card.appendChild(hdr);
 
