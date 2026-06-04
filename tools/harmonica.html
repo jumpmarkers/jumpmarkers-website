@@ -158,8 +158,8 @@
     .nc.arp-sblow { background: var(--sblow-arp); color: #1a0000; box-shadow: 0 0 14px rgba(255,109,0,0.6),  inset 0 1px 0 rgba(255,255,255,0.25); }
     .nc.arp-sdraw { background: var(--sdraw-arp); color: #1a0010; box-shadow: 0 0 14px rgba(255,64,129,0.6),  inset 0 1px 0 rgba(255,255,255,0.25); }
     .nc.dim-blow, .nc.dim-draw, .nc.dim-sblow, .nc.dim-sdraw {
-      background: #1e1e3a;
-      color: #5a5a90;
+      background: #0d0d1a;
+      color: #3a3a60;
     }
 
     /* ── Legend ── */
@@ -292,6 +292,10 @@
 </header>
 
 <div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label" id="ctrlHarpKeyLabel">Afinación Armónica</span>
+    <div class="btn-row" id="harpKeyBtns"></div>
+  </div>
   <div class="ctrl-group">
     <span class="ctrl-label" id="ctrlScaleLabel">Tipo de Escala</span>
     <select id="scaleSelect"></select>
@@ -497,7 +501,8 @@ const DEG_NAMES = ['1','3','5','7','9'];
 const TRANSLATIONS = {
   es: {
     pageTitle:    'Armónica Cromática — Escalas y Arpegios',
-    pageSubtitle: (n) => `Harmónica Cromática en C · ${n} Agujeros`,
+    pageSubtitle: (k, n) => `Harmónica Cromática en ${k} · ${n} Agujeros`,
+    ctrlHarpKey: 'Afinación Armónica',
     ctrlScale: 'Tipo de Escala', ctrlKey: 'Tonalidad', ctrlArp: 'Modo Arpegio',
     pathBtn: '⟿ Recorrido', settingsBtn: '⚙ Config.', modalTitle: 'Configuración',
     holesLabel: 'Agujeros', langLabel: 'Idioma',
@@ -542,7 +547,8 @@ const TRANSLATIONS = {
   },
   en: {
     pageTitle:    'Chromatic Harmonica — Scales & Arpeggios',
-    pageSubtitle: (n) => `Chromatic Harmonica in C · ${n} Holes`,
+    pageSubtitle: (k, n) => `Chromatic Harmonica in ${k} · ${n} Holes`,
+    ctrlHarpKey: 'Harmonica Tuning',
     ctrlScale: 'Scale Type', ctrlKey: 'Key', ctrlArp: 'Arpeggio Mode',
     pathBtn: '⟿ Scale Path', settingsBtn: '⚙ Settings', modalTitle: 'Settings',
     holesLabel: 'Holes', langLabel: 'Language',
@@ -591,7 +597,7 @@ const TRANSLATIONS = {
 // STATE
 // ═══════════════════════════════════════════════════════
 
-const DEFAULTS = { scaleId:'major', keyIdx:0, arpMode:'1357', numHoles:12, lang:'en', showPath:false, pathVariant:0, zoomLevel:1.0, zoomX:1.0, customIntervals:[] };
+const DEFAULTS = { scaleId:'major', keyIdx:0, harpKey:0, arpMode:'1357', numHoles:12, lang:'en', showPath:false, pathVariant:0, zoomLevel:1.0, zoomX:1.0, customIntervals:[] };
 const state = Object.assign({}, DEFAULTS);
 
 function saveState() {
@@ -705,15 +711,17 @@ function render() {
       const rl = T.rowLabels[rowIdx];
       h += `<div class="row-lbl"><span class="lbl-icon">${ico}</span><span class="lbl-text">${rl}</span></div>`;
       for (let i=0; i<n; i++) {
-        const ni  = HOLES[i][ri];
+        const hk  = state.harpKey || 0;
+        const ni  = (HOLES[i][ri] + hk) % 12;
+        const midi = MIDI_HOLES[i][ri] + hk;
         const inS = sNotes.has(ni);
         const inA = aSet_.has(ni);
         const ex  = i%4===0 ? ' oct-start' : '';
         if (isArpSection) {
-          h += noteCellArp(ni, rc, inS, inA, ki, scale.arp5, state.arpMode, MIDI_HOLES[i][ri]);
+          h += noteCellArp(ni, rc, inS, inA, ki, scale.arp5, state.arpMode, midi);
         } else {
           const deg = inS ? scaleDegree(ni, ki, scale.intervals) : null;
-          h += noteCell(ni, rc, inS, inA, ex, false, MIDI_HOLES[i][ri], deg);
+          h += noteCell(ni, rc, inS, inA, ex, false, midi, deg);
         }
       }
     });
@@ -751,7 +759,8 @@ function applyLang() {
   T = TRANSLATIONS[state.lang];
   document.documentElement.lang = state.lang;
   document.getElementById('pageH1').textContent         = T.pageTitle;
-  document.getElementById('pageSubtitle').textContent   = T.pageSubtitle(state.numHoles);
+  document.getElementById('pageSubtitle').textContent   = T.pageSubtitle(KEY_LABELS[state.harpKey], state.numHoles);
+  document.getElementById('ctrlHarpKeyLabel').textContent = T.ctrlHarpKey;
   document.getElementById('ctrlScaleLabel').textContent = T.ctrlScale;
   document.getElementById('ctrlKeyLabel').textContent   = T.ctrlKey;
   document.getElementById('ctrlArpLabel').textContent   = T.ctrlArp;
@@ -1097,6 +1106,17 @@ function initControls() {
   sel.value = state.scaleId;
   sel.addEventListener('change', e=>{ state.scaleId=e.target.value; state.pathVariant=0; render(); });
 
+  // Harmonica tuning buttons
+  const hkb = document.getElementById('harpKeyBtns');
+  hkb.innerHTML = KEY_LABELS.map((k,i)=>`<button class="btn${i===state.harpKey?' active':''}" data-hk="${i}">${k}</button>`).join('');
+  hkb.addEventListener('click', e=>{
+    const btn=e.target.closest('[data-hk]'); if(!btn) return;
+    state.harpKey=+btn.dataset.hk; state.pathVariant=0;
+    hkb.querySelectorAll('.btn').forEach(b=>b.classList.toggle('active',b===btn));
+    document.getElementById('pageSubtitle').textContent = T.pageSubtitle(KEY_LABELS[state.harpKey], state.numHoles);
+    render();
+  });
+
   // Key buttons
   const kb = document.getElementById('keyBtns');
   kb.innerHTML = KEY_LABELS.map((k,i)=>`<button class="btn${i===state.keyIdx?' active':''}" data-i="${i}">${k}</button>`).join('');
@@ -1124,7 +1144,7 @@ function initControls() {
     const btn=e.target.closest('[data-h]'); if(!btn) return;
     state.numHoles=+btn.dataset.h; state.pathVariant=0;
     hb.querySelectorAll('.btn').forEach(b=>b.classList.toggle('active',b===btn));
-    document.getElementById('pageSubtitle').textContent = T.pageSubtitle(state.numHoles);
+    document.getElementById('pageSubtitle').textContent = T.pageSubtitle(KEY_LABELS[state.harpKey], state.numHoles);
     render();
   });
 
