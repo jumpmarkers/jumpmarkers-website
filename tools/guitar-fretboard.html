@@ -467,6 +467,36 @@
       .nc.on { color: rgba(255,255,255,0.95) !important; border: none !important; }
     }
 
+    /* ── Support banner ── */
+    .support-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+      margin: 40px 0 0;
+      padding: 22px 28px;
+      background: linear-gradient(135deg, rgba(124,111,255,0.08) 0%, rgba(0,229,255,0.05) 100%);
+      border: 1px solid rgba(124,111,255,0.25);
+      border-radius: 14px;
+    }
+    .support-banner-text { flex: 1; min-width: 240px; }
+    .support-banner-text p {
+      font-size: 0.88rem; line-height: 1.6; color: var(--muted);
+      margin: 0;
+    }
+    .support-banner-text strong { color: var(--text); font-weight: 600; }
+    .support-banner-text .brand {
+      color: var(--accent); font-weight: 700;
+    }
+    .support-banner-cta {
+      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+      padding: 11px 20px;
+      background: var(--accent); color: #fff;
+      border-radius: 8px; font-size: 0.85rem; font-weight: 700;
+      text-decoration: none; letter-spacing: 0.3px;
+      transition: filter .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .support-banner-cta:hover { filter: brightness(1.15); transform: translateY(-1px); }
+
     /* ── Footer ── */
     footer {
       text-align: center; padding: 22px 20px;
@@ -508,6 +538,21 @@
 
   <div id="boards-container"></div>
 </main>
+
+<div class="support-banner">
+  <div class="support-banner-text">
+    <p>
+      <strong>This tool is free — and it always will be.</strong>
+      If you've found it useful, or you simply enjoy seeing independent developers build things like this,
+      the best way to support this work is to give <span class="brand">JumpMarkers</span> a try.
+      It's a free Chrome extension that transforms how you watch YouTube — save timestamped markers,
+      organize them into folders, and jump back to any moment instantly.
+    </p>
+  </div>
+  <a class="support-banner-cta" href="https://chromewebstore.google.com/detail/jumpmarkers/mhoegmpedkbeokpldinhbnibikkkefjn" target="_blank">
+    🔖 Try JumpMarkers — Free
+  </a>
+</div>
 
 <footer>
   <a href="../index.html">JumpMarkers</a> · Free Tools · Guitar Fretboard Visualizer
