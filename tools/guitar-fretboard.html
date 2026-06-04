@@ -26,8 +26,8 @@
       --mono:     'DM Mono', monospace;
       --display:  'Josefin Sans', sans-serif;
       --body:     'Inter', system-ui, sans-serif;
-      --neck:     #13100a;
-      --neck2:    #1c180e;
+      --neck:     #0d0d0d;
+      --neck2:    #111111;
       --fret-col: #5a4830;
       --nut-col:  #c8a468;
     }
@@ -785,7 +785,6 @@ function buildFbOuter(b) {
       nc.title = `${noteName}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}`;
       if (isOn) {
         nc.style.background = color;
-        nc.style.boxShadow  = `0 0 10px ${color}88, 0 0 18px ${color}33`;
       }
       if (b.tonic === noteIdx) {
         nc.style.outline      = '2px solid rgba(255,255,255,0.7)';
