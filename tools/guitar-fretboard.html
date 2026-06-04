@@ -403,11 +403,14 @@
       nav, .page-header, .toolbar, .note-palette,
       .board-header, .range-wrap, .add-board-wrap, .fret-sticker, footer { display: none !important; }
 
-      body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
-      main { max-width: 100% !important; padding: 8px 12px !important; }
+      body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; height: 100%; }
+      main { max-width: 100% !important; padding: 8px 12px !important; min-height: 96vh; display: flex !important; flex-direction: column !important; }
+
+      /* Distribute boards to fill the full page height */
+      .boards-container { flex: 1 !important; display: flex !important; flex-direction: column !important; justify-content: space-evenly !important; }
 
       .board-card {
-        margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid;
+        page-break-inside: avoid; break-inside: avoid;
         background: #fff !important; border: 1px solid #ccc !important;
         border-radius: 4px !important; overflow: hidden;
       }
@@ -431,12 +434,12 @@
       .fh-num { color: #777 !important; padding-bottom: 3px !important; font-size: 0.58rem !important; }
       .fdot { background: #aaa !important; width: 5px !important; height: 5px !important; }
 
-      /* String rows — compact height */
-      .fc { height: 22px !important; }
-      .fs-label { height: 22px !important; width: 24px !important; font-size: 0.62rem !important; }
+      /* String rows — +10% height */
+      .fc { height: 24px !important; }
+      .fs-label { height: 24px !important; width: 24px !important; font-size: 0.62rem !important; }
 
-      /* Note circles — smaller for print */
-      .nc { width: 18px !important; height: 18px !important; font-size: 0.52rem !important; }
+      /* Note circles — +10% */
+      .nc { width: 20px !important; height: 20px !important; font-size: 0.55rem !important; }
 
       /* String labels */
       .fs-label { color: #333 !important; }
