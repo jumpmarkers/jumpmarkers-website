@@ -490,6 +490,7 @@
 
   <div class="toolbar">
     <button class="btn btn-outline" id="btn-export" style="flex-shrink:0">⬇ Export PDF</button>
+    <button class="btn btn-outline" id="btn-clear-all" style="flex-shrink:0;color:var(--red);border-color:var(--red)">✕ Clear All</button>
     <div class="presets-wrap">
       <div class="presets-top">
         <span class="presets-label">Presets</span>
@@ -1153,6 +1154,11 @@ function buildCard(b) {
 // ─── Global event bindings ────────────────────────────────────────────────────
 // btn-add is now rendered dynamically at the bottom of boards-container
 document.getElementById('btn-export').addEventListener('click', () => window.print());
+document.getElementById('btn-clear-all').addEventListener('click', () => {
+  if (boards.length <= 1 || confirm(`Remove all ${boards.length} fretboards?`)) {
+    boards = []; nextId = 1; addBoard();
+  }
+});
 document.getElementById('btn-save-preset').addEventListener('click', savePreset);
 document.getElementById('preset-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') savePreset();
