@@ -213,6 +213,19 @@
       .leg-sep { height: 16px; }
     }
 
+    /* ── Scroll hint ── */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(6px); }
+    }
+    .scroll-hint {
+      text-align: center; font-size: 1.6rem;
+      margin: 18px 0 0; opacity: 0.55;
+      animation: bounce 1.4s ease-in-out infinite;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .scroll-hint.hidden { opacity: 0; pointer-events: none; }
+
     /* ── Support banner ── */
     .support-banner {
       display: flex; align-items: center; justify-content: space-between;
@@ -308,6 +321,8 @@
 </div>
 
 <div class="legend" id="legend"></div>
+
+<div class="scroll-hint" id="scroll-hint">👇</div>
 
 <!-- Settings modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeSettings()"></div>
@@ -1214,6 +1229,17 @@ initControls();
 applyLang();
 applyZoom();
 render();
+
+// Hide scroll hint once user scrolls
+(function() {
+  const hint = document.getElementById('scroll-hint');
+  if (!hint) return;
+  const hide = () => { hint.classList.add('hidden'); window.removeEventListener('scroll', hide); };
+  window.addEventListener('scroll', hide, { passive: true });
+  hint.addEventListener('click', () => {
+    document.querySelector('.support-banner')?.scrollIntoView({ behavior: 'smooth' });
+  });
+})();
 </script>
 </body>
 </html>
