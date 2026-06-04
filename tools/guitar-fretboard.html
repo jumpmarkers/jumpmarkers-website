@@ -542,10 +542,11 @@ try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch
 function getDegreeColor(board, noteIdx) {
   if (!board.selectedNotes.has(noteIdx)) return null;
   if (board.tonic === null || board.tonic === undefined) return NOTE_COL[noteIdx];
-  const t = board.tonic;
-  const sorted = [...board.selectedNotes].sort((a, b) => ((a - t + 12) % 12) - ((b - t + 12) % 12));
-  const deg = sorted.indexOf(noteIdx);
-  return deg >= 0 ? DEGREE_COL[deg % DEGREE_COL.length] : NOTE_COL[noteIdx];
+  // Map semitone interval from tonic → scale degree index (0=root, 1=2nd, 2=3rd, 3=4th, 4=5th, 5=6th, 6=7th)
+  // Tritone (6) treated as b5 (degree 5 family)
+  const DEG_MAP = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
+  const interval = (noteIdx - board.tonic + 12) % 12;
+  return DEGREE_COL[DEG_MAP[interval]];
 }
 
 // ─── Board helpers ────────────────────────────────────────────────────────────
