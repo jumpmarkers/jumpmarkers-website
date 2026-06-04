@@ -304,10 +304,6 @@
     <span class="ctrl-label" id="ctrlArpLabel">Modo Arpegio</span>
     <div class="btn-row" id="arpBtns"></div>
   </div>
-  <div class="ctrl-group">
-    <span class="ctrl-label" id="ctrlHarpKeyLabel">Afinación Armónica</span>
-    <div class="btn-row" id="harpKeyBtns"></div>
-  </div>
   <div class="ctrl-group" style="margin-left:auto;align-self:flex-end">
     <div class="btn-row">
       <button class="btn" id="pathBtn" onclick="togglePath()">⟿ Recorrido</button>
@@ -369,6 +365,10 @@
     <button class="modal-close" onclick="closeSettings()">✕</button>
   </div>
   <div class="modal-body">
+    <div class="setting-group">
+      <span class="setting-label" id="modalHarpKeyLabel">Afinación Armónica</span>
+      <div class="btn-row" id="harpKeyBtns"></div>
+    </div>
     <div class="setting-group">
       <span class="setting-label" id="modalHolesLabel">Agujeros</span>
       <div class="btn-row" id="holesBtns"></div>
@@ -502,10 +502,9 @@ const TRANSLATIONS = {
   es: {
     pageTitle:    'Armónica Cromática — Escalas y Arpegios',
     pageSubtitle: (k, n) => `Harmónica Cromática en ${k} · ${n} Agujeros`,
-    ctrlHarpKey: 'Afinación Armónica',
     ctrlScale: 'Tipo de Escala', ctrlKey: 'Tonalidad', ctrlArp: 'Modo Arpegio',
     pathBtn: '⟿ Recorrido', settingsBtn: '⚙ Config.', modalTitle: 'Configuración',
-    holesLabel: 'Agujeros', langLabel: 'Idioma',
+    holesLabel: 'Agujeros', langLabel: 'Idioma', modalHarpKey: 'Afinación Armónica',
     mainTitle: (n) => `Armónica — ${n} Agujeros`,
     arpTitle:  (mode, n) => `Arpegio ${mode} — ${n} Agujeros`,
     infoNotes: 'Notas:', infoArp: 'Arpegio:',
@@ -548,10 +547,9 @@ const TRANSLATIONS = {
   en: {
     pageTitle:    'Chromatic Harmonica — Scales & Arpeggios',
     pageSubtitle: (k, n) => `Chromatic Harmonica in ${k} · ${n} Holes`,
-    ctrlHarpKey: 'Harmonica Tuning',
     ctrlScale: 'Scale Type', ctrlKey: 'Key', ctrlArp: 'Arpeggio Mode',
     pathBtn: '⟿ Scale Path', settingsBtn: '⚙ Settings', modalTitle: 'Settings',
-    holesLabel: 'Holes', langLabel: 'Language',
+    holesLabel: 'Holes', langLabel: 'Language', modalHarpKey: 'Harmonica Tuning',
     mainTitle: (n) => `Harmonica — ${n} Holes`,
     arpTitle:  (mode, n) => `Arpeggio ${mode} — ${n} Holes`,
     infoNotes: 'Notes:', infoArp: 'Arpeggio:',
@@ -760,7 +758,7 @@ function applyLang() {
   document.documentElement.lang = state.lang;
   document.getElementById('pageH1').textContent         = T.pageTitle;
   document.getElementById('pageSubtitle').textContent   = T.pageSubtitle(KEY_LABELS[state.harpKey], state.numHoles);
-  document.getElementById('ctrlHarpKeyLabel').textContent = T.ctrlHarpKey;
+  document.getElementById('modalHarpKeyLabel').textContent = T.modalHarpKey;
   document.getElementById('ctrlScaleLabel').textContent = T.ctrlScale;
   document.getElementById('ctrlKeyLabel').textContent   = T.ctrlKey;
   document.getElementById('ctrlArpLabel').textContent   = T.ctrlArp;
