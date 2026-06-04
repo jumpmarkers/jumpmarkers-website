@@ -212,6 +212,31 @@
       .leg-swatch { width: 14px; height: 9px; }
       .leg-sep { height: 16px; }
     }
+
+    /* ── Support banner ── */
+    .support-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+      margin: 40px 0 0;
+      padding: 22px 28px;
+      background: linear-gradient(135deg, rgba(124,111,255,0.08) 0%, rgba(0,229,255,0.05) 100%);
+      border: 1px solid rgba(124,111,255,0.25);
+      border-radius: 14px;
+    }
+    .support-banner-text { flex: 1; min-width: 240px; }
+    .support-banner-text p { font-size: 0.88rem; line-height: 1.6; color: var(--text-sub); margin: 0; }
+    .support-banner-text strong { color: var(--text); font-weight: 600; }
+    .support-banner-text .brand { color: var(--accent); font-weight: 700; }
+    .support-banner-cta {
+      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+      padding: 11px 20px;
+      background: var(--accent); color: #fff;
+      border-radius: 8px; font-size: 0.85rem; font-weight: 700;
+      text-decoration: none; letter-spacing: 0.3px;
+      transition: filter .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .support-banner-cta:hover { filter: brightness(1.15); transform: translateY(-1px); }
   </style>
 </head>
 <body>
@@ -301,6 +326,22 @@
       <div class="btn-row" id="langBtns"></div>
     </div>
   </div>
+</div>
+
+<div class="support-banner">
+  <div class="support-banner-text">
+    <p>
+      <strong>This tool is free — and it always will be.</strong>
+      If you've found it useful, or you simply enjoy seeing independent developers build things like this,
+      the best way to support this work is to give <span class="brand">JumpMarkers</span> a try.
+      It's a free Chrome extension built for people who learn music from YouTube — mark exact moments in a song,
+      loop sections while you work out the notes, scrub frame by frame with audio to catch every detail,
+      and organize everything into folders by song or technique.
+    </p>
+  </div>
+  <a class="support-banner-cta" href="https://chromewebstore.google.com/detail/jumpmarkers/mhoegmpedkbeokpldinhbnibikkkefjn" target="_blank">
+    🔖 Try JumpMarkers — Free
+  </a>
 </div>
 
 <script>
