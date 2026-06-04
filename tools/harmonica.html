@@ -239,9 +239,12 @@
       50%       { transform: translateY(6px); }
     }
     .scroll-hint {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      left: 0; right: 0;
       display: flex; justify-content: space-between;
-      font-size: 1.6rem;
-      margin: 18px 0 0; padding-bottom: 16px; opacity: 0.55;
+      padding: 0 14px;
+      font-size: 1.4rem; line-height: 1;
+      opacity: 0.6; pointer-events: auto;
       animation: bounce 1.4s ease-in-out infinite;
       cursor: pointer; transition: opacity .2s;
     }
@@ -349,9 +352,10 @@
   </div>
 </div>
 
-<div class="legend" id="legend"></div>
-
-<div class="scroll-hint" id="scroll-hint"><span>👇</span><span>👇</span></div>
+<div style="position:relative">
+  <div class="legend" id="legend"></div>
+  <div class="scroll-hint" id="scroll-hint"><span>👇</span><span>👇</span></div>
+</div>
 
 <!-- Settings modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeSettings()"></div>
