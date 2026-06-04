@@ -381,9 +381,24 @@
 
     /* ── Add board wrap ── */
     .add-board-wrap {
-      display: flex; justify-content: center;
+      display: flex; justify-content: center; gap: 10px;
       padding: 18px 0 6px;
     }
+    .dup-wrap { position: relative; }
+    .dup-dropdown {
+      display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 8px; min-width: 170px; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 100;
+    }
+    .dup-dropdown.open { display: block; }
+    .dup-item {
+      padding: 9px 16px; font-size: 0.82rem; cursor: pointer; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background .1s;
+    }
+    .dup-item:hover { background: var(--bg-hover); }
 
     /* ── Empty state ── */
     .empty-state {
@@ -644,6 +659,24 @@ function addBoard(opts) {
   renderAll();
 }
 
+function duplicateBoard(id) {
+  const src = boards.find(b => b.id === id);
+  if (!src) return;
+  boards.push(mkBoard({
+    label:        src.label + ' (copy)',
+    totalFrets:   src.totalFrets,
+    startFret:    src.startFret,
+    endFret:      src.endFret,
+    fretWidth:    src.fretWidth,
+    tonic:        src.tonic,
+    sticker:      src.sticker,
+    stickerStyle: src.stickerStyle,
+    visibleNotes: [...src.visibleNotes],
+    selectedNotes:[...src.selectedNotes],
+  }));
+  renderAll();
+}
+
 function removeBoard(id) {
   boards = boards.filter(b => b.id !== id);
   renderAll();
@@ -778,11 +811,43 @@ function renderAll() {
 
   const addWrap = document.createElement('div');
   addWrap.className = 'add-board-wrap';
+
   const addBtn = document.createElement('button');
   addBtn.className = 'btn btn-primary';
   addBtn.textContent = '+ Add Fretboard';
   addBtn.addEventListener('click', () => addBoard());
   addWrap.appendChild(addBtn);
+
+  // ── Duplicate button with board picker ──
+  const dupWrap = document.createElement('div');
+  dupWrap.className = 'dup-wrap';
+
+  const dupBtn = document.createElement('button');
+  dupBtn.className = 'btn btn-outline';
+  dupBtn.textContent = '⧉ Duplicate';
+
+  const dupDrop = document.createElement('div');
+  dupDrop.className = 'dup-dropdown';
+
+  dupBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (boards.length === 1) { duplicateBoard(boards[0].id); return; }
+    dupDrop.innerHTML = boards.map(b =>
+      `<div class="dup-item" data-bid="${b.id}">${esc(b.label)}</div>`
+    ).join('');
+    dupDrop.classList.toggle('open');
+  });
+  dupDrop.addEventListener('click', e => {
+    const item = e.target.closest('[data-bid]');
+    if (!item) return;
+    duplicateBoard(+item.dataset.bid);
+    dupDrop.classList.remove('open');
+  });
+  document.addEventListener('click', () => dupDrop.classList.remove('open'));
+
+  dupWrap.appendChild(dupBtn);
+  dupWrap.appendChild(dupDrop);
+  addWrap.appendChild(dupWrap);
   wrap.appendChild(addWrap);
 
   renderPresets();
