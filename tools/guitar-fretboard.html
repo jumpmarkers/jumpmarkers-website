@@ -753,7 +753,7 @@ function refreshBoard(boardId) {
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
 function buildFbOuter(b) {
   const fretsToShow = [];
-  for (let f = b.startFret; f < b.startFret + b.viewFrets; f++) fretsToShow.push(f);
+  for (let f = b.startFret; f <= b.endFret; f++) fretsToShow.push(f);
 
   const outer = document.createElement('div');
   outer.className = 'fretboard-outer';
