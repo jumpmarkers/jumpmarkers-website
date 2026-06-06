@@ -121,6 +121,7 @@
       color: var(--text); transition: border-color .15s;
     }
     .preset-chip:hover { border-color: var(--accent2); }
+    .preset-chip.active { border-color: var(--accent); color: var(--accent); }
     .del-preset {
       background: none; border: none; color: var(--muted);
       cursor: pointer; padding: 2px 7px; font-size: 0.78rem;
@@ -717,6 +718,7 @@ function addBoard(opts) {
 
 // ─── Drag overlay (mini-map) ──────────────────────────────────────────────────
 let _dndOverlay = null;
+let _activeDragId = null;
 
 function buildMiniThumb(b) {
   const cv = document.createElement('canvas');
@@ -780,6 +782,8 @@ function showDragOverlay(draggedId) {
       if (fi < 0 || ti < 0) return;
       boards.splice(ti, 0, boards.splice(fi, 1)[0]);
       renderAll();
+      // Rebuild overlay with updated order
+      showDragOverlay(_activeDragId);
     });
     ov.appendChild(item);
   });
@@ -882,11 +886,10 @@ function updateLabel(boardId, val) {
 }
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
-function savePreset() {
-  const input = document.getElementById('preset-name');
-  const name = input.value.trim();
-  if (!name) { input.focus(); return; }
-  const data = {
+let currentPresetName = null;
+
+function buildPresetData(name) {
+  return {
     name,
     boards: boards.map(b => ({
       label: b.label, totalFrets: b.totalFrets,
@@ -897,9 +900,30 @@ function savePreset() {
       hiddenCells: [...b.hiddenCells],
     })),
   };
-  const idx = presets.findIndex(p => p.name === name);
+}
+
+function savePreset() {
+  const input = document.getElementById('preset-name');
+  const name  = input.value.trim();
+
+  if (!name) {
+    if (currentPresetName) {
+      if (!confirm(`Overwrite preset "${currentPresetName}"?`)) return;
+      const idx = presets.findIndex(p => p.name === currentPresetName);
+      if (idx >= 0) presets[idx] = buildPresetData(currentPresetName);
+      localStorage.setItem('gfv-presets', JSON.stringify(presets));
+      renderPresets();
+    } else {
+      input.focus();
+    }
+    return;
+  }
+
+  const data = buildPresetData(name);
+  const idx  = presets.findIndex(p => p.name === name);
   if (idx >= 0) presets[idx] = data; else presets.push(data);
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
+  currentPresetName = name;
   input.value = '';
   renderPresets();
 }
@@ -907,6 +931,7 @@ function savePreset() {
 function loadPreset(name) {
   const p = presets.find(p => p.name === name);
   if (!p) return;
+  currentPresetName = name;
   boards = []; nextId = 1;
   p.boards.forEach(o => boards.push(mkBoard(o)));
   renderAll();
@@ -933,7 +958,7 @@ function renderPresets() {
     return;
   }
   list.innerHTML = presets.map(p =>
-    `<span class="preset-chip" data-name="${esc(p.name)}">${esc(p.name)}<button class="del-preset" title="Delete">✕</button></span>`
+    `<span class="preset-chip${p.name === currentPresetName ? ' active' : ''}" data-name="${esc(p.name)}">${esc(p.name)}<button class="del-preset" title="Delete">✕</button></span>`
   ).join('');
   list.querySelectorAll('.preset-chip').forEach(chip => {
     const n = chip.dataset.name;
@@ -1206,10 +1231,12 @@ function buildCard(b) {
   dragHandle.addEventListener('mousedown', () => { card.draggable = true; });
   dragHandle.addEventListener('mouseup',   () => { card.draggable = false; });
   card.addEventListener('dragstart', e => {
+    _activeDragId = b.id;
     e.dataTransfer.setData('text/plain', String(b.id));
     setTimeout(() => showDragOverlay(b.id), 0);
   });
   card.addEventListener('dragend', () => {
+    _activeDragId = null;
     card.draggable = false;
     card.classList.remove('drop-above', 'drop-below');
     hideDragOverlay();
