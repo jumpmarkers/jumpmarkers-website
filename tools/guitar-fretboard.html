@@ -868,8 +868,36 @@ function clampStart(b) {
   b.viewFrets = b.endFret - b.startFret;
 }
 
+// ─── Undo / Redo ──────────────────────────────────────────────────────────────
+const MAX_HISTORY = 60;
+let _history = [];
+let _histIdx  = -1;
+
+function _serializeBoards() {
+  return JSON.stringify(boards.map(b => ({
+    ...b,
+    selectedNotes: [...b.selectedNotes],
+    visibleNotes:  [...b.visibleNotes],
+    hiddenCells:   [...b.hiddenCells],
+  })));
+}
+function _applySnapshot(snap) {
+  boards = JSON.parse(snap).map(o => mkBoard(o));
+  nextId = Math.max(0, ...boards.map(b => b.id)) + 1;
+  renderAll();
+}
+function pushHistory() {
+  _history = _history.slice(0, _histIdx + 1);
+  _history.push(_serializeBoards());
+  if (_history.length > MAX_HISTORY) _history.shift();
+  else _histIdx++;
+}
+function undo() { if (_histIdx > 0)                       { _histIdx--; _applySnapshot(_history[_histIdx]); } }
+function redo() { if (_histIdx < _history.length - 1)     { _histIdx++; _applySnapshot(_history[_histIdx]); } }
+
 // ─── Actions ──────────────────────────────────────────────────────────────────
 function addBoard(opts) {
+  pushHistory();
   boards.push(mkBoard(opts));
   renderAll();
 }
@@ -957,6 +985,7 @@ function hideDragOverlay() {
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
+  pushHistory();
   b.selectedNotes = new Set([...b.selectedNotes].map(n => (n + delta + 12) % 12));
   b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
   if (b.tonic !== null && b.tonic !== undefined)
@@ -968,6 +997,7 @@ function shiftNotes(boardId, delta) {
 function duplicateBoard(id) {
   const src = boards.find(b => b.id === id);
   if (!src) return;
+  pushHistory();
   boards.push(mkBoard({
     label:        src.label + ' (copy)',
     totalFrets:   src.totalFrets,
@@ -986,6 +1016,7 @@ function duplicateBoard(id) {
 }
 
 function removeBoard(id) {
+  pushHistory();
   boards = boards.filter(b => b.id !== id);
   renderAll();
 }
@@ -993,6 +1024,7 @@ function removeBoard(id) {
 function toggleNote(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
+  pushHistory();
   if (b.selectedNotes.has(noteIdx)) {
     b.selectedNotes.delete(noteIdx);
     if (b.tonic === noteIdx) b.tonic = null;
@@ -1006,6 +1038,7 @@ function toggleNote(boardId, noteIdx) {
 function clearBoard(boardId) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
+  pushHistory();
   b.selectedNotes.clear();
   b.tonic = null;
   refreshBoard(boardId);
@@ -1014,6 +1047,7 @@ function clearBoard(boardId) {
 function toggleVisible(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
+  pushHistory();
   if (b.visibleNotes.has(noteIdx)) {
     if (b.selectedNotes.has(noteIdx)) return; // highlighted → can't hide
     b.visibleNotes.delete(noteIdx);
@@ -1089,6 +1123,7 @@ function savePreset() {
 function loadPreset(name) {
   const p = presets.find(p => p.name === name);
   if (!p) return;
+  pushHistory();
   currentPresetName = name;
   boards = []; nextId = 1;
   p.boards.forEach(o => boards.push(mkBoard(o)));
@@ -1324,6 +1359,7 @@ function buildFbOuter(b) {
       cell.addEventListener('click', e => {
         if (!e.altKey) return;
         e.stopPropagation();
+        pushHistory();
         b.hiddenCells.has(cellKey) ? b.hiddenCells.delete(cellKey) : b.hiddenCells.add(cellKey);
         refreshBoard(b.id);
       });
@@ -1439,6 +1475,7 @@ function buildCard(b) {
     const fi = boards.findIndex(x => x.id === fromId);
     let   ti = boards.findIndex(x => x.id === toId);
     if (fi < 0 || ti < 0) return;
+    pushHistory();
     const [moved] = boards.splice(fi, 1);
     ti = boards.findIndex(x => x.id === toId); // recalculate after splice
     boards.splice(pos === 'above' ? ti : ti + 1, 0, moved);
@@ -1833,8 +1870,19 @@ document.getElementById('preset-file-input').addEventListener('change', e => {
   reader.readAsText(file);
 });
 
+// ─── Undo/Redo keyboard shortcuts ────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+  }
+});
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 addBoard();
+// Save initial state so Ctrl+Z can return to blank board
+_history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
 </script>
 </body>
