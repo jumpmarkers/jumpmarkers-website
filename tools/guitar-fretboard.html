@@ -655,6 +655,7 @@ function mkBoard(opts = {}) {
     stickerStyle:  opts.stickerStyle || 'cassette',
     visibleNotes:  new Set(opts.visibleNotes !== undefined ? opts.visibleNotes : []),
     selectedNotes: new Set(opts.selectedNotes || []),
+    hiddenCells:   new Set(opts.hiddenCells || []),
   };
 }
 
@@ -693,6 +694,7 @@ function duplicateBoard(id) {
     fretWidth:    src.fretWidth,
     tonic:        src.tonic,
     colorShift:   src.colorShift || 0,
+    hiddenCells:  [...src.hiddenCells],
     sticker:      src.sticker,
     stickerStyle: src.stickerStyle,
     visibleNotes: [...src.visibleNotes],
@@ -770,8 +772,9 @@ function savePreset() {
       label: b.label, totalFrets: b.totalFrets,
       startFret: b.startFret, endFret: b.endFret,
       viewFrets: b.viewFrets, fretWidth: b.fretWidth,
-      tonic: b.tonic, sticker: b.sticker, stickerStyle: b.stickerStyle,
+      tonic: b.tonic, colorShift: b.colorShift || 0, sticker: b.sticker, stickerStyle: b.stickerStyle,
       visibleNotes: [...b.visibleNotes], selectedNotes: [...b.selectedNotes],
+      hiddenCells: [...b.hiddenCells],
     })),
   };
   const idx = presets.findIndex(p => p.name === name);
@@ -945,14 +948,26 @@ function buildFbOuter(b) {
       const isOn  = color !== null;
       const isVis = b.visibleNotes.has(noteIdx);
 
+      const cellKey = `${si}-${f}`;
+      const isHidden = b.hiddenCells.has(cellKey);
+
       const cell = document.createElement('div');
       cell.className = 'fc ' + (f === 0 ? 'fc-open' : 'fc-fret');
       cell.style.setProperty('--sw', STR_W[si]);
       cell.style.setProperty('--sc', STR_C[si]);
 
+      // Alt+click anywhere on cell: toggle cell-level hide
+      cell.addEventListener('click', e => {
+        if (!e.altKey) return;
+        e.stopPropagation();
+        b.hiddenCells.has(cellKey) ? b.hiddenCells.delete(cellKey) : b.hiddenCells.add(cellKey);
+        refreshBoard(b.id);
+      });
+
       if (!isVis) {
         cell.classList.add('fc-empty');
-        cell.addEventListener('click', () => {
+        cell.addEventListener('click', e => {
+          if (e.altKey) return;
           b.visibleNotes.add(noteIdx);
           b.selectedNotes.add(noteIdx);
           refreshBoard(b.id);
@@ -961,36 +976,37 @@ function buildFbOuter(b) {
         return;
       }
 
-      const nc = document.createElement('div');
-      nc.className = 'nc' + (isOn ? ' on' : '');
-      nc.textContent = noteName;
-      nc.title = `${noteName}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}`;
-      if (isOn) {
-        nc.style.background = color;
-      }
-      if (b.tonic === noteIdx) {
-        nc.style.outline      = '2px solid rgba(255,255,255,0.7)';
-        nc.style.outlineOffset = '2px';
-      }
-      nc.addEventListener('click', e => {
-        if (e.ctrlKey || e.metaKey) {
-          if (b.selectedNotes.has(noteIdx)) {
-            b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
-            liveUpdateFretboard(b.id);
+      if (!isHidden) {
+        const nc = document.createElement('div');
+        nc.className = 'nc' + (isOn ? ' on' : '');
+        nc.textContent = noteName;
+        nc.title = `${noteName}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Alt+click to hide this note)`;
+        if (isOn) {
+          nc.style.background = color;
+        }
+        if (b.tonic === noteIdx) {
+          nc.style.outline      = '2px solid rgba(255,255,255,0.7)';
+          nc.style.outlineOffset = '2px';
+        }
+        nc.addEventListener('click', e => {
+          if (e.altKey) return; // handled by cell listener
+          if (e.ctrlKey || e.metaKey) {
+            if (b.selectedNotes.has(noteIdx)) {
+              b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
+              liveUpdateFretboard(b.id);
+            }
+            return;
           }
-          return;
-        }
-        if (b.selectedNotes.has(noteIdx)) {
-          // highlighted → un-highlight (stays visible as dim)
-          nc.classList.add('pop');
-          nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
-          toggleNote(b.id, noteIdx);
-        } else {
-          // dim (visible, not highlighted) → remove from visibility
-          toggleVisible(b.id, noteIdx);
-        }
-      });
-      cell.appendChild(nc);
+          if (b.selectedNotes.has(noteIdx)) {
+            nc.classList.add('pop');
+            nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
+            toggleNote(b.id, noteIdx);
+          } else {
+            toggleVisible(b.id, noteIdx);
+          }
+        });
+        cell.appendChild(nc);
+      }
       fb.appendChild(cell);
     });
   });
