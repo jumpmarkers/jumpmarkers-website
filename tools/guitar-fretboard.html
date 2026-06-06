@@ -122,6 +122,23 @@
     }
     .preset-chip:hover { border-color: var(--accent2); }
     .preset-chip.active { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Preset context menu ── */
+    .preset-ctx {
+      position: fixed; z-index: 9999;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 4px 0;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+      min-width: 140px;
+    }
+    .preset-ctx-item {
+      padding: 8px 16px; font-size: 0.82rem; color: var(--text);
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      transition: background .1s;
+    }
+    .preset-ctx-item:hover { background: var(--surface); }
+    .preset-ctx-item.danger { color: var(--red); }
+    .preset-ctx-item.danger:hover { background: rgba(255,107,107,.1); }
     .del-preset {
       background: none; border: none; color: var(--muted);
       cursor: pointer; padding: 2px 7px; font-size: 0.78rem;
@@ -950,6 +967,66 @@ function esc(s) {
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ─── Preset context menu ─────────────────────────────────────────────────────
+let _ctxMenu = null;
+function closeCtxMenu() { if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; } }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
+
+function showPresetCtx(e, name) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeCtxMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'preset-ctx';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top  = e.clientY + 'px';
+
+  const items = [
+    { icon: '⧉', label: 'Duplicate', action: () => duplicatePreset(name) },
+    { icon: '✎', label: 'Rename',    action: () => renamePreset(name)    },
+  ];
+  items.forEach(({ icon, label, action }) => {
+    const item = document.createElement('div');
+    item.className = 'preset-ctx-item';
+    item.innerHTML = `<span>${icon}</span><span>${label}</span>`;
+    item.addEventListener('click', e => { e.stopPropagation(); closeCtxMenu(); action(); });
+    menu.appendChild(item);
+  });
+
+  document.body.appendChild(menu);
+  _ctxMenu = menu;
+
+  // Flip if out of viewport
+  const rect = menu.getBoundingClientRect();
+  if (rect.right  > window.innerWidth)  menu.style.left = (e.clientX - rect.width)  + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top  = (e.clientY - rect.height) + 'px';
+}
+
+function duplicatePreset(name) {
+  const p = presets.find(x => x.name === name);
+  if (!p) return;
+  let newName = name + ' (copy)';
+  let i = 2;
+  while (presets.find(x => x.name === newName)) newName = `${name} (copy ${i++})`;
+  presets.push({ ...p, name: newName });
+  localStorage.setItem('gfv-presets', JSON.stringify(presets));
+  renderPresets();
+}
+
+function renamePreset(name) {
+  const newName = prompt('New name:', name)?.trim();
+  if (!newName || newName === name) return;
+  if (presets.find(x => x.name === newName)) { alert(`A preset named "${newName}" already exists.`); return; }
+  const p = presets.find(x => x.name === name);
+  if (!p) return;
+  p.name = newName;
+  if (currentPresetName === name) currentPresetName = newName;
+  localStorage.setItem('gfv-presets', JSON.stringify(presets));
+  renderPresets();
+}
+
 function renderPresets() {
   const list = document.getElementById('preset-list');
   if (!list) return;
@@ -963,6 +1040,7 @@ function renderPresets() {
   list.querySelectorAll('.preset-chip').forEach(chip => {
     const n = chip.dataset.name;
     chip.addEventListener('click', () => loadPreset(n));
+    chip.addEventListener('contextmenu', e => showPresetCtx(e, n));
     chip.querySelector('.del-preset').addEventListener('click', e => { e.stopPropagation(); deletePreset(n); });
   });
 }
