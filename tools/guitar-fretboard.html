@@ -667,6 +667,16 @@ function addBoard(opts) {
   renderAll();
 }
 
+function shiftNotes(boardId, delta) {
+  const b = boards.find(b => b.id === boardId);
+  if (!b) return;
+  b.selectedNotes = new Set([...b.selectedNotes].map(n => (n + delta + 12) % 12));
+  b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
+  if (b.tonic !== null && b.tonic !== undefined)
+    b.tonic = (b.tonic + delta + 12) % 12;
+  refreshBoard(boardId);
+}
+
 function duplicateBoard(id) {
   const src = boards.find(b => b.id === id);
   if (!src) return;
@@ -1118,6 +1128,22 @@ function buildCard(b) {
   clearBtn.textContent = 'Clear all';
   clearBtn.addEventListener('click', () => clearBoard(b.id));
   palette.appendChild(clearBtn);
+
+  const shiftL = document.createElement('button');
+  shiftL.className = 'btn btn-outline btn-sm';
+  shiftL.textContent = '◄';
+  shiftL.title = 'Shift all notes down 1 semitone';
+  shiftL.style.cssText = 'padding:4px 9px;margin-left:6px';
+  shiftL.addEventListener('click', () => shiftNotes(b.id, -1));
+  palette.appendChild(shiftL);
+
+  const shiftR = document.createElement('button');
+  shiftR.className = 'btn btn-outline btn-sm';
+  shiftR.textContent = '►';
+  shiftR.title = 'Shift all notes up 1 semitone';
+  shiftR.style.cssText = 'padding:4px 9px';
+  shiftR.addEventListener('click', () => shiftNotes(b.id, 1));
+  palette.appendChild(shiftR);
 
   card.appendChild(palette);
 
