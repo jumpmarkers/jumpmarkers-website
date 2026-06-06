@@ -594,6 +594,45 @@
       font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
     }
     footer a { color: var(--accent2); }
+
+    /* ── Settings / Help modal ── */
+    .fb-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 5000;
+      align-items: center; justify-content: center;
+    }
+    .fb-modal-overlay.open { display: flex; }
+    .fb-modal {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 14px; width: 420px; max-width: 95vw; max-height: 85vh;
+      overflow-y: auto; box-shadow: 0 24px 48px rgba(0,0,0,.6);
+    }
+    .fb-modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+      font-family: var(--display); font-size: 1rem; font-weight: 700; color: var(--text);
+    }
+    .fb-modal-close {
+      background: none; border: none; color: var(--muted);
+      font-size: 1.1rem; cursor: pointer; padding: 2px 6px;
+      border-radius: 4px; line-height: 1;
+    }
+    .fb-modal-close:hover { color: var(--text); background: var(--surface); }
+    .fb-modal-body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 18px; }
+    .fb-setting-group { display: flex; flex-direction: column; gap: 8px; }
+    .fb-setting-label {
+      font-family: var(--mono); font-size: 0.64rem; text-transform: uppercase;
+      letter-spacing: 1.2px; color: var(--muted); font-weight: 700;
+    }
+    .fb-setting-desc { font-size: 0.75rem; color: var(--muted); margin-top: 2px; opacity: .7; }
+    .fb-btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .fb-btn-group .btn { font-size: 0.78rem; padding: 6px 12px; }
+    .fb-btn-group .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* Help table */
+    .help-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .help-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+    .help-table td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); font-weight: 600; width: 38%; }
+    .help-section-title { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 0 4px; }
   </style>
 </head>
 <body>
@@ -614,6 +653,8 @@
   <div class="toolbar">
     <button class="btn btn-outline" id="btn-export" style="flex-shrink:0">⬇ Export PDF</button>
     <button class="btn btn-outline" id="btn-clear-all" style="flex-shrink:0;color:var(--red);border-color:var(--red)">✕ Clear All</button>
+    <button class="btn btn-outline" id="btn-fb-settings" style="flex-shrink:0">⚙ Settings</button>
+    <button class="btn btn-outline" id="btn-fb-help" style="flex-shrink:0">? Help</button>
     <div class="presets-wrap">
       <div class="presets-top">
         <span class="presets-label">Presets</span>
@@ -632,6 +673,70 @@
 
   <div id="boards-container"></div>
 </main>
+
+<!-- Settings Modal -->
+<div class="fb-modal-overlay" id="fb-settings-overlay">
+  <div class="fb-modal">
+    <div class="fb-modal-head">⚙ Settings <button class="fb-modal-close" id="fb-settings-close">✕</button></div>
+    <div class="fb-modal-body">
+      <div class="fb-setting-group">
+        <span class="fb-setting-label">Note Names</span>
+        <div class="fb-btn-group">
+          <button class="btn btn-outline" data-s="noteSystem" data-v="anglo">A B C</button>
+          <button class="btn btn-outline" data-s="noteSystem" data-v="latin">Do Re Mi</button>
+        </div>
+      </div>
+      <div class="fb-setting-group">
+        <span class="fb-setting-label">Accidentals</span>
+        <div class="fb-btn-group">
+          <button class="btn btn-outline" data-s="accidentals" data-v="flats">♭ Flats</button>
+          <button class="btn btn-outline" data-s="accidentals" data-v="sharps">♯ Sharps</button>
+        </div>
+      </div>
+      <div class="fb-setting-group">
+        <span class="fb-setting-label">Display in Fretboard</span>
+        <div class="fb-btn-group">
+          <button class="btn btn-outline" data-s="noteDisplay" data-v="names">Note Names</button>
+          <button class="btn btn-outline" data-s="noteDisplay" data-v="intervals">Intervals</button>
+        </div>
+        <span class="fb-setting-desc">Intervals require a Root note (Ctrl+click) to be set on each fretboard.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="fb-modal-overlay" id="fb-help-overlay">
+  <div class="fb-modal">
+    <div class="fb-modal-head">? Help &amp; Shortcuts <button class="fb-modal-close" id="fb-help-close">✕</button></div>
+    <div class="fb-modal-body">
+      <div class="help-section-title">🖱 Mouse</div>
+      <table class="help-table">
+        <tr><td>Click on dim note</td><td>Highlight the note across the whole fretboard</td></tr>
+        <tr><td>Click on highlighted note</td><td>Un-highlight it (keeps it visible)</td></tr>
+        <tr><td>Click on visible note</td><td>Hide it from the fretboard</td></tr>
+        <tr><td>Ctrl + Click</td><td>Set / unset that note as Root</td></tr>
+        <tr><td>Alt + Click</td><td>Hide / show that specific note at that exact fret &amp; string</td></tr>
+        <tr><td>Shift + Scroll</td><td>Zoom in / out on fret width</td></tr>
+      </table>
+      <div class="help-section-title">⠿ Drag &amp; Drop</div>
+      <table class="help-table">
+        <tr><td>Drag ⠿ handle</td><td>Reorder fretboards. A mini-map appears for quick navigation.</td></tr>
+      </table>
+      <div class="help-section-title">🎨 Note Colors</div>
+      <table class="help-table">
+        <tr><td>Color of note</td><td>Degree relative to Root: 🔴 Root · 🔵 2nd · 🟢 3rd · 🟡 4th · 🩶 5th · 🟣 6th · 🟠 7th</td></tr>
+        <tr><td>Interval display</td><td>Enable in Settings to show P1, m2, M2… instead of note names</td></tr>
+      </table>
+      <div class="help-section-title">💾 Presets</div>
+      <table class="help-table">
+        <tr><td>Right-click preset</td><td>Duplicate or Rename it</td></tr>
+        <tr><td>Save (empty name)</td><td>Overwrites the currently loaded preset</td></tr>
+        <tr><td>Export / Import</td><td>Save presets to a .json file and restore them anytime</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
 
 <div class="support-banner">
   <div class="support-banner-text">
@@ -655,7 +760,30 @@
 
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
-const NOTES     = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const NOTES          = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const NOTES_FLAT     = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const NOTES_SHARP    = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NOTES_LAT_FLAT = ['Do','Reb','Re','Mib','Mi','Fa','Solb','Sol','Lab','La','Sib','Si'];
+const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
+
+// ─── App settings ─────────────────────────────────────────────────────────────
+let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names' };
+try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
+function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
+
+function getNoteName(idx) {
+  if (appSettings.noteSystem === 'latin')
+    return appSettings.accidentals === 'sharps' ? NOTES_LAT_SH[idx] : NOTES_LAT_FLAT[idx];
+  return appSettings.accidentals === 'sharps' ? NOTES_SHARP[idx] : NOTES_FLAT[idx];
+}
+function getDisplayName(noteIdx, board) {
+  if (appSettings.noteDisplay === 'intervals' && board &&
+      board.tonic !== null && board.tonic !== undefined)
+    return INTERVAL_NAMES[(noteIdx - board.tonic + 12) % 12];
+  return getNoteName(noteIdx);
+}
+
 const OPEN      = [4, 11, 7, 2, 9, 4]; // e B G D A E  (high to low, top to bottom)
 const STR_NAMES = ['e','B','G','D','A','E'];
 const STR_W     = ['0.7px','0.9px','1.2px','1.5px','1.8px','2.2px'];
@@ -1176,7 +1304,7 @@ function buildFbOuter(b) {
 
     fretsToShow.forEach(f => {
       const noteIdx  = (openNoteIdx + f) % 12;
-      const noteName = NOTES[noteIdx];
+      const noteName = getDisplayName(noteIdx, b);
       const color = getDegreeColor(b, noteIdx);
       const isOn  = color !== null;
       const isVis = b.visibleNotes.has(noteIdx);
@@ -1213,7 +1341,7 @@ function buildFbOuter(b) {
         const nc = document.createElement('div');
         nc.className = 'nc' + (isOn ? ' on' : '');
         nc.textContent = noteName;
-        nc.title = `${noteName}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Alt+click to hide this note)`;
+        nc.title = `${getNoteName(noteIdx)}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Alt+click to hide this note)`;
         if (isOn) {
           nc.style.background = color;
         }
@@ -1400,7 +1528,7 @@ function buildCard(b) {
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
     pill.className = 'note-pill' + (b.selectedNotes.has(i) ? ' active' : '');
-    pill.textContent = name;
+    pill.textContent = getNoteName(i);
     const pc = getDegreeColor(b, i);
     if (pc) {
       pill.style.background  = pc;
@@ -1428,7 +1556,7 @@ function buildCard(b) {
   const tonicBadge = document.createElement('span');
   if (b.tonic !== null && b.tonic !== undefined) {
     tonicBadge.className = 'tonic-badge active';
-    tonicBadge.textContent = `Root: ${NOTES[b.tonic]}`;
+    tonicBadge.textContent = `Root: ${getNoteName(b.tonic)}`;
   } else {
     tonicBadge.className = 'tonic-badge hint';
     tonicBadge.textContent = 'Ctrl+click = root';
@@ -1473,7 +1601,7 @@ function buildCard(b) {
     const pill = document.createElement('button');
     const isVis = b.visibleNotes.has(i);
     pill.className = 'note-pill' + (isVis ? ' vis-on' : '');
-    pill.textContent = name;
+    pill.textContent = getNoteName(i);
     pill.title = isVis ? 'Visible — click to hide' : 'Hidden — click to show';
     pill.addEventListener('click', () => toggleVisible(b.id, i));
     visRow.appendChild(pill);
@@ -1615,6 +1743,40 @@ function buildCard(b) {
 // ─── Global event bindings ────────────────────────────────────────────────────
 // btn-add is now rendered dynamically at the bottom of boards-container
 document.getElementById('btn-export').addEventListener('click', () => window.print());
+
+// ── Settings modal ──
+function openFbSettings() {
+  const ov = document.getElementById('fb-settings-overlay');
+  ov.classList.add('open');
+  // Mark active buttons
+  ov.querySelectorAll('[data-s]').forEach(btn => {
+    btn.classList.toggle('active', appSettings[btn.dataset.s] === btn.dataset.v);
+  });
+}
+document.getElementById('btn-fb-settings').addEventListener('click', openFbSettings);
+document.getElementById('fb-settings-close').addEventListener('click', () =>
+  document.getElementById('fb-settings-overlay').classList.remove('open'));
+document.getElementById('fb-settings-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+document.getElementById('fb-settings-overlay').querySelectorAll('[data-s]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    appSettings[btn.dataset.s] = btn.dataset.v;
+    saveAppSettings();
+    btn.closest('.fb-btn-group').querySelectorAll('[data-s]').forEach(b =>
+      b.classList.toggle('active', b === btn));
+    renderAll();
+  });
+});
+
+// ── Help modal ──
+document.getElementById('btn-fb-help').addEventListener('click', () =>
+  document.getElementById('fb-help-overlay').classList.add('open'));
+document.getElementById('fb-help-close').addEventListener('click', () =>
+  document.getElementById('fb-help-overlay').classList.remove('open'));
+document.getElementById('fb-help-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
 document.getElementById('btn-clear-all').addEventListener('click', () => {
   if (boards.length <= 1 || confirm(`Remove all ${boards.length} fretboards?`)) {
     boards = []; nextId = 1; addBoard();
