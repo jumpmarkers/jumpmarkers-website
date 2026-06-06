@@ -490,15 +490,20 @@
       body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; height: 100%; }
       main { max-width: 100% !important; padding: 10px 14px !important; min-height: 100vh; display: flex !important; flex-direction: column !important; }
 
-      /* Distribute boards to fill the full page height evenly */
-      .boards-container { flex: 1 !important; display: flex !important; flex-direction: column !important; justify-content: space-between !important; }
+      /* Each board card gets an equal share of the page height */
+      .boards-container { flex: 1 !important; display: flex !important; flex-direction: column !important; gap: 6px !important; }
 
       .board-card {
+        flex: 1 !important;
         margin: 0 !important;
         page-break-inside: avoid; break-inside: avoid;
         background: #fff !important; border: 1px solid #ccc !important;
         border-radius: 4px !important; overflow: hidden;
+        display: flex !important; flex-direction: column !important;
       }
+
+      /* Keep fretboard outer from expanding — content stays compact */
+      .fretboard-outer { flex-shrink: 0 !important; }
 
       /* Title label */
       .print-label {
