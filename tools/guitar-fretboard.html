@@ -621,7 +621,10 @@ try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch
 // Returns the display color for a note, factoring in tonic/degree coloring
 function getDegreeColor(board, noteIdx) {
   if (!board.selectedNotes.has(noteIdx)) return null;
-  if (board.tonic === null || board.tonic === undefined) return NOTE_COL[noteIdx];
+  if (board.tonic === null || board.tonic === undefined) {
+    // Shift the color assignment along with the notes
+    return NOTE_COL[(noteIdx - (board.colorShift || 0) + 12) % 12];
+  }
   // Map semitone interval from tonic → scale degree index (0=root, 1=2nd, 2=3rd, 3=4th, 4=5th, 5=6th, 6=7th)
   // Tritone (6) treated as b5 (degree 5 family)
   const DEG_MAP = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
@@ -647,6 +650,7 @@ function mkBoard(opts = {}) {
     viewFrets:     endFret - startFret,
     fretWidth:     opts.fretWidth || 52,
     tonic:         opts.tonic !== undefined ? opts.tonic : null,
+    colorShift:    opts.colorShift || 0,
     sticker:       opts.sticker || '',
     stickerStyle:  opts.stickerStyle || 'cassette',
     visibleNotes:  new Set(opts.visibleNotes !== undefined ? opts.visibleNotes : []),
@@ -674,6 +678,7 @@ function shiftNotes(boardId, delta) {
   b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
   if (b.tonic !== null && b.tonic !== undefined)
     b.tonic = (b.tonic + delta + 12) % 12;
+  b.colorShift = ((b.colorShift || 0) + delta + 12) % 12;
   refreshBoard(boardId);
 }
 
@@ -687,6 +692,7 @@ function duplicateBoard(id) {
     endFret:      src.endFret,
     fretWidth:    src.fretWidth,
     tonic:        src.tonic,
+    colorShift:   src.colorShift || 0,
     sticker:      src.sticker,
     stickerStyle: src.stickerStyle,
     visibleNotes: [...src.visibleNotes],
