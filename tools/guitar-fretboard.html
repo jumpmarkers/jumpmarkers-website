@@ -148,10 +148,8 @@
     }
     .drag-handle:hover { color: var(--muted); }
     .drag-handle:active { cursor: grabbing; }
-    .board-card.drag-over {
-      outline: 2px solid var(--accent2);
-      outline-offset: 2px;
-    }
+    .board-card.drop-above { border-top: 3px solid #f5a623 !important; }
+    .board-card.drop-below { border-bottom: 3px solid #f5a623 !important; }
     .board-label-input {
       font-family: var(--display); font-size: 1rem; font-weight: 700;
       background: none; border: none; color: var(--text); outline: none;
@@ -1057,18 +1055,32 @@ function buildCard(b) {
   card.appendChild(printLabel);
 
   // ── Drag & drop reorder ──────────────────────────────────────────────────
-  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
-  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  function clearDropClasses() {
+    card.classList.remove('drop-above', 'drop-below');
+  }
+  function getDropPosition(e) {
+    const rect = card.getBoundingClientRect();
+    return e.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
+  }
+  card.addEventListener('dragover', e => {
+    e.preventDefault();
+    clearDropClasses();
+    card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
+  });
+  card.addEventListener('dragleave', clearDropClasses);
   card.addEventListener('drop', e => {
     e.preventDefault();
-    card.classList.remove('drag-over');
+    const pos = getDropPosition(e);
+    clearDropClasses();
     const fromId = +e.dataTransfer.getData('text/plain');
     const toId   = b.id;
     if (fromId === toId) return;
     const fi = boards.findIndex(x => x.id === fromId);
-    const ti = boards.findIndex(x => x.id === toId);
+    let   ti = boards.findIndex(x => x.id === toId);
     if (fi < 0 || ti < 0) return;
-    boards.splice(ti, 0, boards.splice(fi, 1)[0]);
+    const [moved] = boards.splice(fi, 1);
+    ti = boards.findIndex(x => x.id === toId); // recalculate after splice
+    boards.splice(pos === 'above' ? ti : ti + 1, 0, moved);
     renderAll();
   });
 
