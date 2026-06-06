@@ -1370,6 +1370,7 @@ function buildFbOuter(b) {
           if (e.altKey) return;
           b.visibleNotes.add(noteIdx);
           b.selectedNotes.add(noteIdx);
+          pushHistory();
           refreshBoard(b.id);
         });
         fb.appendChild(cell);
@@ -1393,6 +1394,7 @@ function buildFbOuter(b) {
           if (e.ctrlKey || e.metaKey) {
             if (b.selectedNotes.has(noteIdx)) {
               b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
+              pushHistory();
               liveUpdateFretboard(b.id);
             }
             return;
@@ -1656,6 +1658,7 @@ function buildCard(b) {
   vAllBtn.textContent = 'All';
   vAllBtn.addEventListener('click', () => {
     b.visibleNotes = new Set([0,1,2,3,4,5,6,7,8,9,10,11]);
+    pushHistory();
     refreshBoard(b.id);
   });
   visRow.appendChild(vAllBtn);
@@ -1665,6 +1668,7 @@ function buildCard(b) {
   vNoneBtn.textContent = 'None';
   vNoneBtn.addEventListener('click', () => {
     b.visibleNotes = new Set([...b.visibleNotes].filter(n => b.selectedNotes.has(n)));
+    pushHistory();
     refreshBoard(b.id);
   });
   visRow.appendChild(vNoneBtn);
