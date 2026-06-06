@@ -1275,6 +1275,13 @@ function buildCard(b) {
     const rect = card.getBoundingClientRect();
     return e.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
   }
+  // dragenter fires instantly on entry — show line immediately
+  card.addEventListener('dragenter', e => {
+    e.preventDefault();
+    clearDropClasses();
+    card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
+  });
+  // dragover keeps it updated as mouse moves within the card
   card.addEventListener('dragover', e => {
     e.preventDefault();
     clearDropClasses();
