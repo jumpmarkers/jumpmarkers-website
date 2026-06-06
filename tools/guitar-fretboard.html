@@ -897,8 +897,8 @@ function redo() { if (_histIdx < _history.length - 1)     { _histIdx++; _applySn
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 function addBoard(opts) {
-  pushHistory();
   boards.push(mkBoard(opts));
+  pushHistory();
   renderAll();
 }
 
@@ -985,19 +985,18 @@ function hideDragOverlay() {
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  pushHistory();
   b.selectedNotes = new Set([...b.selectedNotes].map(n => (n + delta + 12) % 12));
   b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
   if (b.tonic !== null && b.tonic !== undefined)
     b.tonic = (b.tonic + delta + 12) % 12;
   b.colorShift = ((b.colorShift || 0) + delta + 12) % 12;
+  pushHistory();
   refreshBoard(boardId);
 }
 
 function duplicateBoard(id) {
   const src = boards.find(b => b.id === id);
   if (!src) return;
-  pushHistory();
   boards.push(mkBoard({
     label:        src.label + ' (copy)',
     totalFrets:   src.totalFrets,
@@ -1012,19 +1011,19 @@ function duplicateBoard(id) {
     visibleNotes: [...src.visibleNotes],
     selectedNotes:[...src.selectedNotes],
   }));
+  pushHistory();
   renderAll();
 }
 
 function removeBoard(id) {
-  pushHistory();
   boards = boards.filter(b => b.id !== id);
+  pushHistory();
   renderAll();
 }
 
 function toggleNote(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  pushHistory();
   if (b.selectedNotes.has(noteIdx)) {
     b.selectedNotes.delete(noteIdx);
     if (b.tonic === noteIdx) b.tonic = null;
@@ -1032,28 +1031,29 @@ function toggleNote(boardId, noteIdx) {
     b.selectedNotes.add(noteIdx);
     b.visibleNotes.add(noteIdx); // highlight forces visible
   }
+  pushHistory();
   refreshBoard(boardId);
 }
 
 function clearBoard(boardId) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  pushHistory();
   b.selectedNotes.clear();
   b.tonic = null;
+  pushHistory();
   refreshBoard(boardId);
 }
 
 function toggleVisible(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  pushHistory();
   if (b.visibleNotes.has(noteIdx)) {
     if (b.selectedNotes.has(noteIdx)) return; // highlighted → can't hide
     b.visibleNotes.delete(noteIdx);
   } else {
     b.visibleNotes.add(noteIdx);
   }
+  pushHistory();
   refreshBoard(boardId);
 }
 
@@ -1123,10 +1123,10 @@ function savePreset() {
 function loadPreset(name) {
   const p = presets.find(p => p.name === name);
   if (!p) return;
-  pushHistory();
   currentPresetName = name;
   boards = []; nextId = 1;
   p.boards.forEach(o => boards.push(mkBoard(o)));
+  pushHistory();
   renderAll();
 }
 
@@ -1359,8 +1359,8 @@ function buildFbOuter(b) {
       cell.addEventListener('click', e => {
         if (!e.altKey) return;
         e.stopPropagation();
-        pushHistory();
         b.hiddenCells.has(cellKey) ? b.hiddenCells.delete(cellKey) : b.hiddenCells.add(cellKey);
+        pushHistory();
         refreshBoard(b.id);
       });
 
@@ -1475,10 +1475,10 @@ function buildCard(b) {
     const fi = boards.findIndex(x => x.id === fromId);
     let   ti = boards.findIndex(x => x.id === toId);
     if (fi < 0 || ti < 0) return;
-    pushHistory();
     const [moved] = boards.splice(fi, 1);
     ti = boards.findIndex(x => x.id === toId); // recalculate after splice
     boards.splice(pos === 'above' ? ti : ti + 1, 0, moved);
+    pushHistory();
     renderAll();
   });
 
