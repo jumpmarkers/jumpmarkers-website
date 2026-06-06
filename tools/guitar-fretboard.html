@@ -1123,17 +1123,11 @@ function buildCard(b) {
   }
   palette.appendChild(tonicBadge);
 
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'btn btn-outline btn-sm';
-  clearBtn.textContent = 'Clear all';
-  clearBtn.addEventListener('click', () => clearBoard(b.id));
-  palette.appendChild(clearBtn);
-
   const shiftL = document.createElement('button');
   shiftL.className = 'btn btn-outline btn-sm';
   shiftL.textContent = '◄';
   shiftL.title = 'Shift all notes down 1 semitone';
-  shiftL.style.cssText = 'padding:4px 9px;margin-left:6px';
+  shiftL.style.cssText = 'padding:4px 9px';
   shiftL.addEventListener('click', () => shiftNotes(b.id, -1));
   palette.appendChild(shiftL);
 
@@ -1144,6 +1138,13 @@ function buildCard(b) {
   shiftR.style.cssText = 'padding:4px 9px';
   shiftR.addEventListener('click', () => shiftNotes(b.id, 1));
   palette.appendChild(shiftR);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-outline btn-sm';
+  clearBtn.textContent = 'Clear all';
+  clearBtn.style.cssText = 'margin-left:10px';
+  clearBtn.addEventListener('click', () => clearBoard(b.id));
+  palette.appendChild(clearBtn);
 
   card.appendChild(palette);
 
