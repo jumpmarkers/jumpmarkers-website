@@ -140,6 +140,18 @@
       padding: 12px 18px; border-bottom: 1px solid var(--border);
       background: var(--bg2);
     }
+    .drag-handle {
+      cursor: grab; color: var(--border2); font-size: 1.1rem; line-height: 1;
+      padding: 2px 4px; border-radius: 4px; flex-shrink: 0;
+      transition: color .15s;
+      user-select: none;
+    }
+    .drag-handle:hover { color: var(--muted); }
+    .drag-handle:active { cursor: grabbing; }
+    .board-card.drag-over {
+      outline: 2px solid var(--accent2);
+      outline-offset: 2px;
+    }
     .board-label-input {
       font-family: var(--display); font-size: 1rem; font-weight: 700;
       background: none; border: none; color: var(--text); outline: none;
@@ -1044,9 +1056,36 @@ function buildCard(b) {
   printLabel.innerHTML = `${displayName}<span>${b.label !== b.sticker && b.sticker ? b.label : ''}</span>`;
   card.appendChild(printLabel);
 
+  // ── Drag & drop reorder ──────────────────────────────────────────────────
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const fromId = +e.dataTransfer.getData('text/plain');
+    const toId   = b.id;
+    if (fromId === toId) return;
+    const fi = boards.findIndex(x => x.id === fromId);
+    const ti = boards.findIndex(x => x.id === toId);
+    if (fi < 0 || ti < 0) return;
+    boards.splice(ti, 0, boards.splice(fi, 1)[0]);
+    renderAll();
+  });
+
   // ── Header ──────────────────────────────────────────────────────────────
   const hdr = document.createElement('div');
   hdr.className = 'board-header';
+
+  // Drag handle
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'drag-handle';
+  dragHandle.textContent = '⠿';
+  dragHandle.title = 'Drag to reorder';
+  dragHandle.addEventListener('mousedown', () => { card.draggable = true; });
+  dragHandle.addEventListener('mouseup',   () => { card.draggable = false; });
+  card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(b.id)); });
+  card.addEventListener('dragend',   () => { card.draggable = false; card.classList.remove('drag-over'); });
+  hdr.appendChild(dragHandle);
 
   const labelInput = document.createElement('input');
   labelInput.className = 'board-label-input';
