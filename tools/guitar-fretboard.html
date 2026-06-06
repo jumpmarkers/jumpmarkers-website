@@ -614,6 +614,10 @@
         <div class="preset-save-row">
           <input class="preset-name-input" id="preset-name" type="text" placeholder="Preset name…" maxlength="40" autocomplete="off">
           <button class="btn btn-outline btn-sm" id="btn-save-preset">Save</button>
+          <button class="btn btn-outline btn-sm" id="btn-export-presets" title="Export all presets to a file">⬇ Export</button>
+          <label class="btn btn-outline btn-sm" id="btn-import-presets" title="Load presets from a file" style="cursor:pointer">
+            ⬆ Import<input type="file" id="preset-file-input" accept=".json" style="display:none">
+          </label>
         </div>
       </div>
       <div class="preset-list" id="preset-list"></div>
@@ -1613,6 +1617,49 @@ document.getElementById('btn-clear-all').addEventListener('click', () => {
 document.getElementById('btn-save-preset').addEventListener('click', savePreset);
 document.getElementById('preset-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') savePreset();
+});
+
+// ── Export presets ──
+document.getElementById('btn-export-presets').addEventListener('click', () => {
+  if (!presets.length) { alert('No presets to export.'); return; }
+  const blob = new Blob([JSON.stringify(presets, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fretboard-presets.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Import presets ──
+document.getElementById('preset-file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!Array.isArray(imported)) throw new Error();
+      const mode = presets.length
+        ? confirm(`Merge with existing presets?\n\nOK = merge (keep both)\nCancel = replace all`)
+          ? 'merge' : 'replace'
+        : 'replace';
+      if (mode === 'replace') {
+        presets = imported;
+      } else {
+        // Merge: add only presets whose name doesn't already exist
+        imported.forEach(p => {
+          if (!presets.find(x => x.name === p.name)) presets.push(p);
+        });
+      }
+      localStorage.setItem('gfv-presets', JSON.stringify(presets));
+      renderPresets();
+      alert(`${imported.length} preset(s) imported successfully.`);
+    } catch {
+      alert('Invalid file. Please select a valid fretboard presets JSON file.');
+    }
+    e.target.value = ''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
