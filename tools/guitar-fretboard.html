@@ -1233,7 +1233,7 @@ function buildCard(b) {
   card.addEventListener('dragstart', e => {
     _activeDragId = b.id;
     e.dataTransfer.setData('text/plain', String(b.id));
-    setTimeout(() => showDragOverlay(b.id), 0);
+    showDragOverlay(b.id);
   });
   card.addEventListener('dragend', () => {
     _activeDragId = null;
