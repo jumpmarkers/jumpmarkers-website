@@ -150,6 +150,39 @@
     .drag-handle:active { cursor: grabbing; }
     .board-card.drop-above { border-top: 3px solid #f5a623 !important; }
     .board-card.drop-below { border-bottom: 3px solid #f5a623 !important; }
+
+    /* ── Drag mini overlay ── */
+    .dnd-overlay {
+      position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+      z-index: 9999; background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 8px 6px; display: flex; flex-direction: column;
+      gap: 3px; max-height: 80vh; overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7); min-width: 220px;
+      pointer-events: all;
+    }
+    .dnd-overlay-title {
+      font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); padding: 2px 8px 6px;
+      border-bottom: 1px solid var(--border); margin-bottom: 2px;
+    }
+    .dnd-mini-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px; border-radius: 7px;
+      border: 1px solid transparent; cursor: pointer;
+      transition: background .1s, border-color .1s;
+    }
+    .dnd-mini-item:hover { background: var(--surface); }
+    .dnd-mini-item.drop-here { border-color: #f5a623; background: rgba(245,166,35,0.12); }
+    .dnd-mini-item.is-dragging { opacity: 0.35; pointer-events: none; }
+    .dnd-mini-thumb {
+      width: 44px; height: 26px; flex-shrink: 0;
+      border-radius: 3px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .dnd-mini-label {
+      font-size: 0.82rem; font-weight: 700; color: var(--text);
+      font-family: var(--display); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+    }
     .board-label-input {
       font-family: var(--display); font-size: 1rem; font-weight: 700;
       background: none; border: none; color: var(--text); outline: none;
@@ -682,6 +715,83 @@ function addBoard(opts) {
   renderAll();
 }
 
+// ─── Drag overlay (mini-map) ──────────────────────────────────────────────────
+let _dndOverlay = null;
+
+function buildMiniThumb(b) {
+  const cv = document.createElement('canvas');
+  cv.width = 44; cv.height = 26;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#13100a';
+  ctx.fillRect(0, 0, 44, 26);
+  // string lines
+  for (let s = 0; s < 6; s++) {
+    ctx.fillStyle = '#6a5830';
+    ctx.fillRect(0, 3 + s * 4, 44, 1);
+  }
+  // note dots
+  [...b.selectedNotes].forEach(n => {
+    const col = getDegreeColor(b, n) || '#555';
+    const x = 4 + n * 3;
+    const y = 3 + (n % 6) * 4;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  return cv;
+}
+
+function showDragOverlay(draggedId) {
+  hideDragOverlay();
+  const ov = document.createElement('div');
+  ov.className = 'dnd-overlay';
+  const title = document.createElement('div');
+  title.className = 'dnd-overlay-title';
+  title.textContent = 'Move to position';
+  ov.appendChild(title);
+
+  boards.forEach(bd => {
+    const item = document.createElement('div');
+    item.className = 'dnd-mini-item' + (bd.id === draggedId ? ' is-dragging' : '');
+    item.dataset.bid = bd.id;
+
+    const thumb = buildMiniThumb(bd);
+    thumb.className = 'dnd-mini-thumb';
+    const label = document.createElement('span');
+    label.className = 'dnd-mini-label';
+    label.textContent = bd.label;
+    item.appendChild(thumb);
+    item.appendChild(label);
+
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      ov.querySelectorAll('.dnd-mini-item').forEach(el => el.classList.remove('drop-here'));
+      if (bd.id !== draggedId) item.classList.add('drop-here');
+    });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      ov.querySelectorAll('.dnd-mini-item').forEach(el => el.classList.remove('drop-here'));
+      const fromId = +e.dataTransfer.getData('text/plain');
+      const toId   = bd.id;
+      if (fromId === toId) return;
+      const fi = boards.findIndex(x => x.id === fromId);
+      const ti = boards.findIndex(x => x.id === toId);
+      if (fi < 0 || ti < 0) return;
+      boards.splice(ti, 0, boards.splice(fi, 1)[0]);
+      renderAll();
+    });
+    ov.appendChild(item);
+  });
+
+  document.body.appendChild(ov);
+  _dndOverlay = ov;
+}
+
+function hideDragOverlay() {
+  if (_dndOverlay) { _dndOverlay.remove(); _dndOverlay = null; }
+}
+
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
@@ -1095,8 +1205,15 @@ function buildCard(b) {
   dragHandle.title = 'Drag to reorder';
   dragHandle.addEventListener('mousedown', () => { card.draggable = true; });
   dragHandle.addEventListener('mouseup',   () => { card.draggable = false; });
-  card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(b.id)); });
-  card.addEventListener('dragend',   () => { card.draggable = false; card.classList.remove('drag-over'); });
+  card.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', String(b.id));
+    setTimeout(() => showDragOverlay(b.id), 0);
+  });
+  card.addEventListener('dragend', () => {
+    card.draggable = false;
+    card.classList.remove('drop-above', 'drop-below');
+    hideDragOverlay();
+  });
   hdr.appendChild(dragHandle);
 
   const labelInput = document.createElement('input');
