@@ -419,6 +419,15 @@
     .swatch-cassette { background:linear-gradient(to bottom,#d83040 30%,#f4f0e8 30%); border:1px solid #c0b8a8; }
     .swatch-minimal { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.22); }
 
+    /* ── Box-select ── */
+    .fb-sel-rect {
+      position: fixed; z-index: 9998; pointer-events: none;
+      border: 2px solid #f5a623; background: rgba(245,166,35,0.09);
+      border-radius: 3px;
+    }
+    .fc.sel-active { background: rgba(245,166,35,0.2) !important; }
+    .fc.sel-active::after { outline: none; }
+
     /* ── Preset chip drag indicator ── */
     .preset-chip { cursor: grab; }
     .preset-chip:active { cursor: grabbing; }
@@ -1012,6 +1021,78 @@ function hideDragOverlay() {
   if (_dndOverlay) { _dndOverlay.remove(); _dndOverlay = null; }
 }
 
+// ─── Box-select ───────────────────────────────────────────────────────────────
+let _bsAnchor = null; // { x0, y0, bid } — mousedown start point
+let _boxSel   = null; // { bid, x0, y0, rect, cells: Set<cellKey> }
+
+function clearBoxSelect() {
+  _bsAnchor = null;
+  if (_boxSel) {
+    _boxSel.rect?.remove();
+    document.querySelectorAll('.fc.sel-active').forEach(c => c.classList.remove('sel-active'));
+    _boxSel = null;
+  }
+}
+
+function applyBoxDelete() {
+  if (!_boxSel?.cells?.size) return;
+  const b = boards.find(b => b.id === _boxSel.bid);
+  if (!b) { clearBoxSelect(); return; }
+  const outer = document.querySelector(`.fretboard-outer[data-bid="${_boxSel.bid}"]`);
+  const toHide = new Set();
+  _boxSel.cells.forEach(key => {
+    const cell = outer?.querySelector(`.fc[data-cell="${key}"]`);
+    if (cell?.querySelector('.nc')) toHide.add(key);
+  });
+  if (!toHide.size) { clearBoxSelect(); return; }
+  pushHistory();
+  toHide.forEach(key => b.hiddenCells.add(key));
+  const bid = _boxSel.bid;
+  clearBoxSelect();
+  refreshBoard(bid);
+}
+
+function _boxSelUpdate(cx, cy) {
+  if (!_boxSel) return;
+  const { x0, y0 } = _boxSel;
+  const x1 = Math.min(x0, cx), y1 = Math.min(y0, cy);
+  const x2 = Math.max(x0, cx), y2 = Math.max(y0, cy);
+  const r = _boxSel.rect;
+  r.style.left = x1 + 'px'; r.style.top    = y1 + 'px';
+  r.style.width = (x2 - x1) + 'px'; r.style.height = (y2 - y1) + 'px';
+  const outer = document.querySelector(`.fretboard-outer[data-bid="${_boxSel.bid}"]`);
+  if (!outer) return;
+  const cells = new Set();
+  outer.querySelectorAll('.fc[data-cell]').forEach(cell => {
+    const cr = cell.getBoundingClientRect();
+    const hit = cr.left < x2 && cr.right > x1 && cr.top < y2 && cr.bottom > y1;
+    cell.classList.toggle('sel-active', hit);
+    if (hit) cells.add(cell.dataset.cell);
+  });
+  _boxSel.cells = cells;
+}
+
+document.addEventListener('mousemove', e => {
+  if (!_bsAnchor) return;
+  const dx = e.clientX - _bsAnchor.x0, dy = e.clientY - _bsAnchor.y0;
+  if (!_boxSel && Math.hypot(dx, dy) > 5) {
+    const rect = document.createElement('div');
+    rect.className = 'fb-sel-rect';
+    document.body.appendChild(rect);
+    _boxSel = { bid: _bsAnchor.bid, x0: _bsAnchor.x0, y0: _bsAnchor.y0, rect, cells: new Set() };
+  }
+  if (_boxSel) _boxSelUpdate(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseup', () => {
+  _bsAnchor = null;
+  if (_boxSel) {
+    _boxSel.rect?.remove();
+    _boxSel.rect = null;
+    if (!_boxSel.cells?.size) clearBoxSelect();
+  }
+});
+
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
@@ -1446,6 +1527,13 @@ function buildFbOuter(b) {
     if (hint) hint.textContent = `Shift+⟳  ${b.fretWidth}px`;
   }, { passive: false });
 
+  outer.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target.closest('.nc, button, input, select')) return;
+    clearBoxSelect();
+    _bsAnchor = { x0: e.clientX, y0: e.clientY, bid: b.id };
+  });
+
   // fret number header row
   fb.appendChild(Object.assign(document.createElement('div'), { className: 'fh-corner' }));
   fretsToShow.forEach(f => {
@@ -1483,6 +1571,7 @@ function buildFbOuter(b) {
 
       const cell = document.createElement('div');
       cell.className = 'fc ' + (f === 0 ? 'fc-open' : 'fc-fret');
+      cell.dataset.cell = cellKey;
       cell.style.setProperty('--sw', STR_W[si]);
       cell.style.setProperty('--sc', STR_C[si]);
 
@@ -2008,6 +2097,8 @@ document.getElementById('preset-file-input').addEventListener('change', e => {
 // ─── Undo/Redo keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Escape') { clearBoxSelect(); return; }
+  if (e.key === 'Delete') { applyBoxDelete(); return; }
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
