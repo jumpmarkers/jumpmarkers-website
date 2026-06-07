@@ -38,7 +38,42 @@
       --neck2:    #111111;
       --fret-col: #5a4830;
       --nut-col:  #c8a468;
+      /* off-note circle (themeable) */
+      --nc-bg:    #1e1e34;
+      --nc-fg:    #44446a;
+      --nc-bd:    #2e2e50;
     }
+
+    /* ════════ Color themes ════════ */
+    html[data-fbtheme="maple"] {
+      --bg:#f6f1e7; --bg2:#efe7d6; --surface:#fffdf8; --surface2:#f2ebdc;
+      --border:#e5dac6; --border2:#d8c9ad; --text:#39312a; --muted:#8d8072;
+      --accent:#a8703a; --accent2:#c2683f; --gold:#b88a4a; --red:#bb5a3e;
+      --neck:#ecd9af; --neck2:#ddc488; --fret-col:#9c8a66; --nut-col:#cdb588;
+      --nc-bg:rgba(58,46,28,.10); --nc-fg:#9a8a6e; --nc-bd:rgba(58,46,28,.22);
+    }
+    html[data-fbtheme="maple"] .fc::before { background:rgba(92,72,40,.55) !important; }
+    html[data-fbtheme="maple"] .note-pill.vis-on {
+      background:rgba(58,46,28,.10); border-color:rgba(58,46,28,.32); color:var(--text);
+    }
+    html[data-fbtheme="maple"] .fc.fc-empty:hover { background:rgba(58,46,28,.05); }
+
+    html[data-fbtheme="walnut"] {
+      --bg:#211910; --bg2:#181109; --surface:#2c2218; --surface2:#382b1e;
+      --border:#4a3a27; --border2:#5d4830; --text:#f1e7d8; --muted:#b0a08c;
+      --accent:#c79a5a; --accent2:#e0a347; --gold:#deb887; --red:#e08a6a;
+      --neck:#5e3f28; --neck2:#46301e; --fret-col:#caa46a; --nut-col:#e9d7b8;
+      --nc-bg:rgba(20,12,4,.5); --nc-fg:#9a866a; --nc-bd:rgba(220,190,150,.20);
+    }
+
+    html[data-fbtheme="ebony"] {
+      --bg:#15161a; --bg2:#101116; --surface:#1d1f24; --surface2:#25272e;
+      --border:#33363f; --border2:#41454f; --text:#eceef2; --muted:#888e98;
+      --accent:#8aa6c2; --accent2:#6f93b4; --gold:#cbb89c; --red:#c97a6a;
+      --neck:#2c2420; --neck2:#201916; --fret-col:#5a4f42; --nut-col:#cbb89c;
+      --nc-bg:#1d2026; --nc-fg:#5a6068; --nc-bd:#2e323b;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body { font-family: var(--body); background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -298,7 +333,7 @@
     .fc {
       height: 39px;
       position: relative; display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(180deg, var(--neck) 0%, var(--neck2) 100%);
+      background: var(--neck);
     }
     /* Empty cell hover hint */
     .fc.fc-empty { cursor: pointer; }
@@ -333,7 +368,7 @@
       font-family: 'Inter', system-ui, sans-serif; font-size: 0.66rem; font-weight: 600;
       letter-spacing: -0.01em;
       cursor: pointer;
-      background: #1e1e34; color: #44446a; border: 1px solid #2e2e50;
+      background: var(--nc-bg); color: var(--nc-fg); border: 1px solid var(--nc-bd);
       transition: transform .1s, filter .1s, box-shadow .1s;
     }
     .nc:hover { transform: scale(1.15); filter: brightness(1.4); z-index: 10; }
@@ -665,6 +700,14 @@
     .help-table td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); font-weight: 600; width: 38%; }
     .help-section-title { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 0 4px; }
   </style>
+  <script>
+    /* Apply saved theme before first paint — prevents flash */
+    try {
+      var _s = JSON.parse(localStorage.getItem('gfv-settings') || '{}');
+      if (_s && _s.theme && _s.theme !== 'midnight')
+        document.documentElement.dataset.fbtheme = _s.theme;
+    } catch(e) {}
+  </script>
 </head>
 <body>
 
@@ -713,6 +756,16 @@
   <div class="fb-modal">
     <div class="fb-modal-head">⚙ Settings <button class="fb-modal-close" id="fb-settings-close">✕</button></div>
     <div class="fb-modal-body">
+      <div class="fb-setting-group">
+        <span class="fb-setting-label">Theme</span>
+        <div class="fb-btn-group">
+          <button class="btn btn-outline" data-s="theme" data-v="midnight">🌙 Midnight</button>
+          <button class="btn btn-outline" data-s="theme" data-v="maple">🪵 Maple</button>
+          <button class="btn btn-outline" data-s="theme" data-v="walnut">🍂 Walnut</button>
+          <button class="btn btn-outline" data-s="theme" data-v="ebony">⬛ Ebony</button>
+        </div>
+        <span class="fb-setting-desc">Changes the interface and fretboard wood. Note colors stay the same.</span>
+      </div>
       <div class="fb-setting-group">
         <span class="fb-setting-label">Note Names</span>
         <div class="fb-btn-group">
@@ -811,9 +864,14 @@ const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La',
 const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
 
 // ─── App settings ─────────────────────────────────────────────────────────────
-let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names' };
+let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'midnight' };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
 function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
+function applyTheme(t) {
+  if (t && t !== 'midnight') document.documentElement.dataset.fbtheme = t;
+  else document.documentElement.removeAttribute('data-fbtheme');
+}
+applyTheme(appSettings.theme);
 
 let layoutCols = 1;
 try { layoutCols = parseInt(localStorage.getItem('gfv-layout-cols') || '1') || 1; } catch(e){}
@@ -987,11 +1045,13 @@ function buildMiniThumb(b) {
   const cv = document.createElement('canvas');
   cv.width = 44; cv.height = 26;
   const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#13100a';
+  const cs = getComputedStyle(document.documentElement);
+  ctx.fillStyle = (cs.getPropertyValue('--neck') || '#0d0d0d').trim();
   ctx.fillRect(0, 0, 44, 26);
   // string lines
+  const strCol = (cs.getPropertyValue('--fret-col') || '#5a4830').trim();
   for (let s = 0; s < 6; s++) {
-    ctx.fillStyle = '#6a5830';
+    ctx.fillStyle = strCol;
     ctx.fillRect(0, 3 + s * 4, 44, 1);
   }
   // note dots
@@ -2070,6 +2130,7 @@ document.getElementById('fb-settings-overlay').querySelectorAll('[data-s]').forE
   btn.addEventListener('click', () => {
     appSettings[btn.dataset.s] = btn.dataset.v;
     saveAppSettings();
+    if (btn.dataset.s === 'theme') applyTheme(btn.dataset.v);
     btn.closest('.fb-btn-group').querySelectorAll('[data-s]').forEach(b =>
       b.classList.toggle('active', b === btn));
     renderAll();
