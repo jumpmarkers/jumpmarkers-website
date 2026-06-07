@@ -873,10 +873,11 @@ function applyTheme(t) {
 }
 applyTheme(appSettings.theme);
 
-// ── Note audio preview (Shift+click) ────────────────────────────────────────
+// ── Note audio preview (Shift+click) — Karplus-Strong plucked string ────────
 let _audioCtx = null;
 function _getAudioCtx() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
   return _audioCtx;
 }
 function playFretNote(si, f) {
@@ -884,29 +885,57 @@ function playFretNote(si, f) {
     const ctx  = _getAudioCtx();
     const midi = OPEN_MIDI[si] + f;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const sr   = ctx.sampleRate;
+    const N    = Math.round(sr / freq); // one string period in samples
 
-    const osc    = ctx.createOscillator();
-    const gain   = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
+    // ── Excitation: low-passed noise → warm nylon pluck (less brightness than steel) ──
+    const exBuf = ctx.createBuffer(1, N, sr);
+    const data  = exBuf.getChannelData(0);
+    let prev = 0;
+    for (let i = 0; i < N; i++) {
+      const r = Math.random() * 2 - 1;
+      prev = 0.5 * r + 0.5 * prev; // one-pole LP on excitation = warmer attack
+      data[i] = prev;
+    }
+    const ex = ctx.createBufferSource();
+    ex.buffer = exBuf;
 
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(5000, ctx.currentTime);
-    filter.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 1.5);
-    filter.Q.value = 1;
+    // ── Karplus-Strong: delay line + damping filter in feedback loop ──
+    const delay = ctx.createDelay(1.0);
+    delay.delayTime.value = 1.0 / freq;
 
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
+    const damp = ctx.createBiquadFilter(); // string stiffness / air damping
+    damp.type = 'lowpass';
+    damp.frequency.value = Math.min(freq * 5, 3200); // nylon = warm → lower cutoff
+    damp.Q.value = 0.3;
 
-    const t = ctx.currentTime;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.28, t + 0.004);    // pluck attack
-    gain.gain.exponentialRampToValueAtTime(0.12, t + 0.12); // initial decay
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // release
-    osc.start(t);
-    osc.stop(t + 1.6);
+    const fbGain = ctx.createGain();
+    fbGain.gain.value = 0.986; // nylon decays a touch faster than steel
+
+    // ── Body resonance: low-shelf warmth ──
+    const body = ctx.createBiquadFilter();
+    body.type = 'lowshelf';
+    body.frequency.value = 380;
+    body.gain.value = 4;
+
+    // ── Output envelope: immediate pluck, natural sustain/decay ──
+    const out = ctx.createGain();
+    const dur = Math.max(1.2, 2.6 - freq / 580); // higher notes decay faster
+    out.gain.setValueAtTime(0.38, ctx.currentTime);
+    out.gain.setTargetAtTime(0.001, ctx.currentTime + 0.06, dur * 0.36);
+
+    // Graph: ex → delay → damp → fbGain → delay (loop)
+    //                   ↘ body → out → destination
+    ex.connect(delay);
+    delay.connect(damp);
+    damp.connect(fbGain);
+    fbGain.connect(delay);  // ← feedback loop (Karplus-Strong heart)
+    damp.connect(body);
+    body.connect(out);
+    out.connect(ctx.destination);
+
+    ex.start();
+    ex.stop(ctx.currentTime + N / sr);
   } catch(err) {}
 }
 
