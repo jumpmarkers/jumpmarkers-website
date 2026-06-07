@@ -150,10 +150,15 @@
     #boards-container.cols-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      column-gap: 20px;
+      column-gap: 16px;
     }
     #boards-container.cols-2 .add-board-wrap,
     #boards-container.cols-2 .empty-state { grid-column: 1 / -1; }
+    main.layout-expanded {
+      max-width: 98vw;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
 
     /* ── Board card ── */
     .board-card {
@@ -813,12 +818,15 @@ function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.str
 let layoutCols = 1;
 try { layoutCols = parseInt(localStorage.getItem('gfv-layout-cols') || '1') || 1; } catch(e){}
 function applyLayout() {
-  const wrap = document.getElementById('boards-container');
-  wrap.classList.toggle('cols-2', layoutCols === 2);
+  const wrap   = document.getElementById('boards-container');
+  const mainEl = document.querySelector('main');
+  const is2    = layoutCols === 2;
+  wrap.classList.toggle('cols-2', is2);
+  mainEl.classList.toggle('layout-expanded', is2);
   const btn = document.getElementById('btn-layout-toggle');
   if (!btn) return;
-  btn.textContent = layoutCols === 2 ? '▬ 1 Col' : '⊞ 2 Col';
-  btn.title       = layoutCols === 2 ? 'Switch to single column' : 'Switch to 2 columns';
+  btn.textContent = is2 ? '▬ 1 Col' : '⊞ 2 Col';
+  btn.title       = is2 ? 'Switch to single column' : 'Switch to 2 columns';
 }
 
 function getNoteName(idx) {
