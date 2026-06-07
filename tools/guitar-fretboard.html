@@ -893,16 +893,27 @@ let _history = [];
 let _histIdx  = -1;
 
 function _serializeBoards() {
-  return JSON.stringify(boards.map(b => ({
-    ...b,
-    selectedNotes: [...b.selectedNotes],
-    visibleNotes:  [...b.visibleNotes],
-    hiddenCells:   [...b.hiddenCells],
-  })));
+  return JSON.stringify({
+    boards: boards.map(b => ({
+      ...b,
+      selectedNotes: [...b.selectedNotes],
+      visibleNotes:  [...b.visibleNotes],
+      hiddenCells:   [...b.hiddenCells],
+    })),
+    presets,
+    currentPresetName,
+  });
 }
 function _applySnapshot(snap) {
-  boards = JSON.parse(snap).map(o => mkBoard(o));
+  const state = JSON.parse(snap);
+  const boardData = Array.isArray(state) ? state : state.boards;
+  boards = boardData.map(o => mkBoard(o));
   nextId = Math.max(0, ...boards.map(b => b.id)) + 1;
+  if (!Array.isArray(state) && state.presets !== undefined) {
+    presets = state.presets;
+    currentPresetName = state.currentPresetName;
+    try { localStorage.setItem('gfv-presets', JSON.stringify(presets)); } catch(e){}
+  }
   renderAll();
 }
 function pushHistory() {
@@ -1121,6 +1132,7 @@ function savePreset() {
   if (!name) {
     if (currentPresetName) {
       if (!confirm(`Overwrite preset "${currentPresetName}"?`)) return;
+      pushHistory();
       const idx = presets.findIndex(p => p.name === currentPresetName);
       if (idx >= 0) presets[idx] = buildPresetData(currentPresetName);
       localStorage.setItem('gfv-presets', JSON.stringify(presets));
@@ -1131,6 +1143,7 @@ function savePreset() {
     return;
   }
 
+  pushHistory();
   const data = buildPresetData(name);
   const idx  = presets.findIndex(p => p.name === name);
   if (idx >= 0) presets[idx] = data; else presets.push(data);
@@ -1151,7 +1164,9 @@ function loadPreset(name) {
 }
 
 function deletePreset(name) {
+  pushHistory();
   presets = presets.filter(p => p.name !== name);
+  if (currentPresetName === name) currentPresetName = null;
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
   renderPresets();
 }
@@ -1240,6 +1255,7 @@ function duplicatePreset(name) {
   let newName = name + ' (copy)';
   let i = 2;
   while (presets.find(x => x.name === newName)) newName = `${name} (copy ${i++})`;
+  pushHistory();
   presets.push({ ...p, name: newName });
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
   renderPresets();
@@ -1251,6 +1267,7 @@ function renamePreset(name) {
   if (presets.find(x => x.name === newName)) { alert(`A preset named "${newName}" already exists.`); return; }
   const p = presets.find(x => x.name === name);
   if (!p) return;
+  pushHistory();
   p.name = newName;
   if (currentPresetName === name) currentPresetName = newName;
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
@@ -1260,6 +1277,7 @@ function renamePreset(name) {
 function setPresetColor(name, color) {
   const p = presets.find(x => x.name === name);
   if (!p) return;
+  pushHistory();
   p.color = color || null;
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
   renderPresets();
@@ -1320,6 +1338,7 @@ function renderPresets() {
       const insertBefore = e.clientX < rect.left + rect.width / 2;
       const fi = presets.findIndex(x => x.name === fromName);
       if (fi < 0) return;
+      pushHistory();
       const [moved] = presets.splice(fi, 1);
       const newTi = presets.findIndex(x => x.name === p.name);
       if (newTi < 0) { presets.push(moved); } else {
