@@ -1789,12 +1789,8 @@ function buildFbOuter(b) {
             }
             return;
           }
-          if (b.selectedNotes.has(noteIdx)) {
-            nc.classList.add('pop');
-            nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
-            toggleNote(b.id, noteIdx);
-          }
-          // visible-only notes: click does nothing (use Alt+click to hide, Shift+click to hear)
+          // Plain click does nothing — use the HIGHLIGHT row to add/remove notes,
+          // Shift+click to hear, Alt+click to hide this cell
         });
         cell.appendChild(nc);
       }
