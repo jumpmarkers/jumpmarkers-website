@@ -147,13 +147,13 @@
     .del-preset:hover { color: var(--red); background: rgba(255,107,107,.1); }
 
     /* ── Two-column layout ── */
-    .boards-container.cols-2 {
+    #boards-container.cols-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
       column-gap: 20px;
     }
-    .boards-container.cols-2 .add-board-wrap,
-    .boards-container.cols-2 .empty-state { grid-column: 1 / -1; }
+    #boards-container.cols-2 .add-board-wrap,
+    #boards-container.cols-2 .empty-state { grid-column: 1 / -1; }
 
     /* ── Board card ── */
     .board-card {
