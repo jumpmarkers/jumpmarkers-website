@@ -742,6 +742,15 @@
       <table class="help-table">
         <tr><td>Drag ⠿ handle</td><td>Reorder fretboards. A mini-map appears for quick navigation.</td></tr>
       </table>
+      <div class="help-section-title">⬜ Box Select</div>
+      <table class="help-table">
+        <tr><td>Drag on fretboard</td><td>Draw a selection rectangle — notes inside are highlighted in orange</td></tr>
+        <tr><td>DEL</td><td>Hide all selected notes at those exact positions (same as Alt+click, one by one)</td></tr>
+        <tr><td>Escape</td><td>Cancel the selection without hiding anything</td></tr>
+        <tr><td>Ctrl+Z</td><td>Undo the hide after pressing DEL</td></tr>
+      </table>
+      <img src="../screenshots/box-select.png" alt="Box Select example" style="width:100%;border-radius:6px;margin-top:8px;border:1px solid var(--border);display:block">
+
       <div class="help-section-title">🎨 Note Colors</div>
       <table class="help-table">
         <tr><td>Color of note</td><td>Degree relative to Root: 🔴 Root · 🔵 2nd · 🟢 3rd · 🟡 4th · 🩶 5th · 🟣 6th · 🟠 7th</td></tr>
@@ -2097,7 +2106,12 @@ document.getElementById('preset-file-input').addEventListener('change', e => {
 // ─── Undo/Redo keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.key === 'Escape') { clearBoxSelect(); return; }
+  if (e.key === 'Escape') {
+    clearBoxSelect();
+    document.getElementById('fb-settings-overlay').classList.remove('open');
+    document.getElementById('fb-help-overlay').classList.remove('open');
+    return;
+  }
   if (e.key === 'Delete') { applyBoxDelete(); return; }
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
