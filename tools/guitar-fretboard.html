@@ -2157,11 +2157,16 @@ document.getElementById('preset-name').addEventListener('keydown', e => {
 
 // ── Export presets ──
 document.getElementById('btn-export-presets').addEventListener('click', () => {
-  if (!presets.length) { alert('No presets to export.'); return; }
-  const blob = new Blob([JSON.stringify(presets, null, 2)], { type: 'application/json' });
+  const exportData = {
+    version: 1,
+    settings: { ...appSettings },
+    layoutCols,
+    presets,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'fretboard-presets.json';
+  a.download = 'fretboard-config.json';
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -2173,25 +2178,58 @@ document.getElementById('preset-file-input').addEventListener('change', e => {
   const reader = new FileReader();
   reader.onload = ev => {
     try {
-      const imported = JSON.parse(ev.target.result);
-      if (!Array.isArray(imported)) throw new Error();
-      const mode = presets.length
-        ? confirm(`Merge with existing presets?\n\nOK = merge (keep both)\nCancel = replace all`)
-          ? 'merge' : 'replace'
-        : 'replace';
-      if (mode === 'replace') {
-        presets = imported;
-      } else {
-        // Merge: add only presets whose name doesn't already exist
-        imported.forEach(p => {
-          if (!presets.find(x => x.name === p.name)) presets.push(p);
-        });
+      const raw = JSON.parse(ev.target.result);
+      // Support both legacy (plain array) and new (object with version) formats
+      const isLegacy = Array.isArray(raw);
+      const importedPresets  = isLegacy ? raw : (Array.isArray(raw.presets) ? raw.presets : []);
+      const importedSettings = isLegacy ? null : (raw.settings || null);
+      const importedLayout   = isLegacy ? null : (raw.layoutCols || null);
+
+      if (!Array.isArray(importedPresets)) throw new Error();
+
+      if (importedPresets.length) {
+        const mode = presets.length
+          ? confirm(`Merge with existing presets?\n\nOK = merge (keep both)\nCancel = replace all`)
+            ? 'merge' : 'replace'
+          : 'replace';
+        if (mode === 'replace') {
+          presets = importedPresets;
+        } else {
+          // Merge: add only presets whose name doesn't already exist
+          importedPresets.forEach(p => {
+            if (!presets.find(x => x.name === p.name)) presets.push(p);
+          });
+        }
+        localStorage.setItem('gfv-presets', JSON.stringify(presets));
+        renderPresets();
       }
-      localStorage.setItem('gfv-presets', JSON.stringify(presets));
-      renderPresets();
-      alert(`${imported.length} preset(s) imported successfully.`);
+
+      // Restore settings if present (new format)
+      if (importedSettings) {
+        Object.assign(appSettings, importedSettings);
+        saveAppSettings();
+        applyTheme(appSettings.theme);
+        // Sync active state of settings modal buttons
+        document.querySelectorAll('#fb-settings-modal [data-s]').forEach(b => {
+          b.classList.toggle('active', b.dataset.v === appSettings[b.dataset.s]);
+        });
+        renderAll();
+      }
+
+      // Restore layout if present
+      if (importedLayout && importedLayout !== layoutCols) {
+        layoutCols = importedLayout;
+        try { localStorage.setItem('gfv-layout-cols', layoutCols); } catch(e){}
+        applyLayout();
+      }
+
+      const lines = [];
+      if (importedPresets.length) lines.push(`${importedPresets.length} preset(s) imported.`);
+      if (importedSettings) lines.push('Settings (theme, note names) restored.');
+      if (!lines.length) lines.push('File loaded — no changes applied.');
+      alert(lines.join('\n'));
     } catch {
-      alert('Invalid file. Please select a valid fretboard presets JSON file.');
+      alert('Invalid file. Please select a valid fretboard config JSON file.');
     }
     e.target.value = ''; // reset so same file can be re-imported
   };
