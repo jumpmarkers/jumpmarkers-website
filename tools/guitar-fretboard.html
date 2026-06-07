@@ -873,6 +873,43 @@ function applyTheme(t) {
 }
 applyTheme(appSettings.theme);
 
+// ── Note audio preview (Shift+click) ────────────────────────────────────────
+let _audioCtx = null;
+function _getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function playFretNote(si, f) {
+  try {
+    const ctx  = _getAudioCtx();
+    const midi = OPEN_MIDI[si] + f;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+
+    const osc    = ctx.createOscillator();
+    const gain   = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(5000, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 1.5);
+    filter.Q.value = 1;
+
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.28, t + 0.004);    // pluck attack
+    gain.gain.exponentialRampToValueAtTime(0.12, t + 0.12); // initial decay
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // release
+    osc.start(t);
+    osc.stop(t + 1.6);
+  } catch(err) {}
+}
+
 let layoutCols = 1;
 try { layoutCols = parseInt(localStorage.getItem('gfv-layout-cols') || '1') || 1; } catch(e){}
 function applyLayout() {
@@ -900,6 +937,7 @@ function getDisplayName(noteIdx, board) {
 }
 
 const OPEN      = [4, 11, 7, 2, 9, 4]; // e B G D A E  (high to low, top to bottom)
+const OPEN_MIDI = [64, 59, 55, 50, 45, 40]; // MIDI note numbers in standard tuning (e B G D A E)
 const STR_NAMES = ['e','B','G','D','A','E'];
 const STR_W     = ['0.7px','0.9px','1.2px','1.5px','1.8px','2.2px'];
 const STR_C     = ['#c8b898','#b8a278','#b09a68','#a89260','#a08850','#9a8050'];
@@ -1626,7 +1664,7 @@ function buildFbOuter(b) {
   }, { passive: false });
 
   outer.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.button !== 0 || e.altKey || e.shiftKey || e.ctrlKey || e.metaKey) return;
     if (e.target.closest('.nc, button, input, select')) return;
     clearBoxSelect();
     _bsAnchor = { x0: e.clientX, y0: e.clientY, bid: b.id };
@@ -1699,7 +1737,7 @@ function buildFbOuter(b) {
         const nc = document.createElement('div');
         nc.className = 'nc' + (isOn ? ' on' : '');
         nc.textContent = noteName;
-        nc.title = `${getNoteName(noteIdx)}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Alt+click to hide this note)`;
+        nc.title = `${getNoteName(noteIdx)}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Shift+click to hear · Alt+click to hide)`;
         if (isOn) {
           nc.style.background = color;
         }
@@ -1708,7 +1746,12 @@ function buildFbOuter(b) {
           nc.style.outlineOffset = '2px';
         }
         nc.addEventListener('click', e => {
-          if (e.altKey) return; // handled by cell listener
+          if (e.altKey) return; // handled by cell listener (hiddenCells toggle)
+          if (e.shiftKey) {
+            e.stopPropagation();
+            playFretNote(si, f);
+            return;
+          }
           if (e.ctrlKey || e.metaKey) {
             if (b.selectedNotes.has(noteIdx)) {
               b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
@@ -1721,9 +1764,8 @@ function buildFbOuter(b) {
             nc.classList.add('pop');
             nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
             toggleNote(b.id, noteIdx);
-          } else {
-            toggleVisible(b.id, noteIdx);
           }
+          // visible-only notes: click does nothing (use Alt+click to hide, Shift+click to hear)
         });
         cell.appendChild(nc);
       }
