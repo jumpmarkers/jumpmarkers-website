@@ -146,6 +146,15 @@
     }
     .del-preset:hover { color: var(--red); background: rgba(255,107,107,.1); }
 
+    /* ── Two-column layout ── */
+    .boards-container.cols-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 20px;
+    }
+    .boards-container.cols-2 .add-board-wrap,
+    .boards-container.cols-2 .empty-state { grid-column: 1 / -1; }
+
     /* ── Board card ── */
     .board-card {
       background: var(--surface); border: 1px solid var(--border);
@@ -685,6 +694,7 @@
       <div class="preset-list" id="preset-list"></div>
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+      <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
       <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
       <button class="btn btn-outline" id="btn-fb-help">? Help</button>
     </div>
@@ -799,6 +809,17 @@ const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','
 let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names' };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
 function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
+
+let layoutCols = 1;
+try { layoutCols = parseInt(localStorage.getItem('gfv-layout-cols') || '1') || 1; } catch(e){}
+function applyLayout() {
+  const wrap = document.getElementById('boards-container');
+  wrap.classList.toggle('cols-2', layoutCols === 2);
+  const btn = document.getElementById('btn-layout-toggle');
+  if (!btn) return;
+  btn.textContent = layoutCols === 2 ? '▬ 1 Col' : '⊞ 2 Col';
+  btn.title       = layoutCols === 2 ? 'Switch to single column' : 'Switch to 2 columns';
+}
 
 function getNoteName(idx) {
   if (appSettings.noteSystem === 'latin')
@@ -2016,6 +2037,11 @@ function buildCard(b) {
 // ─── Global event bindings ────────────────────────────────────────────────────
 // btn-add is now rendered dynamically at the bottom of boards-container
 document.getElementById('btn-export').addEventListener('click', () => window.print());
+document.getElementById('btn-layout-toggle').addEventListener('click', () => {
+  layoutCols = layoutCols === 1 ? 2 : 1;
+  try { localStorage.setItem('gfv-layout-cols', layoutCols); } catch(e){}
+  applyLayout();
+});
 
 // ── Settings modal ──
 function openFbSettings() {
@@ -2124,6 +2150,7 @@ addBoard();
 // Save initial state so Ctrl+Z can return to blank board
 _history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
+applyLayout();
 </script>
 </body>
 </html>
