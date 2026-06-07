@@ -1783,8 +1783,12 @@ function buildFbOuter(b) {
             }
             return;
           }
-          // Plain click does nothing — use the HIGHLIGHT row to add/remove notes,
-          // Shift+click to hear, Alt+click to hide this cell
+          // Toggle highlight — note stays visible on neck regardless (no toggleVisible)
+          if (b.selectedNotes.has(noteIdx)) {
+            nc.classList.add('pop');
+            nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
+          }
+          toggleNote(b.id, noteIdx);
         });
         cell.appendChild(nc);
       }
