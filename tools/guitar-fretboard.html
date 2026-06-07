@@ -1181,11 +1181,13 @@ function hideDragOverlay() {
 }
 
 // ─── Box-select ───────────────────────────────────────────────────────────────
-let _bsAnchor = null; // { x0, y0, bid } — mousedown start point
+let _bsAnchor = null; // { x0, y0, bid }
 let _boxSel   = null; // { bid, x0, y0, rect, cells: Set<cellKey> }
+let _bsAccum  = null; // { bid, cells } — cells accumulated across Ctrl+drags
 
 function clearBoxSelect() {
   _bsAnchor = null;
+  _bsAccum  = null;
   if (_boxSel) {
     _boxSel.rect?.remove();
     document.querySelectorAll('.fc.sel-active').forEach(c => c.classList.remove('sel-active'));
@@ -1221,14 +1223,18 @@ function _boxSelUpdate(cx, cy) {
   r.style.width = (x2 - x1) + 'px'; r.style.height = (y2 - y1) + 'px';
   const outer = document.querySelector(`.fretboard-outer[data-bid="${_boxSel.bid}"]`);
   if (!outer) return;
-  const cells = new Set();
+  const newCells = new Set();
   outer.querySelectorAll('.fc[data-cell]').forEach(cell => {
     const cr = cell.getBoundingClientRect();
-    const hit = cr.left < x2 && cr.right > x1 && cr.top < y2 && cr.bottom > y1;
-    cell.classList.toggle('sel-active', hit);
-    if (hit) cells.add(cell.dataset.cell);
+    if (cr.left < x2 && cr.right > x1 && cr.top < y2 && cr.bottom > y1)
+      newCells.add(cell.dataset.cell);
   });
-  _boxSel.cells = cells;
+  // Merge with accumulated cells from previous Ctrl+drags
+  const accum = (_bsAccum?.bid === _boxSel.bid) ? _bsAccum.cells : null;
+  const allCells = accum ? new Set([...accum, ...newCells]) : newCells;
+  outer.querySelectorAll('.fc[data-cell]').forEach(cell =>
+    cell.classList.toggle('sel-active', allCells.has(cell.dataset.cell)));
+  _boxSel.cells = allCells;
 }
 
 document.addEventListener('mousemove', e => {
@@ -1687,9 +1693,18 @@ function buildFbOuter(b) {
   }, { passive: false });
 
   outer.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.altKey || e.shiftKey || e.ctrlKey || e.metaKey) return;
+    if (e.button !== 0 || e.altKey || e.shiftKey || e.metaKey) return;
     if (e.target.closest('.nc, button, input, select')) return;
-    clearBoxSelect();
+    if (e.ctrlKey) {
+      // Additive mode: save existing selection, keep sel-active highlights
+      _bsAccum = (_boxSel?.bid === b.id && _boxSel.cells?.size)
+        ? { bid: b.id, cells: new Set(_boxSel.cells) }
+        : (_bsAccum?.bid === b.id ? _bsAccum : null);
+      _bsAnchor = null;
+      if (_boxSel) { _boxSel.rect?.remove(); _boxSel = null; }
+    } else {
+      clearBoxSelect();
+    }
     _bsAnchor = { x0: e.clientX, y0: e.clientY, bid: b.id };
   });
 
