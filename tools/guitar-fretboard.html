@@ -229,7 +229,7 @@
     .palette-label {
       font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase;
       letter-spacing: .8px; color: var(--muted); margin-right: 2px; white-space: nowrap;
-      min-width: 62px;
+      width: 72px; flex-shrink: 0;
     }
     .note-pill {
       min-width: 36px; padding: 4px 8px; border-radius: 6px;
@@ -418,6 +418,12 @@
     .swatch-chalkboard { background:#293d2a; border:2px solid #6a4820; }
     .swatch-cassette { background:linear-gradient(to bottom,#d83040 30%,#f4f0e8 30%); border:1px solid #c0b8a8; }
     .swatch-minimal { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.22); }
+
+    /* ── Preset chip drag indicator ── */
+    .preset-chip { cursor: grab; }
+    .preset-chip:active { cursor: grabbing; }
+    .preset-chip.drag-over-left  { box-shadow: -3px 0 0 0 var(--accent2); }
+    .preset-chip.drag-over-right { box-shadow:  3px 0 0 0 var(--accent2); }
 
     /* ── Range slider ── */
     .range-wrap {
@@ -813,6 +819,17 @@ const NOTE_COL  = [
 ];
 const FRET_OPTIONS  = [12,15,17,19,22,24];
 const VIEW_OPTIONS  = [7,8,9,10,11,12,13];
+const PRESET_COLORS = [
+  { label: 'Default', value: null      },
+  { label: 'Red',     value: '#c0392b' },
+  { label: 'Orange',  value: '#d35400' },
+  { label: 'Amber',   value: '#c9a227' },
+  { label: 'Green',   value: '#27ae60' },
+  { label: 'Teal',    value: '#16a085' },
+  { label: 'Blue',    value: '#2980b9' },
+  { label: 'Purple',  value: '#8e44ad' },
+  { label: 'Pink',    value: '#c0395a' },
+];
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let boards  = [];
@@ -1080,6 +1097,7 @@ function updateLabel(boardId, val) {
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
 let currentPresetName = null;
+let _dragPresetName   = null;
 
 function buildPresetData(name) {
   return {
@@ -1160,18 +1178,52 @@ function showPresetCtx(e, name) {
   menu.style.left = e.clientX + 'px';
   menu.style.top  = e.clientY + 'px';
 
-  const items = [
+  [
     { icon: '⧉', label: 'Duplicate', action: () => duplicatePreset(name) },
     { icon: '✎', label: 'Rename',    action: () => renamePreset(name)    },
-  ];
-  items.forEach(({ icon, label, action }) => {
+  ].forEach(({ icon, label, action }) => {
     const item = document.createElement('div');
     item.className = 'preset-ctx-item';
     item.innerHTML = `<span>${icon}</span><span>${label}</span>`;
-    item.addEventListener('click', e => { e.stopPropagation(); closeCtxMenu(); action(); });
+    item.addEventListener('click', ev => { ev.stopPropagation(); closeCtxMenu(); action(); });
     menu.appendChild(item);
   });
 
+  // ── Color picker row ──
+  const sep = document.createElement('div');
+  sep.style.cssText = 'height:1px;background:var(--border);margin:3px 0';
+  menu.appendChild(sep);
+
+  const colorRow = document.createElement('div');
+  colorRow.style.cssText = 'padding:8px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap';
+
+  const clrLabel = document.createElement('span');
+  clrLabel.style.cssText = 'font-family:var(--mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-right:2px;white-space:nowrap';
+  clrLabel.textContent = 'Color';
+  colorRow.appendChild(clrLabel);
+
+  const p = presets.find(x => x.name === name);
+  const currentColor = p ? (p.color || null) : null;
+
+  PRESET_COLORS.forEach(({ label, value }) => {
+    const dot = document.createElement('button');
+    dot.title = label;
+    const isActive = currentColor === value;
+    const isDefault = value === null;
+    dot.style.cssText = [
+      'width:17px;height:17px;border-radius:50%;cursor:pointer;flex-shrink:0;padding:0;transition:transform .1s;',
+      isDefault
+        ? 'background:linear-gradient(135deg,#1a2252 45%,#3a4a80 45%,#3a4a80 55%,#1a2252 55%);border:2px dashed #3a4a80;'
+        : `background:${value};border:2px solid ${value};`,
+      isActive ? 'outline:2.5px solid rgba(255,255,255,0.8);outline-offset:1.5px;' : '',
+    ].join('');
+    dot.addEventListener('mouseenter', () => { dot.style.transform = 'scale(1.25)'; });
+    dot.addEventListener('mouseleave', () => { dot.style.transform = ''; });
+    dot.addEventListener('click', ev => { ev.stopPropagation(); closeCtxMenu(); setPresetColor(name, value); });
+    colorRow.appendChild(dot);
+  });
+
+  menu.appendChild(colorRow);
   document.body.appendChild(menu);
   _ctxMenu = menu;
 
@@ -1204,6 +1256,14 @@ function renamePreset(name) {
   renderPresets();
 }
 
+function setPresetColor(name, color) {
+  const p = presets.find(x => x.name === name);
+  if (!p) return;
+  p.color = color || null;
+  localStorage.setItem('gfv-presets', JSON.stringify(presets));
+  renderPresets();
+}
+
 function renderPresets() {
   const list = document.getElementById('preset-list');
   if (!list) return;
@@ -1211,14 +1271,64 @@ function renderPresets() {
     list.innerHTML = '<span style="font-family:var(--mono);font-size:.7rem;color:var(--muted);opacity:.6">No saved presets</span>';
     return;
   }
-  list.innerHTML = presets.map(p =>
-    `<span class="preset-chip${p.name === currentPresetName ? ' active' : ''}" data-name="${esc(p.name)}">${esc(p.name)}<button class="del-preset" title="Delete">✕</button></span>`
-  ).join('');
-  list.querySelectorAll('.preset-chip').forEach(chip => {
-    const n = chip.dataset.name;
-    chip.addEventListener('click', () => loadPreset(n));
-    chip.addEventListener('contextmenu', e => showPresetCtx(e, n));
-    chip.querySelector('.del-preset').addEventListener('click', e => { e.stopPropagation(); deletePreset(n); });
+  list.innerHTML = '';
+  presets.forEach(p => {
+    const chip = document.createElement('span');
+    chip.className = 'preset-chip' + (p.name === currentPresetName ? ' active' : '');
+    chip.dataset.name = p.name;
+    chip.draggable = true;
+    if (p.color) {
+      chip.style.background  = p.color + '30';
+      chip.style.borderColor = p.color;
+    }
+    chip.innerHTML = `${esc(p.name)}<button class="del-preset" title="Delete">✕</button>`;
+
+    chip.addEventListener('click', e => { if (!e.target.classList.contains('del-preset')) loadPreset(p.name); });
+    chip.addEventListener('contextmenu', e => showPresetCtx(e, p.name));
+    chip.querySelector('.del-preset').addEventListener('click', e => { e.stopPropagation(); deletePreset(p.name); });
+
+    // ── Drag to reorder ──
+    chip.addEventListener('dragstart', e => {
+      _dragPresetName = p.name;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', p.name);
+      setTimeout(() => { chip.style.opacity = '0.4'; }, 0);
+    });
+    chip.addEventListener('dragend', () => {
+      _dragPresetName = null;
+      chip.style.opacity = '';
+      list.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('drag-over-left', 'drag-over-right'));
+    });
+    chip.addEventListener('dragover', e => {
+      if (!_dragPresetName || _dragPresetName === p.name) return;
+      e.preventDefault();
+      const rect = chip.getBoundingClientRect();
+      const side = e.clientX < rect.left + rect.width / 2 ? 'drag-over-left' : 'drag-over-right';
+      list.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('drag-over-left', 'drag-over-right'));
+      chip.classList.add(side);
+    });
+    chip.addEventListener('dragleave', e => {
+      if (!chip.contains(e.relatedTarget)) chip.classList.remove('drag-over-left', 'drag-over-right');
+    });
+    chip.addEventListener('drop', e => {
+      e.preventDefault();
+      chip.classList.remove('drag-over-left', 'drag-over-right');
+      const fromName = _dragPresetName;
+      if (!fromName || fromName === p.name) return;
+      const rect = chip.getBoundingClientRect();
+      const insertBefore = e.clientX < rect.left + rect.width / 2;
+      const fi = presets.findIndex(x => x.name === fromName);
+      if (fi < 0) return;
+      const [moved] = presets.splice(fi, 1);
+      const newTi = presets.findIndex(x => x.name === p.name);
+      if (newTi < 0) { presets.push(moved); } else {
+        presets.splice(insertBefore ? newTi : newTi + 1, 0, moved);
+      }
+      localStorage.setItem('gfv-presets', JSON.stringify(presets));
+      renderPresets();
+    });
+
+    list.appendChild(chip);
   });
 }
 
