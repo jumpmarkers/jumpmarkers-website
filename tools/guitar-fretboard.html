@@ -890,7 +890,7 @@ function playFretNote(si, f) {
     const sr   = ctx.sampleRate;
 
     // Nylon strings: lower notes sustain longer
-    const decaySec = Math.min(3.0, Math.max(0.8, 2.8 - freq / 350));
+    const decaySec = Math.min(1.5, Math.max(0.4, 1.4 - freq / 350));
     const N   = Math.round(sr / freq);       // delay line length = 1 period
     const len = Math.ceil(decaySec * sr);    // total output samples
 
