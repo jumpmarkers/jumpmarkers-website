@@ -211,14 +211,19 @@
     }
     .del-preset:hover { color: var(--red); background: rgba(255,107,107,.1); }
 
-    /* ── Two-column layout ── */
+    /* ── Two-column layout (column-first flow: 1,2,3 ↓ col1  then 4,5,6 ↓ col2) ── */
     #boards-container.cols-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      column-count: 2;
       column-gap: 16px;
     }
+    #boards-container.cols-2 .board-card {
+      break-inside: avoid;
+      margin-bottom: 16px;
+      display: inline-block; /* required for column-count flow */
+      width: 100%;
+    }
     #boards-container.cols-2 .add-board-wrap,
-    #boards-container.cols-2 .empty-state { grid-column: 1 / -1; }
+    #boards-container.cols-2 .empty-state { column-span: all; }
     main.layout-expanded {
       max-width: 98vw;
       padding-left: 10px;
