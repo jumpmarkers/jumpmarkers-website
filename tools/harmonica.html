@@ -83,6 +83,45 @@
     .btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--accent); }
     .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     .settings-btn { color: var(--text); font-size: 0.85rem; padding: 7px 14px; }
+
+    /* ── Scale Picker ── */
+    .scale-picker { position: relative; min-width: 220px; }
+    .scale-picker-trigger {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 8px 12px; font-size: 0.9rem;
+      cursor: pointer; user-select: none; transition: border-color .15s;
+    }
+    .scale-picker-trigger:hover,
+    .scale-picker.open .scale-picker-trigger { border-color: var(--accent); outline: none; }
+    .scale-picker-trigger:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .scale-picker-caret { font-size: 0.7rem; opacity: .55; transition: transform .15s; flex-shrink: 0; }
+    .scale-picker.open .scale-picker-caret { transform: rotate(180deg); }
+    .scale-picker-drop {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0;
+      min-width: 100%; width: max-content; max-width: 280px; max-height: 340px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); z-index: 200;
+      box-shadow: 0 8px 28px rgba(0,0,0,.55); flex-direction: column; overflow: hidden;
+    }
+    .scale-picker.open .scale-picker-drop { display: flex; }
+    .scale-search-input {
+      padding: 8px 12px; background: var(--bg); color: var(--text);
+      border: none; border-bottom: 1px solid var(--border); font-size: 0.85rem;
+      outline: none; width: 100%; flex-shrink: 0;
+    }
+    .scale-search-list { overflow-y: auto; flex: 1; }
+    .scale-group-hdr {
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-sub); padding: 8px 12px 3px; font-weight: 700; pointer-events: none;
+    }
+    .scale-opt {
+      padding: 7px 16px; cursor: pointer; font-size: 0.87rem; color: var(--text);
+      transition: background .08s; white-space: nowrap;
+    }
+    .scale-opt:hover, .scale-opt.sp-focused { background: var(--bg-hover); }
+    .scale-opt.sp-selected { color: var(--accent); font-weight: 600; }
+    .scale-no-results { padding: 14px 12px; font-size: 0.82rem; color: var(--text-sub); text-align: center; }
     #presetNameInput { background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;font-size:0.85rem;flex:1;min-width:120px; }
     #presetNameInput:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
     .preset-row { display:flex;align-items:center;gap:6px;margin-bottom:5px; }
@@ -303,7 +342,17 @@
 <div class="controls">
   <div class="ctrl-group">
     <span class="ctrl-label" id="ctrlScaleLabel">Tipo de Escala</span>
-    <select id="scaleSelect"></select>
+    <div class="scale-picker" id="scalePicker">
+      <div class="scale-picker-trigger" id="scalePickerTrigger" tabindex="0">
+        <span id="scalePickerLabel">Mayor (Jónico)</span>
+        <span class="scale-picker-caret">▾</span>
+      </div>
+      <div class="scale-picker-drop" id="scalePickerDrop">
+        <input type="text" id="scaleSearch" class="scale-search-input"
+               placeholder="Buscar escalas…" autocomplete="off" spellcheck="false">
+        <div class="scale-search-list" id="scaleSearchList"></div>
+      </div>
+    </div>
   </div>
   <div class="ctrl-group">
     <span class="ctrl-label" id="ctrlKeyLabel">Tonalidad</span>
@@ -486,6 +535,19 @@ const SCALES = {
   wholeTone:    { intervals:[0,2,4,6,8,10],             arp5:[0,4,8,10,2] },
   chromatic:    { intervals:[0,1,2,3,4,5,6,7,8,9,10,11],arp5:[0,4,7,11,2] },
   custom:       { intervals:[0,2,4,5,7,9,11],           arp5:[0,4,7,11,2] },
+  // ── Pentatonic ─────────────────────────────────────────
+  minorPentatonic:  { intervals:[0,3,5,7,10],           arp5:[0,3,7,10,3]  },
+  majorBlues:       { intervals:[0,2,3,4,7,9],          arp5:[0,4,7,9,2]   },
+  minorBlues:       { intervals:[0,3,5,6,7,10],         arp5:[0,3,7,10,3]  },
+  egyptianPentatonic:{ intervals:[0,2,5,7,10],          arp5:[0,2,7,10,2]  },
+  hirajoshi:        { intervals:[0,2,3,7,8],            arp5:[0,2,3,7,8]   },
+  inSen:            { intervals:[0,1,5,7,10],           arp5:[0,1,7,10,1]  },
+  // ── World / Exotic ─────────────────────────────────────
+  doubleHarmonic:   { intervals:[0,1,4,5,7,8,11],       arp5:[0,4,7,11,1]  },
+  hungarianMinor:   { intervals:[0,2,3,6,7,8,11],       arp5:[0,3,7,11,2]  },
+  persian:          { intervals:[0,1,4,5,6,8,11],       arp5:[0,4,6,8,11]  },
+  prometheus:       { intervals:[0,2,4,6,9,10],         arp5:[0,4,6,10,2]  },
+  augmented:        { intervals:[0,3,4,7,8,11],         arp5:[0,4,8,11,3]  },
 };
 
 const SCALE_GROUPS = [
@@ -494,6 +556,8 @@ const SCALE_GROUPS = [
   { id:'hm_modes',     keys:['harmonicMinor','locrianN6','ionianA5','dorianN4','phrygianDom','lydianN2','altDim'] },
   { id:'hmaj_modes',   keys:['harmonicMajor','dorianb5','phrygianb4','lydianb3','mixob2','lydianAugN2','locrianbb7'] },
   { id:'other',        keys:['diminished','bebop','pentatonic','blues','wholeTone','chromatic','custom'] },
+  { id:'pentatonic',   keys:['minorPentatonic','majorBlues','minorBlues','egyptianPentatonic','hirajoshi','inSen'] },
+  { id:'world',        keys:['doubleHarmonic','hungarianMinor','persian','prometheus','augmented'] },
 ];
 
 const ARP_MODES = [
@@ -530,11 +594,18 @@ const TRANSLATIONS = {
       lydianb3:'Lidio b3', mixob2:'Mixolidio b2', lydianAugN2:'Lidio Aug #2', locrianbb7:'Locrio bb7',
       diminished:'Disminuida', bebop:'Bebop', pentatonic:'Pentatónica Mayor',
       blues:'Blues', wholeTone:'Tonos Enteros', chromatic:'Cromática', custom:'Personalizada',
+      minorPentatonic:'Pentatónica Menor', majorBlues:'Blues Mayor', minorBlues:'Blues Menor',
+      egyptianPentatonic:'Pentatónica Egipcia', hirajoshi:'Hirajoshi', inSen:'In Sen',
+      doubleHarmonic:'Doble Armónica (Bizantina)', hungarianMinor:'Menor Húngara',
+      persian:'Persa', prometheus:'Prometeo', augmented:'Aumentada',
     },
     scaleGroups: {
       major_modes:'Modos Escala Mayor', mm_modes:'Modos Menor Melódica',
       hm_modes:'Modos Menor Armónica', hmaj_modes:'Modos Mayor Armónica', other:'Otras Escalas',
+      pentatonic:'Pentatónicas', world:'Mundo / Exóticas',
     },
+    scaleNoResults: 'Sin resultados',
+    scaleSearchHint: 'Buscar escalas…',
     customPanelTitle: 'Escala Personalizada',
     customNotesLabel: 'Seleccionar Notas',
     savePreset: '💾 Guardar',
@@ -575,11 +646,18 @@ const TRANSLATIONS = {
       lydianb3:'Lydian b3', mixob2:'Mixolydian b2', lydianAugN2:'Lydian Aug #2', locrianbb7:'Locrian bb7',
       diminished:'Diminished', bebop:'Bebop', pentatonic:'Major Pentatonic',
       blues:'Blues', wholeTone:'Whole Tone', chromatic:'Chromatic', custom:'Custom',
+      minorPentatonic:'Minor Pentatonic', majorBlues:'Major Blues', minorBlues:'Minor Blues',
+      egyptianPentatonic:'Egyptian Pentatonic', hirajoshi:'Hirajoshi', inSen:'In Sen',
+      doubleHarmonic:'Double Harmonic (Byzantine)', hungarianMinor:'Hungarian Minor',
+      persian:'Persian', prometheus:'Prometheus', augmented:'Augmented',
     },
     scaleGroups: {
       major_modes:'Major Scale Modes', mm_modes:'Melodic Minor Modes',
       hm_modes:'Harmonic Minor Modes', hmaj_modes:'Harmonic Major Modes', other:'Other Scales',
+      pentatonic:'Pentatonic', world:'World / Exotic',
     },
+    scaleNoResults: 'No results',
+    scaleSearchHint: 'Search scales…',
     customPanelTitle: 'Custom Scale',
     customNotesLabel: 'Select Notes',
     savePreset: '💾 Save',
@@ -776,8 +854,9 @@ function applyLang() {
   document.getElementById('modalTitle').textContent     = T.modalTitle;
   document.getElementById('modalHolesLabel').textContent = T.holesLabel;
   document.getElementById('modalLangLabel').textContent  = T.langLabel;
-  [...document.getElementById('scaleSelect').options].forEach(o => { o.textContent = T.scales[o.value]; });
-  document.getElementById('scaleSelect').querySelectorAll('optgroup').forEach((og, i) => { og.label = T.scaleGroups[SCALE_GROUPS[i].id]; });
+  document.getElementById('scalePickerLabel').textContent = T.scales[state.scaleId];
+  document.getElementById('scaleSearch').placeholder = T.scaleSearchHint;
+  rebuildScaleList('');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1104,14 +1183,89 @@ function deletePreset(idx) {
 // INIT
 // ═══════════════════════════════════════════════════════
 
+// ── Scale Picker ──────────────────────────────────────────────────────────────
+function rebuildScaleList(filter) {
+  const list = document.getElementById('scaleSearchList');
+  const q = filter.trim().toLowerCase();
+  let html = '', totalMatches = 0;
+  SCALE_GROUPS.forEach(g => {
+    const matching = g.keys.filter(id => !q || T.scales[id].toLowerCase().includes(q));
+    if (!matching.length) return;
+    totalMatches += matching.length;
+    html += `<div class="scale-group-hdr">${T.scaleGroups[g.id]}</div>`;
+    matching.forEach(id => {
+      html += `<div class="scale-opt${id===state.scaleId?' sp-selected':''}" data-sid="${id}">${T.scales[id]}</div>`;
+    });
+  });
+  if (!totalMatches) html = `<div class="scale-no-results">${T.scaleNoResults}</div>`;
+  list.innerHTML = html;
+}
+
+function openScalePicker() {
+  const picker = document.getElementById('scalePicker');
+  picker.classList.add('open');
+  const inp = document.getElementById('scaleSearch');
+  inp.value = '';
+  rebuildScaleList('');
+  inp.focus();
+  // Scroll selected option into view
+  requestAnimationFrame(() => {
+    const sel = document.querySelector('#scaleSearchList .sp-selected');
+    if (sel) sel.scrollIntoView({ block: 'center' });
+  });
+}
+function closeScalePicker() {
+  document.getElementById('scalePicker').classList.remove('open');
+}
+function selectScaleById(id) {
+  state.scaleId = id;
+  state.pathVariant = 0;
+  document.getElementById('scalePickerLabel').textContent = T.scales[id];
+  closeScalePicker();
+  render();
+}
+
 function initControls() {
-  // Scale select
-  const sel = document.getElementById('scaleSelect');
-  sel.innerHTML = SCALE_GROUPS.map(g =>
-    `<optgroup label="${T.scaleGroups[g.id]}">${g.keys.map(id=>`<option value="${id}">${T.scales[id]}</option>`).join('')}</optgroup>`
-  ).join('');
-  sel.value = state.scaleId;
-  sel.addEventListener('change', e=>{ state.scaleId=e.target.value; state.pathVariant=0; render(); });
+  // Scale picker
+  const trigger = document.getElementById('scalePickerTrigger');
+  trigger.addEventListener('click', () => {
+    document.getElementById('scalePicker').classList.contains('open') ? closeScalePicker() : openScalePicker();
+  });
+  trigger.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); openScalePicker(); }
+  });
+  document.getElementById('scaleSearch').addEventListener('input', e => rebuildScaleList(e.target.value));
+  document.getElementById('scaleSearch').addEventListener('keydown', e => {
+    const list = document.getElementById('scaleSearchList');
+    const opts = [...list.querySelectorAll('.scale-opt')];
+    const cur  = list.querySelector('.sp-focused');
+    if (e.key === 'Escape') { closeScalePicker(); trigger.focus(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const idx  = cur ? opts.indexOf(cur) : -1;
+      const next = e.key === 'ArrowDown'
+        ? (idx + 1) % opts.length
+        : (idx - 1 + opts.length) % opts.length;
+      cur?.classList.remove('sp-focused');
+      opts[next]?.classList.add('sp-focused');
+      opts[next]?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'Enter') {
+      const focused = list.querySelector('.sp-focused') || opts[0];
+      if (focused) selectScaleById(focused.dataset.sid);
+    }
+  });
+  document.getElementById('scaleSearchList').addEventListener('click', e => {
+    const opt = e.target.closest('.scale-opt');
+    if (opt) selectScaleById(opt.dataset.sid);
+  });
+  document.addEventListener('click', e => {
+    if (!document.getElementById('scalePicker').contains(e.target)) closeScalePicker();
+  });
+  // Set initial label
+  document.getElementById('scalePickerLabel').textContent = T.scales[state.scaleId];
+  document.getElementById('scaleSearch').placeholder = T.scaleSearchHint;
 
   // Harmonica tuning buttons
   const hkb = document.getElementById('harpKeyBtns');

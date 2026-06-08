@@ -58,6 +58,12 @@
       background:rgba(58,46,28,.10); border-color:rgba(58,46,28,.32); color:var(--text);
     }
     html[data-fbtheme="maple"] .fc.fc-empty:hover { background:rgba(58,46,28,.05); }
+    html[data-fbtheme="maple"] .btn-primary {
+      background: transparent; color: var(--muted); border-color: var(--border);
+    }
+    html[data-fbtheme="maple"] .btn-primary:hover {
+      color: var(--text); border-color: var(--border2); filter: none;
+    }
 
     html[data-fbtheme="walnut"] {
       --bg:#211910; --bg2:#181109; --surface:#2c2218; --surface2:#382b1e;
@@ -110,7 +116,7 @@
     .uke-btn img { width: 52px; height: 52px; object-fit: contain;
       position: absolute; top: 0; left: 0; transition: opacity .2s;
       filter: brightness(0) invert(1); }
-    html[data-fbtheme="maple"]  .uke-btn img { filter: brightness(0) saturate(100%) invert(47%) sepia(55%) saturate(500%) hue-rotate(10deg) brightness(85%) contrast(95%); }
+    html[data-fbtheme="maple"]  .uke-btn img { filter: brightness(0) saturate(100%) invert(30%) sepia(60%) saturate(800%) hue-rotate(8deg) brightness(80%) contrast(110%); }
     html[data-fbtheme="walnut"] .uke-btn img { filter: brightness(0) saturate(100%) invert(68%) sepia(40%) saturate(500%) hue-rotate(20deg) brightness(90%) contrast(90%); }
     html[data-fbtheme="ebony"]  .uke-btn img { filter: brightness(0) saturate(100%) invert(65%) sepia(20%) saturate(400%) hue-rotate(180deg) brightness(90%) contrast(90%); }
     .uke-btn .uke-normal { opacity: 1; }
@@ -500,6 +506,8 @@
     }
     .fc.sel-active { background: rgba(245,166,35,0.2) !important; }
     .fc.sel-active::after { outline: none; }
+    .fc.fc-hidden { cursor: pointer; }
+    .fc.fc-hidden:hover { background: rgba(255,255,255,0.07); }
 
     /* ── Preset chip drag indicator ── */
     .preset-chip { cursor: grab; }
@@ -608,7 +616,10 @@
 
       /* Fretboard area — compact for print */
       .fretboard-outer { overflow: visible !important; padding: 5px 14px 3px !important; background: #fff !important; }
-      .fretboard { width: 100% !important; }
+      /* Remove the JS-set minimum fret width so columns shrink to 1fr and all frets fit */
+      .fretboard { width: 100% !important; --fret-w: 0px !important; }
+      /* Board card must not clip the fretboard */
+      .board-card { overflow: visible !important; }
 
       /* Fret header numbers & dots — compact */
       .fh-num { color: #777 !important; padding-bottom: 3px !important; font-size: 0.58rem !important; }
@@ -1725,16 +1736,17 @@ function buildFbOuter(b) {
 
   outer.addEventListener('mousedown', e => {
     if (e.button !== 0 || e.altKey || e.shiftKey || e.metaKey) return;
+    // Clear selection on any non-ctrl click — even on .nc — so stale
+    // _boxSel doesn't accidentally accumulate into future Ctrl+drags.
+    if (!e.ctrlKey && !e.metaKey) clearBoxSelect();
     if (e.target.closest('.nc, button, input, select')) return;
-    if (e.ctrlKey) {
+    if (e.ctrlKey || e.metaKey) {
       // Additive mode: save existing selection, keep sel-active highlights
       _bsAccum = (_boxSel?.bid === b.id && _boxSel.cells?.size)
         ? { bid: b.id, cells: new Set(_boxSel.cells) }
         : (_bsAccum?.bid === b.id ? _bsAccum : null);
       _bsAnchor = null;
       if (_boxSel) { _boxSel.rect?.remove(); _boxSel = null; }
-    } else {
-      clearBoxSelect();
     }
     _bsAnchor = { x0: e.clientX, y0: e.clientY, bid: b.id };
   });
@@ -1835,6 +1847,16 @@ function buildFbOuter(b) {
           toggleNote(b.id, noteIdx);
         });
         cell.appendChild(nc);
+      } else {
+        // Note is visible but this cell was hidden (box-select DEL or Alt+click).
+        // Regular click restores it so the user can re-add notes by clicking.
+        cell.classList.add('fc-hidden');
+        cell.addEventListener('click', e => {
+          if (e.altKey) return; // alt+click handled by the cell listener above
+          b.hiddenCells.delete(cellKey);
+          pushHistory();
+          refreshBoard(b.id);
+        });
       }
       fb.appendChild(cell);
     });
@@ -2219,7 +2241,18 @@ function buildCard(b) {
 
 // ─── Global event bindings ────────────────────────────────────────────────────
 // btn-add is now rendered dynamically at the bottom of boards-container
-document.getElementById('btn-export').addEventListener('click', () => window.print());
+document.getElementById('btn-export').addEventListener('click', () => {
+  // In 2-column mode auto-set @page landscape so all frets fit side by side
+  let printStyle = null;
+  if (layoutCols === 2) {
+    printStyle = document.createElement('style');
+    printStyle.id = 'gfv-print-landscape';
+    printStyle.textContent = '@page { size: landscape; }';
+    document.head.appendChild(printStyle);
+  }
+  window.print();
+  if (printStyle) setTimeout(() => printStyle.remove(), 500);
+});
 document.getElementById('btn-layout-toggle').addEventListener('click', () => {
   layoutCols = layoutCols === 1 ? 2 : 1;
   try { localStorage.setItem('gfv-layout-cols', layoutCols); } catch(e){}
