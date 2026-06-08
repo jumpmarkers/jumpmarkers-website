@@ -1818,11 +1818,9 @@ function buildFbOuter(b) {
             return;
           }
           if (e.ctrlKey || e.metaKey) {
-            if (b.selectedNotes.has(noteIdx)) {
-              b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
-              pushHistory();
-              liveUpdateFretboard(b.id);
-            }
+            b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
+            pushHistory();
+            liveUpdateFretboard(b.id);
             return;
           }
           // Toggle highlight — note stays visible on neck regardless (no toggleVisible)
@@ -2009,7 +2007,9 @@ function buildCard(b) {
     pill.addEventListener('click', e => {
       if (e.shiftKey) { _playMidi(60 + i); return; }
       if (e.ctrlKey || e.metaKey) {
-        if (b.selectedNotes.has(i)) { b.tonic = (b.tonic === i) ? null : i; refreshBoard(b.id); }
+        b.tonic = (b.tonic === i) ? null : i;
+        pushHistory();
+        refreshBoard(b.id);
         return;
       }
       toggleNote(b.id, i);
