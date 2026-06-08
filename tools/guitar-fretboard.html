@@ -1820,7 +1820,7 @@ function buildFbOuter(b) {
           if (e.ctrlKey || e.metaKey) {
             b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
             pushHistory();
-            liveUpdateFretboard(b.id);
+            refreshBoard(b.id);
             return;
           }
           // Toggle highlight — note stays visible on neck regardless (no toggleVisible)
