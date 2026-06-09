@@ -2250,16 +2250,7 @@ function buildCard(b) {
 // ─── Global event bindings ────────────────────────────────────────────────────
 // btn-add is now rendered dynamically at the bottom of boards-container
 document.getElementById('btn-export').addEventListener('click', () => {
-  // In 2-column mode auto-set @page landscape so all frets fit side by side
-  let printStyle = null;
-  if (layoutCols === 2) {
-    printStyle = document.createElement('style');
-    printStyle.id = 'gfv-print-landscape';
-    printStyle.textContent = '@page { size: landscape; }';
-    document.head.appendChild(printStyle);
-  }
   window.print();
-  if (printStyle) setTimeout(() => printStyle.remove(), 500);
 });
 document.getElementById('btn-layout-toggle').addEventListener('click', () => {
   layoutCols = layoutCols === 1 ? 2 : 1;
