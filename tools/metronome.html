@@ -1045,7 +1045,7 @@ function buildBeatsRow(){
     btn.textContent=state==='rest'?'—':'♩';
     btn.addEventListener('click',()=>{
       beatPattern[i]=beatPattern[i]==='accent'?'normal':beatPattern[i]==='normal'?'rest':'accent';
-      buildBeatsRow();
+      buildBeatsRow(); pushHistory();
     });
     el.appendChild(btn);
   }
@@ -1073,7 +1073,7 @@ function buildSubdivRow(){
     btn.setAttribute('aria-label',`Sub ${i+1}: ${isOn?'on':'rest'}`);
     btn.addEventListener('click',()=>{
       subdivPattern[i]=!subdivPattern[i];
-      buildSubdivRow();
+      buildSubdivRow(); pushHistory();
     });
     el.appendChild(btn);
   }
@@ -1086,6 +1086,7 @@ function setBpm(v){
   bpm=Math.max(20,Math.min(320,Math.round(v)));
   document.getElementById('bpmNum').textContent=bpm;
   document.getElementById('tempoName').textContent=getTempoName(bpm);
+  pushHistoryDebounced();
 }
 
 function resetVisual(){
@@ -1160,7 +1161,7 @@ document.addEventListener('touchmove',e=>{ if(dragY0===null)return; setBpm(dragB
 document.addEventListener('mouseup', ()=>{ dragY0=null; });
 document.addEventListener('touchend',()=>{ dragY0=null; });
 bpmEl.addEventListener('wheel',e=>{ e.preventDefault(); setBpm(bpm+(e.deltaY<0?1:-1)); },{passive:false});
-bpmEl.addEventListener('dblclick',()=>{ const v=prompt('Enter BPM (20–320):',bpm); if(v!==null) setBpm(parseFloat(v)||bpm); });
+bpmEl.addEventListener('dblclick',()=>{ const v=prompt('Enter BPM (20–320):',bpm); if(v!==null){ setBpm(parseFloat(v)||bpm); clearTimeout(historyDebTimer); pushHistory(); } });
 
 let holdTimer=null;
 function startHold(dir){ holdTimer=setInterval(()=>setBpm(bpm+dir*3),90); }
@@ -1181,15 +1182,15 @@ function stopHold(){ clearInterval(holdTimer); holdTimer=null; }
 function restart(){ if(isPlaying){ stopMetronome(); startMetronome(); } }
 
 document.getElementById('timeSigCell').addEventListener('click',()=>{
-  timeSigIdx=(timeSigIdx+1)%TIME_SIGS.length; updateTimeSig(); buildSvg(); restart();
+  timeSigIdx=(timeSigIdx+1)%TIME_SIGS.length; updateTimeSig(); buildSvg(); restart(); pushHistory();
 });
 document.getElementById('timeSigCell').addEventListener('keydown',e=>{
-  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); timeSigIdx=(timeSigIdx+1)%TIME_SIGS.length; updateTimeSig(); buildSvg(); restart(); }
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); timeSigIdx=(timeSigIdx+1)%TIME_SIGS.length; updateTimeSig(); buildSvg(); restart(); pushHistory(); }
 });
 
-document.getElementById('soundCell').addEventListener('click',()=>{ soundIdx=(soundIdx+1)%SOUNDS.length; updateSound(); });
+document.getElementById('soundCell').addEventListener('click',()=>{ soundIdx=(soundIdx+1)%SOUNDS.length; updateSound(); pushHistory(); });
 document.getElementById('soundCell').addEventListener('keydown',e=>{
-  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); soundIdx=(soundIdx+1)%SOUNDS.length; updateSound(); }
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); soundIdx=(soundIdx+1)%SOUNDS.length; updateSound(); pushHistory(); }
 });
 
 document.getElementById('vizCell').addEventListener('click',()=>{
@@ -1197,16 +1198,18 @@ document.getElementById('vizCell').addEventListener('click',()=>{
   const svg=document.getElementById('beatSvg'), fd=document.getElementById('beatFlashDiv'), ico=document.getElementById('vizIcon');
   if(vizMode==='circle'){ svg.style.display='block'; fd.style.display='none'; ico.textContent='◉'; ico.classList.add('active'); }
   else{ svg.style.display='none'; fd.style.display='flex'; ico.textContent='◎'; ico.classList.remove('active'); }
+  pushHistory();
 });
 
 document.getElementById('subdivCycle').addEventListener('click',()=>{
-  subdivision=(subdivision%10)+1; updateSubdiv(); buildSvg(); restart();
+  subdivision=(subdivision%10)+1; updateSubdiv(); buildSvg(); restart(); pushHistory();
 });
 
 document.getElementById('subdivToggle').addEventListener('click',()=>{
   subdivEnabled=!subdivEnabled;
   document.getElementById('subdivToggle').classList.toggle('on', subdivEnabled);
   document.getElementById('subdivNotes').classList.toggle('disabled', !subdivEnabled);
+  pushHistory();
 });
 
 document.getElementById('playBtn').addEventListener('click',()=>{
@@ -1229,18 +1232,22 @@ document.getElementById('tapBtn').addEventListener('touchend',e=>{ e.preventDefa
     const snd=SOUNDS[soundIdx], def=PITCH_DEFS[snd], k=key.toLowerCase();
     pitchState[snd][k]=s2f(+e.target.value,def.min,def.max);
     document.getElementById(`pitch${key}Val`).textContent=pitchState[snd][k]+' Hz';
+    pushHistoryDebounced();
   });
 });
 
 /* ── Mixer faders ── */
 document.getElementById('faderMain').addEventListener('input',e=>{
   volMain=+e.target.value/100; document.getElementById('valMain').textContent=e.target.value;
+  pushHistoryDebounced();
 });
 document.getElementById('faderSub').addEventListener('input',e=>{
   volSub=+e.target.value/100; document.getElementById('valSub').textContent=e.target.value;
+  pushHistoryDebounced();
 });
 document.getElementById('faderMaster').addEventListener('input',e=>{
   volMaster=+e.target.value/100; document.getElementById('valMaster').textContent=e.target.value;
+  pushHistoryDebounced();
 });
 
 /* ── Pan knob ── */
@@ -1252,6 +1259,7 @@ function setPanSub(v){
   const deg=(panSub/100)*135;
   panKnobEl.querySelector('.pan-knob-dot').style.transform=`rotate(${deg}deg)`;
   document.getElementById('panSubVal').textContent=panSub===0?'C':panSub<0?`L${Math.abs(panSub)}`:`R${panSub}`;
+  pushHistoryDebounced();
 }
 
 panKnobEl.addEventListener('mousedown',e=>{ panDragY=e.clientY; panDragVal0=panSub; e.preventDefault(); });
@@ -1282,17 +1290,108 @@ function applyAccentColor(hex){
   root.setProperty('--inner-on',hex); root.setProperty('--shadow-beat',hexToRgba(hex,.4));
   root.setProperty('--shadow-beat-hi',hexToRgba(hi,.5));
 }
-document.getElementById('colorInput').addEventListener('input',e=>applyAccentColor(e.target.value));
+document.getElementById('colorInput').addEventListener('input',e=>{ applyAccentColor(e.target.value); pushHistoryDebounced(); });
 
 /* ── Keyboard shortcuts ── */
 document.addEventListener('keydown',e=>{
   if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  const ctrl=e.ctrlKey||e.metaKey;
+  if(ctrl && e.key==='z'){ e.preventDefault(); undo(); return; }
+  if(ctrl && (e.key==='y'||(e.shiftKey&&e.key==='Z'))){ e.preventDefault(); redo(); return; }
   if(e.code==='Space'){ e.preventDefault(); if(isPlaying){stopMetronome();setPlaying(false);}else{startMetronome();setPlaying(true);} }
   if(e.key.toLowerCase()==='t') onTap();
   if(e.key.toLowerCase()==='m') document.getElementById('volBtn').click();
   if(e.key==='ArrowUp')   { e.preventDefault(); setBpm(bpm+1); }
   if(e.key==='ArrowDown') { e.preventDefault(); setBpm(bpm-1); }
 });
+
+/* ═══════════════════════════════════════════════════
+   UNDO / REDO HISTORY
+   ═══════════════════════════════════════════════════ */
+const MAX_HISTORY = 50;
+const undoStack   = [];
+let   historyIdx  = -1;
+let   historyLocked  = false;
+let   historyDebTimer = null;
+
+function getStateSnapshot(){
+  return {
+    bpm, timeSigIdx, soundIdx, subdivision, vizMode,
+    beatPattern:   [...beatPattern],
+    subdivPattern: [...subdivPattern],
+    subdivEnabled,
+    volMain, volSub, volMaster, panSub,
+    pitchState: JSON.parse(JSON.stringify(pitchState)),
+    colorHex:   document.getElementById('colorInput').value,
+  };
+}
+
+function pushHistory(){
+  if(historyLocked) return;
+  clearTimeout(historyDebTimer);
+  undoStack.splice(historyIdx + 1);          // discard any redo states
+  undoStack.push(getStateSnapshot());
+  if(undoStack.length > MAX_HISTORY) undoStack.shift();
+  historyIdx = undoStack.length - 1;
+}
+
+function pushHistoryDebounced(){
+  if(historyLocked) return;
+  clearTimeout(historyDebTimer);
+  historyDebTimer = setTimeout(pushHistory, 600);
+}
+
+function applyState(snap){
+  historyLocked = true;
+  bpm          = snap.bpm;
+  timeSigIdx   = snap.timeSigIdx;
+  soundIdx     = snap.soundIdx;
+  subdivision  = snap.subdivision;
+  vizMode      = snap.vizMode || 'circle';
+  beatPattern  = [...(snap.beatPattern  || ['accent','normal','normal','normal'])];
+  subdivPattern= [...(snap.subdivPattern|| [])];
+  subdivEnabled= snap.subdivEnabled ?? true;
+  volMain      = snap.volMain   ?? 1;
+  volSub       = snap.volSub    ?? 0.8;
+  volMaster    = snap.volMaster ?? 1;
+  panSub       = snap.panSub    ?? 0;
+  if(snap.pitchState) Object.keys(snap.pitchState).forEach(s=>{ if(pitchState[s]) Object.assign(pitchState[s], snap.pitchState[s]); });
+
+  setBpm(bpm);
+  updateTimeSig(); updateSound(); updateSubdiv();
+  document.getElementById('subdivToggle').classList.toggle('on', subdivEnabled);
+  document.getElementById('subdivNotes').classList.toggle('disabled', !subdivEnabled);
+
+  const svgEl2=document.getElementById('beatSvg'), fdEl=document.getElementById('beatFlashDiv'), icoEl=document.getElementById('vizIcon');
+  if(vizMode==='circle'){ svgEl2.style.display='block'; fdEl.style.display='none'; icoEl.textContent='◉'; icoEl.classList.add('active'); }
+  else{ svgEl2.style.display='none'; fdEl.style.display='flex'; icoEl.textContent='◎'; icoEl.classList.remove('active'); }
+
+  buildSvg();
+  setPanSub(panSub);
+  document.getElementById('faderMain').value      = Math.round(volMain  *100);
+  document.getElementById('valMain').textContent  = Math.round(volMain  *100);
+  document.getElementById('faderSub').value       = Math.round(volSub   *100);
+  document.getElementById('valSub').textContent   = Math.round(volSub   *100);
+  document.getElementById('faderMaster').value    = Math.round(volMaster*100);
+  document.getElementById('valMaster').textContent= Math.round(volMaster*100);
+  if(snap.colorHex){ applyAccentColor(snap.colorHex); document.getElementById('colorInput').value=snap.colorHex; }
+
+  historyLocked = false;
+  clearTimeout(historyDebTimer); // cancel any debounce triggered during apply
+  if(isPlaying){ stopMetronome(); startMetronome(); }
+}
+
+function undo(){
+  if(historyIdx <= 0) return;
+  historyIdx--;
+  applyState(undoStack[historyIdx]);
+}
+
+function redo(){
+  if(historyIdx >= undoStack.length - 1) return;
+  historyIdx++;
+  applyState(undoStack[historyIdx]);
+}
 
 /* ═══════════════════════════════════════════════════
    PRESETS
@@ -1302,20 +1401,8 @@ let presets = (() => {
   catch(e){ return [null,null,null,null]; }
 })();
 
-function getPresetData(){
-  return {
-    bpm, timeSigIdx, soundIdx, subdivision,
-    beatPattern:   [...beatPattern],
-    subdivPattern: [...subdivPattern],
-    subdivEnabled,
-    volMain, volSub, volMaster, panSub,
-    pitchState:    JSON.parse(JSON.stringify(pitchState)),
-    colorHex:      document.getElementById('colorInput').value,
-  };
-}
-
 function savePreset(idx){
-  presets[idx] = getPresetData();
+  presets[idx] = getStateSnapshot();
   try{ localStorage.setItem('metro_presets', JSON.stringify(presets)); }catch(e){}
   buildPresetButtons();
 }
@@ -1328,40 +1415,8 @@ function clearPreset(idx){
 
 function loadPreset(idx){
   const p = presets[idx]; if(!p) return;
-  bpm          = p.bpm;
-  timeSigIdx   = p.timeSigIdx;
-  soundIdx     = p.soundIdx;
-  subdivision  = p.subdivision;
-  beatPattern  = [...(p.beatPattern  || ['accent','normal','normal','normal'])];
-  subdivPattern= [...(p.subdivPattern|| [])];
-  subdivEnabled= p.subdivEnabled ?? true;
-  volMain      = p.volMain  ?? 1;
-  volSub       = p.volSub   ?? 0.8;
-  volMaster    = p.volMaster?? 1;
-  panSub       = p.panSub   ?? 0;
-  if(p.pitchState) Object.keys(p.pitchState).forEach(s=>{ if(pitchState[s]) Object.assign(pitchState[s], p.pitchState[s]); });
-
-  setBpm(bpm);
-  updateTimeSig();
-  updateSound();
-  updateSubdiv();
-  document.getElementById('subdivToggle').classList.toggle('on', subdivEnabled);
-  document.getElementById('subdivNotes').classList.toggle('disabled', !subdivEnabled);
-  buildSvg();
-  setPanSub(panSub);
-
-  document.getElementById('faderMain').value    = Math.round(volMain  *100);
-  document.getElementById('valMain').textContent= Math.round(volMain  *100);
-  document.getElementById('faderSub').value     = Math.round(volSub   *100);
-  document.getElementById('valSub').textContent = Math.round(volSub   *100);
-  document.getElementById('faderMaster').value  = Math.round(volMaster*100);
-  document.getElementById('valMaster').textContent=Math.round(volMaster*100);
-
-  if(p.colorHex){
-    applyAccentColor(p.colorHex);
-    document.getElementById('colorInput').value = p.colorHex;
-  }
-  if(isPlaying){ stopMetronome(); startMetronome(); }
+  applyState(p);   // restore all state (historyLocked inside)
+  pushHistory();   // make this load undoable
 }
 
 function buildPresetButtons(){
@@ -1414,6 +1469,7 @@ updateSound();   // also calls updatePitchUI
 updateSubdiv();  // also calls buildSubdivRow
 buildSvg();
 buildPresetButtons();
+pushHistory();   // seed undo stack with initial state
 requestAnimationFrame(rafLoop);
 </script>
 </body>
