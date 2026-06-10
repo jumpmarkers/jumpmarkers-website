@@ -88,12 +88,12 @@
 
     /* ── Split-screen metronome panel ── */
     .metro-panel {
-      flex-shrink: 0; width: 0; overflow: hidden;
-      border-right: 1px solid var(--border);
-      transition: width 0.28s ease; height: 100vh;
+      flex-shrink: 0; width: 300px;
+      border-right: 2px solid var(--border);
+      height: 100vh; display: none;
     }
-    .metro-panel.open { width: 262px; }
-    .metro-panel iframe { width: 262px; height: 100%; border: none; display: block; }
+    .metro-panel.open { display: flex; flex-direction: column; }
+    .metro-panel iframe { flex: 1; width: 100%; border: none; display: block; min-height: 0; }
     .content-wrap { flex: 1; overflow-y: auto; min-width: 0; height: 100vh; }
     #btn-metronome-split.active {
       background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important;
