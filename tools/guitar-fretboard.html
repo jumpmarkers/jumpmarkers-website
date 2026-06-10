@@ -2430,15 +2430,15 @@ document.addEventListener('keydown', e => {
   const panel  = document.getElementById('metro-panel');
   const iframe = document.getElementById('metro-iframe');
   let open = false;
-  let loaded = false;
   try { open = localStorage.getItem('gfv-split') === '1'; } catch(e){}
+
+  iframe.src = 'metronome.html';
 
   function applySplit(state) {
     open = state;
     panel.classList.toggle('open', open);
     btn.classList.toggle('active', open);
     btn.textContent = open ? '✕ Metronome' : '🥁 Metronome';
-    if (open && !loaded) { iframe.src = 'metronome.html'; loaded = true; }
     try { localStorage.setItem('gfv-split', open ? '1' : '0'); } catch(e){}
   }
 
