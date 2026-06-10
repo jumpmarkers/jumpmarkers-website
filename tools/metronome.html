@@ -917,29 +917,33 @@ function rafLoop(){
 }
 
 function onBeat(beat){
+  const btype = beatPattern[beat] || 'normal';
+  const beatActive = btype !== 'rest';
   // Circular SVG
   if(vizMode==='circle'){
     const beats=TIME_SIGS[timeSigIdx].beats;
     for(let i=0;i<beats;i++){
       const p=svgEl(`[data-beat="${i}"]`); if(!p) continue;
-      const on=i===beat;
-      p.setAttribute('fill', on?(beat===0?'var(--beat-hi)':'var(--beat-on)'):'var(--beat-off)');
+      const on = i===beat && beatActive;
+      p.setAttribute('fill', on?(btype==='accent'?'var(--beat-hi)':'var(--beat-on)'):'var(--beat-off)');
       if(on){ p.classList.remove('seg-pulse'); void p.getBoundingClientRect(); p.classList.add('seg-pulse'); }
     }
     const n=document.getElementById('beatNum');
-    if(n){ n.textContent=beat+1; n.setAttribute('fill','var(--text)'); }
+    if(n){ n.textContent=beat+1; n.setAttribute('fill', beatActive?'var(--text)':'var(--dim)'); }
   } else {
-    const fd=document.getElementById('beatFlashDiv');
-    const fn=document.getElementById('flashNum');
-    if(fn) fn.textContent=beat+1;
-    fd.classList.remove('on-beat'); void fd.getBoundingClientRect(); fd.classList.add('on-beat');
-    setTimeout(()=>fd.classList.remove('on-beat'),90);
+    if(beatActive){
+      const fd=document.getElementById('beatFlashDiv');
+      const fn=document.getElementById('flashNum');
+      if(fn) fn.textContent=beat+1;
+      fd.classList.remove('on-beat'); void fd.getBoundingClientRect(); fd.classList.add('on-beat');
+      setTimeout(()=>fd.classList.remove('on-beat'),90);
+    }
   }
-  // Beats row highlight
+  // Beats row highlight — only on active beats
   const btns=document.querySelectorAll('#beatsRow .beat-note');
   btns.forEach((b,i)=>{
     b.classList.remove('lit');
-    if(i===beat){ void b.getBoundingClientRect(); b.classList.add('lit'); }
+    if(i===beat && beatActive){ void b.getBoundingClientRect(); b.classList.add('lit'); }
   });
 }
 
@@ -948,9 +952,11 @@ function onSubBeat(beat,sub){
   const beats=TIME_SIGS[timeSigIdx].beats;
   const total=beats*subdivision;
   const noteIdx=beat*subdivision+sub;
+  // Only light up if subdivisions are enabled and this sub position is active
+  const subActive = subdivEnabled && subdivPattern[sub-1]!==false;
   for(let i=0;i<total;i++){
     const p=svgEl(`[data-note="${i}"]`); if(!p) continue;
-    p.setAttribute('fill', i===noteIdx?'var(--inner-on)':'var(--inner-off)');
+    p.setAttribute('fill', (i===noteIdx && subActive)?'var(--inner-on)':'var(--inner-off)');
   }
 }
 
