@@ -19,7 +19,20 @@
       --mono: 'DM Mono', monospace;
     }
     html { scroll-behavior: smooth; }
-    body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.7; }
+    body {
+      background: var(--bg); color: var(--text); font-family: var(--body); font-size: 16px; line-height: 1.7;
+      background-image: url('bg.png');
+      background-size: cover;
+      background-position: center top;
+      background-attachment: fixed;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background: rgba(13,17,48,.82);
+      pointer-events: none;
+    }
+    nav, section, .features, .bottom-cta, footer { position: relative; z-index: 1; }
     a { color: var(--gold); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
