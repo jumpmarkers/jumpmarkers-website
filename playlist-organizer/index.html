@@ -136,12 +136,12 @@
       border: 1px solid rgba(255,255,255,.08);
       cursor: zoom-in;
       transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
-      filter: contrast(1.08) saturate(1.12) brightness(1.02);
+      filter: url(#sharpen) contrast(1.14) saturate(1.14) brightness(1.02);
     }
     .feature-img img:hover {
       transform: scale(1.03);
       box-shadow: 0 20px 72px rgba(0,0,0,.7), 0 4px 16px rgba(0,0,0,.4);
-      filter: contrast(1.1) saturate(1.18) brightness(1.04);
+      filter: url(#sharpen) contrast(1.18) saturate(1.2) brightness(1.04);
     }
 
     /* LIGHTBOX */
@@ -328,6 +328,15 @@
   <a href="mailto:jumpmarkers@gmail.com">Contact</a>
   <span style="margin-left:10px">© 2026 jumpmarkers.com</span>
 </footer>
+
+<!-- SVG SHARPEN FILTER -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <filter id="sharpen">
+      <feConvolveMatrix order="3" kernelMatrix="0 -1 0 -1 5 -1 0 -1 0" preserveAlpha="true"/>
+    </filter>
+  </defs>
+</svg>
 
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox">
