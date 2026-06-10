@@ -40,6 +40,8 @@
       --shadow-beat-hi:rgba(224,96,249,.5);
     }
 
+    html.in-iframe nav { display: none; }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', system-ui, sans-serif;
@@ -497,6 +499,7 @@
       .beat-svg       { max-width: min(280px, calc(100vw - 48px)); }
     }
   </style>
+  <script>if (window.self !== window.top) document.documentElement.classList.add('in-iframe');</script>
 </head>
 <body>
 

@@ -762,8 +762,8 @@
     /* Apply saved theme before first paint — prevents flash */
     try {
       var _s = JSON.parse(localStorage.getItem('gfv-settings') || '{}');
-      if (_s && _s.theme && _s.theme !== 'midnight')
-        document.documentElement.dataset.fbtheme = _s.theme;
+      var _t = (_s && _s.theme) || 'ebony';
+      if (_t !== 'midnight') document.documentElement.dataset.fbtheme = _t;
     } catch(e) {}
   </script>
 </head>
@@ -935,7 +935,7 @@ const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La',
 const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
 
 // ─── App settings ─────────────────────────────────────────────────────────────
-let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'midnight' };
+let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony' };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
 function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
 function applyTheme(t) {
