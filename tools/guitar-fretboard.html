@@ -1429,8 +1429,10 @@ let currentPresetName = null;
 let _dragPresetName   = null;
 
 function buildPresetData(name) {
+  const existing = presets.find(p => p.name === name);
   return {
     name,
+    ...(existing?.color && { color: existing.color }),
     boards: boards.map(b => ({
       label: b.label, totalFrets: b.totalFrets,
       startFret: b.startFret, endFret: b.endFret,
