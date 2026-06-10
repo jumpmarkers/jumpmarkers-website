@@ -83,21 +83,7 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
-    body { font-family: var(--body); background: var(--bg); color: var(--text);
-           display: flex; height: 100vh; overflow: hidden; }
-
-    /* ── Split-screen metronome panel ── */
-    .metro-panel {
-      flex-shrink: 0; width: 0; overflow: hidden;
-      border-right: 1px solid var(--border); background: var(--bg);
-      transition: width 0.25s ease; height: 100vh; position: relative;
-    }
-    .metro-panel.open { width: 265px; }
-    .metro-panel iframe { width: 265px; height: 100%; border: none; display: block; }
-    .content-wrap { flex: 1; overflow-y: auto; min-width: 0; height: 100vh; }
-    .btn-split { font-family: var(--mono); }
-    .btn-split.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
-    @media print { .metro-panel { display: none !important; } }
+    body { font-family: var(--body); background: var(--bg); color: var(--text); min-height: 100vh; }
     a { color: inherit; text-decoration: none; }
 
     /* ── Nav ── */
@@ -768,11 +754,6 @@
 </head>
 <body>
 
-<div class="metro-panel" id="metro-panel">
-  <iframe id="metro-iframe" src="" title="Metronome" allow="autoplay"></iframe>
-</div>
-<div class="content-wrap">
-
 <nav>
   <a class="nav-brand" href="../index.html">
     JumpMarkers <span class="nav-sep">/</span> <span class="nav-tool">Guitar Fretboard</span>
@@ -783,7 +764,6 @@
       <img class="uke-broken" src="../assets/uke_broken.png" alt="Support">
     </a>
     <span class="uke-label">buy me ukulele strings</span>
-    <button class="btn btn-outline btn-sm btn-split" id="btn-metronome-split" title="Split screen with Metronome">🥁 Metronome</button>
     <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
   </div>
 </nav>
@@ -820,7 +800,6 @@
 
   <div id="boards-container"></div>
 </main>
-</div><!-- /.content-wrap -->
 
 <!-- Settings Modal -->
 <div class="fb-modal-overlay" id="fb-settings-overlay">
@@ -2423,27 +2402,6 @@ document.addEventListener('keydown', e => {
     if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
   }
 });
-
-// ─── Split-screen metronome ───────────────────────────────────────────────────
-(function() {
-  const btn   = document.getElementById('btn-metronome-split');
-  const panel = document.getElementById('metro-panel');
-  const iframe = document.getElementById('metro-iframe');
-  let open = false;
-  try { open = localStorage.getItem('gfv-split') === '1'; } catch(e){}
-
-  function applySplit(state) {
-    open = state;
-    panel.classList.toggle('open', open);
-    btn.classList.toggle('active', open);
-    btn.title = open ? 'Close metronome panel' : 'Split screen with Metronome';
-    if (open && !iframe.src) iframe.src = 'metronome.html';
-    try { localStorage.setItem('gfv-split', open ? '1' : '0'); } catch(e){}
-  }
-
-  btn.addEventListener('click', () => applySplit(!open));
-  applySplit(open); // restore persisted state
-})();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 addBoard();
