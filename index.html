@@ -1200,25 +1200,35 @@
   document.addEventListener('touchend', onPointerUp);
 })();
 
-// ── Scroll video scrubbing ───────────────────────────
+// ── Scroll video scrubbing (lerp) ────────────────────
 (function(){
   const video = document.getElementById('bg-video');
-  let ticking = false;
+  let target  = 0;   // where scroll says we should be
+  let current = 0;   // where we actually are (lerped)
+  let rafId   = null;
 
-  function scrub() {
-    if (!video.duration) return;
-    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    const fraction  = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
-    video.currentTime = fraction * video.duration;
-    ticking = false;
+  function getTarget() {
+    if (!video.duration) return 0;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    return max > 0 ? Math.min(window.scrollY / max, 1) * video.duration : 0;
+  }
+
+  function loop() {
+    current += (target - current) * 0.1;          // 0.1 = smooth but responsive
+    if (Math.abs(current - video.currentTime) > 0.013) {
+      video.currentTime = current;
+    }
+    rafId = Math.abs(target - current) > 0.001
+      ? requestAnimationFrame(loop)
+      : null;
   }
 
   window.addEventListener('scroll', () => {
-    if (!ticking) { requestAnimationFrame(scrub); ticking = true; }
+    target = getTarget();
+    if (!rafId) rafId = requestAnimationFrame(loop);
   }, { passive: true });
 
-  video.addEventListener('loadedmetadata', scrub);
-  video.addEventListener('canplaythrough', scrub);
+  video.addEventListener('loadedmetadata', () => { target = current = 0; });
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
