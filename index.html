@@ -1203,9 +1203,20 @@
 // ── Canvas frame-cache scrubbing (Apple-style) ───────
 (function(){
   const video  = document.getElementById('bg-video');
-  const FPS    = 10;   // frames to extract per second of video
+  const FPS    = 8;     // frames per second to extract
+  const GRAB_W = 720;   // capture width — 4× fewer pixels than 1280, much faster
   let frames   = [], canvas = null, ctx = null, ready = false;
   let target   = 0, current = 0, rafId = null, lastIdx = -1;
+
+  // ── Loading indicator ─────────────────────────────
+  const pill = document.createElement('div');
+  Object.assign(pill.style, {
+    position:'fixed', bottom:'16px', right:'16px', zIndex:'200',
+    fontFamily:'monospace', fontSize:'10px', color:'rgba(255,255,255,.45)',
+    background:'rgba(0,0,0,.35)', borderRadius:'6px',
+    padding:'4px 9px', pointerEvents:'none', transition:'opacity .4s'
+  });
+  document.body.appendChild(pill);
 
   // ── Scroll → lerp loop ────────────────────────────
   function loop() {
@@ -1223,7 +1234,7 @@
         lastIdx = idx;
       }
     } else if (video.duration) {
-      video.currentTime = current * video.duration;  // fallback while loading
+      video.currentTime = current * video.duration;
     }
     rafId = Math.abs(target - current) > 0.0002
       ? requestAnimationFrame(loop) : null;
@@ -1246,23 +1257,25 @@
     });
     video.insertAdjacentElement('afterend', canvas);
     ctx = canvas.getContext('2d');
-
     window.addEventListener('resize', () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-      lastIdx = -1;  // force redraw
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight; lastIdx = -1;
     });
 
     const total = Math.ceil(video.duration * FPS);
     for (let i = 0; i < total; i++) {
       video.currentTime = i / FPS;
       await new Promise(r => video.addEventListener('seeked', r, { once:true }));
-      frames.push(await createImageBitmap(video));
+      frames.push(await createImageBitmap(video, { resizeWidth: GRAB_W, resizeQuality: 'medium' }));
+      pill.textContent = `▶ ${Math.round((i+1)/total*100)}%`;
+      // yield to main thread every 5 frames so page stays responsive
+      if (i % 5 === 4) await new Promise(r => setTimeout(r, 0));
     }
 
     video.style.display = 'none';
     canvas.style.display = 'block';
     ready = true;
+    pill.style.opacity = '0';
+    setTimeout(() => pill.remove(), 500);
     if (!rafId) rafId = requestAnimationFrame(loop);
   }
 
