@@ -62,17 +62,17 @@
     .uke-wrap { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; }
     .uke-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 48px; height: 48px; position: relative;
-      opacity: .7; transition: opacity .2s, transform .2s;
+      width: 56px; height: 56px; position: relative;
+      opacity: .75; transition: opacity .2s, transform .2s;
       flex-shrink: 0;
     }
     .uke-btn:hover { opacity: 1; transform: scale(1.12) rotate(-6deg); }
-    .uke-btn img { width: 48px; height: 48px; object-fit: contain; position: absolute; top: 0; left: 0; transition: opacity .2s; filter: brightness(0) invert(1); }
+    .uke-btn img { width: 56px; height: 56px; object-fit: contain; position: absolute; top: 0; left: 0; transition: opacity .2s; filter: brightness(0) invert(1); }
     .uke-btn .uke-normal { opacity: 1; }
     .uke-btn .uke-broken { opacity: 0; }
     .uke-btn:hover .uke-normal { opacity: 0; }
     .uke-btn:hover .uke-broken { opacity: 1; }
-    .uke-label { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); white-space: nowrap; letter-spacing: .3px; }
+    .uke-label { font-family: var(--mono); font-size: 0.75rem; color: #fff; white-space: nowrap; letter-spacing: .4px; opacity: .8; }
 
     /* HERO */
     .hero {
