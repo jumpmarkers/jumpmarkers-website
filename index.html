@@ -671,7 +671,10 @@
 </head>
 <body>
 
-<video id="bg-video" src="bg-video.mp4" preload="auto" muted playsinline></video>
+<video id="bg-video" preload="auto" muted playsinline>
+  <source src="bg-video.webm" type="video/webm">
+  <source src="bg-video.mp4" type="video/mp4">
+</video>
 <div class="bg-overlay"></div>
 
 <!-- NAV -->
@@ -1287,7 +1290,6 @@
 (function(){
   const slogans = [
     'Never lose the <strong>good part.</strong>',
-    'Your Tube memories, <strong>organized.</strong>',
     'Mark it. Keep it. <strong>Find it.</strong>',
     'Your videos, your markers, <strong>your way.</strong>'
   ];
