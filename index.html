@@ -69,15 +69,38 @@
     --display:   'Josefin Sans', sans-serif;
     --body:      'Inter', system-ui, sans-serif;
   }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; background: var(--bg); }
   body {
-    background: var(--bg);
+    background: transparent;
     color: var(--text);
     font-family: var(--body);
     font-size: 16px;
     line-height: 1.6;
     overflow-x: hidden;
   }
+
+  /* ─── SCROLL VIDEO BG ───────────────────────────────── */
+  #bg-video {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: -2;
+    opacity: .55;
+  }
+  .bg-overlay {
+    position: fixed; inset: 0; z-index: -1;
+    background: rgba(13,17,48,.78);
+    pointer-events: none;
+  }
+  /* Make section backgrounds semi-transparent so video bleeds through */
+  .marquee-section { background: rgba(10,14,37,.80) !important; }
+  #features        { background: rgba(13,17,48,.78) !important; }
+  #how             { background: rgba(10,14,37,.82) !important; }
+  #pricing         { background: rgba(13,17,48,.78) !important; }
+  #faq             { background: rgba(10,14,37,.82) !important; }
+  #free-tools      { background: rgba(13,17,48,.78) !important; }
+  #extensions      { background: rgba(13,17,48,.78) !important; }
+  footer           { background: rgba(10,14,37,.88) !important; }
   a { color: inherit; text-decoration: none; }
 
   /* ─── NAV ───────────────────────────────────────────── */
@@ -648,6 +671,9 @@
 </head>
 <body>
 
+<video id="bg-video" src="bg-video.mp4" preload="auto" muted playsinline></video>
+<div class="bg-overlay"></div>
+
 <!-- NAV -->
 <nav>
   <div class="nav-logo">Jump<em>Markers</em></div>
@@ -1172,6 +1198,27 @@
   track.addEventListener('touchstart', e => onPointerDown(e.touches[0].clientX), { passive: true });
   document.addEventListener('touchmove', e => { if (touching) onPointerMove(e.touches[0].clientX); }, { passive: true });
   document.addEventListener('touchend', onPointerUp);
+})();
+
+// ── Scroll video scrubbing ───────────────────────────
+(function(){
+  const video = document.getElementById('bg-video');
+  let ticking = false;
+
+  function scrub() {
+    if (!video.duration) return;
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const fraction  = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
+    video.currentTime = fraction * video.duration;
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) { requestAnimationFrame(scrub); ticking = true; }
+  }, { passive: true });
+
+  video.addEventListener('loadedmetadata', scrub);
+  video.addEventListener('canplaythrough', scrub);
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
