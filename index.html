@@ -1200,35 +1200,74 @@
   document.addEventListener('touchend', onPointerUp);
 })();
 
-// ── Scroll video scrubbing (lerp) ────────────────────
+// ── Canvas frame-cache scrubbing (Apple-style) ───────
 (function(){
-  const video = document.getElementById('bg-video');
-  let target  = 0;   // where scroll says we should be
-  let current = 0;   // where we actually are (lerped)
-  let rafId   = null;
+  const video  = document.getElementById('bg-video');
+  const FPS    = 10;   // frames to extract per second of video
+  let frames   = [], canvas = null, ctx = null, ready = false;
+  let target   = 0, current = 0, rafId = null, lastIdx = -1;
 
-  function getTarget() {
-    if (!video.duration) return 0;
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    return max > 0 ? Math.min(window.scrollY / max, 1) * video.duration : 0;
-  }
-
+  // ── Scroll → lerp loop ────────────────────────────
   function loop() {
-    current += (target - current) * 0.1;          // 0.1 = smooth but responsive
-    if (Math.abs(current - video.currentTime) > 0.013) {
-      video.currentTime = current;
+    current += (target - current) * 0.12;
+    if (ready) {
+      const idx = Math.min(Math.floor(current * frames.length), frames.length - 1);
+      if (idx !== lastIdx && frames[idx]) {
+        const bmp = frames[idx];
+        const cw = canvas.width, ch = canvas.height;
+        const scale = Math.max(cw / bmp.width, ch / bmp.height);
+        const dx = (cw - bmp.width  * scale) / 2;
+        const dy = (ch - bmp.height * scale) / 2;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(bmp, dx, dy, bmp.width * scale, bmp.height * scale);
+        lastIdx = idx;
+      }
+    } else if (video.duration) {
+      video.currentTime = current * video.duration;  // fallback while loading
     }
-    rafId = Math.abs(target - current) > 0.001
-      ? requestAnimationFrame(loop)
-      : null;
+    rafId = Math.abs(target - current) > 0.0002
+      ? requestAnimationFrame(loop) : null;
   }
 
   window.addEventListener('scroll', () => {
-    target = getTarget();
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    target = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
     if (!rafId) rafId = requestAnimationFrame(loop);
   }, { passive: true });
 
-  video.addEventListener('loadedmetadata', () => { target = current = 0; });
+  // ── Build frame cache ─────────────────────────────
+  async function buildCache() {
+    canvas = document.createElement('canvas');
+    canvas.id = 'bg-canvas';
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    Object.assign(canvas.style, {
+      position:'fixed', top:'0', left:'0', zIndex:'-2', opacity:'0.72', display:'none'
+    });
+    video.insertAdjacentElement('afterend', canvas);
+    ctx = canvas.getContext('2d');
+
+    window.addEventListener('resize', () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      lastIdx = -1;  // force redraw
+    });
+
+    const total = Math.ceil(video.duration * FPS);
+    for (let i = 0; i < total; i++) {
+      video.currentTime = i / FPS;
+      await new Promise(r => video.addEventListener('seeked', r, { once:true }));
+      frames.push(await createImageBitmap(video));
+    }
+
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    ready = true;
+    if (!rafId) rafId = requestAnimationFrame(loop);
+  }
+
+  video.addEventListener('canplaythrough', buildCache, { once:true });
+  if (video.readyState >= 4) buildCache();
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
