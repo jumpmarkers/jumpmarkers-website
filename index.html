@@ -1205,8 +1205,8 @@
 // ── Canvas frame-cache scrubbing (Apple-style) ───────
 (function(){
   const video  = document.getElementById('bg-video');
-  const FPS    = 6;     // frames per second to extract
-  const GRAB_W = 540;   // capture width — smaller = faster extraction
+  const FPS    = 5;     // matches video encode fps — no extra seeking needed
+  const GRAB_W = 540;   // matches video width — zero resize work in createImageBitmap
   let frames   = [], canvas = null, ctx = null, ready = false;
   let target   = 0, current = 0, rafId = null, lastIdx = -1;
 
