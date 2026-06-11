@@ -1201,8 +1201,8 @@
 // ── Canvas frame-cache scrubbing (Apple-style) ───────
 (function(){
   const video  = document.getElementById('bg-video');
-  const FPS    = 8;     // frames per second to extract
-  const GRAB_W = 720;   // capture width — 4× fewer pixels than 1280, much faster
+  const FPS    = 6;     // frames per second to extract
+  const GRAB_W = 540;   // capture width — smaller = faster extraction
   let frames   = [], canvas = null, ctx = null, ready = false;
   let target   = 0, current = 0, rafId = null, lastIdx = -1;
 
@@ -1277,8 +1277,8 @@
     if (!rafId) rafId = requestAnimationFrame(loop);
   }
 
-  video.addEventListener('canplaythrough', buildCache, { once:true });
-  if (video.readyState >= 4) buildCache();
+  video.addEventListener('loadedmetadata', buildCache, { once:true });
+  if (video.readyState >= 1) buildCache();
 })();
 
 // ── Rotating h1 slogan (20 s) ────────────────────────
