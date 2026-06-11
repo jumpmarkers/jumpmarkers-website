@@ -1011,8 +1011,8 @@
   <h2>More Chrome Extensions</h2>
   <p class="sec-sub">Other tools we've built for YouTube power users.</p>
 
-  <div class="tools-grid" style="max-width:500px">
-    <a class="tool-card ext-card" href="/playlist-organizer/" style="flex-direction:row;align-items:flex-start;gap:0">
+  <div class="tools-grid" style="max-width:500px;overflow:visible">
+    <a class="tool-card ext-card" href="/playlist-organizer/" style="flex-direction:row;align-items:flex-start;gap:0;overflow:visible;position:relative">
       <div style="display:flex;flex-direction:column;gap:14px;flex:1;min-width:0">
         <img src="/playlist-organizer/icon128.png" alt="Playlist Organizer" style="width:54px;height:54px;border-radius:14px;border:1px solid var(--border2)"/>
         <div class="tool-card-name">Playlist Organizer</div>
@@ -1025,9 +1025,7 @@
         <div class="tool-card-cta">See extension →</div>
       </div>
       <!-- Under construction sign -->
-      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 12px">
-        <img src="/under-construction.png" alt="Under construction" style="width:110px;height:110px;object-fit:contain;border-radius:8px"/>
-      </div>
+      <img src="/under-construction.png" alt="Under construction" style="position:absolute;right:-30px;top:50%;transform:translateY(-50%);width:200px;height:200px;object-fit:contain;border-radius:8px;pointer-events:none"/>
     </a>
   </div>
 </section>
