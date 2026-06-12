@@ -1077,8 +1077,8 @@ let nextId  = 1;
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
 
 // Returns the display color for a note, factoring in tonic/degree coloring
-function getDegreeColor(board, noteIdx) {
-  if (!board.selectedNotes.has(noteIdx)) return null;
+function getDegreeColor(board, noteIdx, isPinned = false) {
+  if (!board.selectedNotes.has(noteIdx) && !isPinned) return null;
   if (board.tonic === null || board.tonic === undefined) {
     // Shift the color assignment along with the notes
     return NOTE_COL[(noteIdx - (board.colorShift || 0) + 12) % 12];
@@ -1279,8 +1279,18 @@ function applyBoxDelete() {
     if (cell?.querySelector('.nc')) toHide.add(key);
   });
   if (!toHide.size) { clearBoxSelect(); return; }
+  const totalVisibleCells = outer ? outer.querySelectorAll('.fc .nc').length : 0;
+  const isFullClear = toHide.size >= totalVisibleCells;
   pushHistory();
-  toHide.forEach(key => b.hiddenCells.add(key));
+  if (isFullClear) {
+    b.selectedNotes.clear();
+    b.visibleNotes.clear();
+    b.hiddenCells.clear();
+    b.pinnedCells.clear();
+    b.tonic = null;
+  } else {
+    toHide.forEach(key => b.hiddenCells.add(key));
+  }
   const bid = _boxSel.bid;
   clearBoxSelect();
   refreshBoard(bid);
@@ -1812,12 +1822,12 @@ function buildFbOuter(b) {
 
     fretsToShow.forEach(f => {
       const noteIdx  = (openNoteIdx + f) % 12;
+      const cellKey  = `${si}-${f}`;
+      const isPinned = b.pinnedCells.has(cellKey);
       const noteName = getDisplayName(noteIdx, b);
-      const color = getDegreeColor(b, noteIdx);
+      const color = getDegreeColor(b, noteIdx, isPinned);
       const isOn  = color !== null;
       const isVis = b.visibleNotes.has(noteIdx);
-
-      const cellKey = `${si}-${f}`;
       const isHidden = b.hiddenCells.has(cellKey);
 
       const cell = document.createElement('div');
@@ -1833,12 +1843,11 @@ function buildFbOuter(b) {
         if (b.pinnedCells.has(cellKey))       b.pinnedCells.delete(cellKey);
         else if (b.hiddenCells.has(cellKey))  b.hiddenCells.delete(cellKey);
         else if (b.visibleNotes.has(noteIdx)) b.hiddenCells.add(cellKey);
-        else { b.pinnedCells.add(cellKey); b.selectedNotes.add(noteIdx); b.visibleNotes.add(noteIdx); }
+        else { b.pinnedCells.add(cellKey); }
         pushHistory();
         refreshBoard(b.id);
       });
 
-      const isPinned = b.pinnedCells.has(cellKey);
       if (!isVis && !isPinned) {
         cell.classList.add('fc-empty');
         cell.addEventListener('click', e => {
@@ -2054,9 +2063,13 @@ function buildCard(b) {
   pLabel.textContent = 'Highlight';
   palette.appendChild(pLabel);
 
+  const pinnedNoteIndices = new Set(
+    [...b.pinnedCells].map(key => { const [si, f] = key.split('-').map(Number); return (OPEN[si] + f) % 12; })
+  );
+
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
-    pill.className = 'note-pill' + (b.selectedNotes.has(i) ? ' active' : '');
+    pill.className = 'note-pill' + (b.selectedNotes.has(i) || pinnedNoteIndices.has(i) ? ' active' : '');
     pill.textContent = getNoteName(i);
     const pc = getDegreeColor(b, i);
     if (pc) {
@@ -2131,7 +2144,7 @@ function buildCard(b) {
 
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
-    const isVis = b.visibleNotes.has(i);
+    const isVis = b.visibleNotes.has(i) || pinnedNoteIndices.has(i);
     pill.className = 'note-pill' + (isVis ? ' vis-on' : '');
     pill.textContent = getNoteName(i);
     pill.title = isVis ? 'Visible — click to hide' : 'Hidden — click to show';
