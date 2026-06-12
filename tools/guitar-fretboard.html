@@ -1114,6 +1114,7 @@ function mkBoard(opts = {}) {
     visibleNotes:  new Set(opts.visibleNotes !== undefined ? opts.visibleNotes : []),
     selectedNotes: new Set(opts.selectedNotes || []),
     hiddenCells:   new Set(opts.hiddenCells || []),
+    pinnedCells:   new Set(opts.pinnedCells || []),
   };
 }
 
@@ -1136,6 +1137,7 @@ function _serializeBoards() {
       selectedNotes: [...b.selectedNotes],
       visibleNotes:  [...b.visibleNotes],
       hiddenCells:   [...b.hiddenCells],
+      pinnedCells:   [...b.pinnedCells],
     })),
     presets,
     currentPresetName,
@@ -1353,6 +1355,7 @@ function duplicateBoard(id) {
     tonic:        src.tonic,
     colorShift:   src.colorShift || 0,
     hiddenCells:  [...src.hiddenCells],
+    pinnedCells:  [...src.pinnedCells],
     sticker:      src.sticker,
     stickerStyle: src.stickerStyle,
     visibleNotes: [...src.visibleNotes],
@@ -1439,7 +1442,7 @@ function buildPresetData(name) {
       viewFrets: b.viewFrets, fretWidth: b.fretWidth,
       tonic: b.tonic, colorShift: b.colorShift || 0, sticker: b.sticker, stickerStyle: b.stickerStyle,
       visibleNotes: [...b.visibleNotes], selectedNotes: [...b.selectedNotes],
-      hiddenCells: [...b.hiddenCells],
+      hiddenCells: [...b.hiddenCells], pinnedCells: [...b.pinnedCells],
     })),
   };
 }
@@ -1823,16 +1826,20 @@ function buildFbOuter(b) {
       cell.style.setProperty('--sw', STR_W[si]);
       cell.style.setProperty('--sc', STR_C[si]);
 
-      // Alt+click anywhere on cell: toggle cell-level hide
+      // Alt+click: cycle pin → unpin / show → hide on this specific cell
       cell.addEventListener('click', e => {
         if (!e.altKey) return;
         e.stopPropagation();
-        b.hiddenCells.has(cellKey) ? b.hiddenCells.delete(cellKey) : b.hiddenCells.add(cellKey);
+        if (b.pinnedCells.has(cellKey))       b.pinnedCells.delete(cellKey);
+        else if (b.hiddenCells.has(cellKey))  b.hiddenCells.delete(cellKey);
+        else if (b.visibleNotes.has(noteIdx)) b.hiddenCells.add(cellKey);
+        else                                  b.pinnedCells.add(cellKey);
         pushHistory();
         refreshBoard(b.id);
       });
 
-      if (!isVis) {
+      const isPinned = b.pinnedCells.has(cellKey);
+      if (!isVis && !isPinned) {
         cell.classList.add('fc-empty');
         cell.addEventListener('click', e => {
           if (e.altKey) return;
