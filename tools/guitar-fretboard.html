@@ -616,24 +616,16 @@
         gap: 0 !important;
       }
 
-      /* 2-column: disable CSS columns so JS row-wrap controls layout */
+      /* 2-column: disable CSS columns; JS beforeprint builds a <table> for reliable page-break */
       #boards-container.cols-2 {
         display: block !important;
         column-count: 1 !important;
       }
-      #boards-container.cols-2 .board-card {
-        display: block !important;
-        width: 100% !important;
-      }
 
-      .print-row-wrap {
-        display: flex !important;
-        gap: 10px !important;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-        margin-bottom: 10px !important;
-      }
-      .print-row-wrap .board-card { flex: 1 !important; margin: 0 !important; }
+      /* Table rows with page-break-inside:avoid work reliably in Chrome */
+      .print-table { width: 100% !important; border-collapse: separate !important; border-spacing: 0 !important; }
+      .print-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+      .print-table td { width: 50% !important; vertical-align: top !important; padding: 0 5px 10px !important; }
 
       .board-card {
         flex: unset !important;
@@ -2517,29 +2509,38 @@ document.addEventListener('keydown', e => {
   applySplit(open);
 })();
 
-// ─── Print: wrap card pairs into rows for reliable 2-col page-break in Chrome ──
+// ─── Print: build <table> for reliable 2-col page-break in Chrome ─────────────
 window.addEventListener('beforeprint', () => {
   const container = document.getElementById('boards-container');
   if (!container || !container.classList.contains('cols-2')) return;
   const cards = [...container.querySelectorAll(':scope > .board-card')];
-  const rows = [];
+  if (!cards.length) return;
+  const table = document.createElement('table');
+  table.className = 'print-table';
   for (let i = 0; i < cards.length; i += 2) {
-    const row = document.createElement('div');
-    row.className = 'print-row-wrap';
-    container.insertBefore(row, cards[i]);
-    row.appendChild(cards[i]);
-    if (cards[i + 1]) row.appendChild(cards[i + 1]);
-    rows.push(row);
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td');
+    td1.appendChild(cards[i]);
+    tr.appendChild(td1);
+    if (cards[i + 1]) {
+      const td2 = document.createElement('td');
+      td2.appendChild(cards[i + 1]);
+      tr.appendChild(td2);
+    } else {
+      td1.colSpan = 2;
+    }
+    table.appendChild(tr);
   }
-  window._printRowWraps = rows;
+  container.appendChild(table);
+  window._printTable = { table, cards };
 });
 window.addEventListener('afterprint', () => {
-  if (!window._printRowWraps) return;
-  window._printRowWraps.forEach(row => {
-    while (row.firstChild) row.parentNode.insertBefore(row.firstChild, row);
-    row.remove();
-  });
-  window._printRowWraps = null;
+  if (!window._printTable) return;
+  const { table, cards } = window._printTable;
+  const container = table.parentNode;
+  cards.forEach(card => container.insertBefore(card, table));
+  table.remove();
+  window._printTable = null;
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
