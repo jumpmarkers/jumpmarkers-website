@@ -702,19 +702,8 @@
       .nc.on { color: rgba(255,255,255,0.95) !important; border: none !important; }
     }
 
-    /* ── Print-only note ── */
+    /* ── Print-only note — injected by JS beforeprint, static div stays hidden ── */
     .print-note { display: none; }
-    @media print {
-      .print-note {
-        display: block !important;
-        margin-top: 24px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #e07820 !important;
-        text-align: center;
-        letter-spacing: 0.02em;
-      }
-    }
 
     /* ── Support banner ── */
     .support-banner {
@@ -2514,47 +2503,58 @@ document.addEventListener('keydown', e => {
   applySplit(open);
 })();
 
-// ─── Print: build <table> for reliable 2-col page-break in Chrome ─────────────
+// ─── Print: build layout + note for reliable page-break in Chrome ──────────────
+const _PRINT_NOTE = 'This tool is free — and it always will be. If you had a good practice time using it, consider supporting the developer by trying JumpMarkers — a free browser extension that can be handy when you\'re trying to learn or transcribe music from YouTube videos.';
+const _NOTE_STYLE = 'text-align:center;padding-top:20px;font-size:0.8rem;font-weight:600;color:#e07820;letter-spacing:0.02em;border:none';
+
 window.addEventListener('beforeprint', () => {
   const container = document.getElementById('boards-container');
-  if (!container || !container.classList.contains('cols-2')) return;
+  if (!container) return;
   const cards = [...container.querySelectorAll(':scope > .board-card')];
   if (!cards.length) return;
-  const table = document.createElement('table');
-  table.className = 'print-table';
-  for (let i = 0; i < cards.length; i += 2) {
-    const tr = document.createElement('tr');
-    const td1 = document.createElement('td');
-    td1.appendChild(cards[i]);
-    tr.appendChild(td1);
-    if (cards[i + 1]) {
-      const td2 = document.createElement('td');
-      td2.appendChild(cards[i + 1]);
-      tr.appendChild(td2);
-    } else {
-      td1.colSpan = 2;
-    }
-    table.appendChild(tr);
-  }
-  // Note row at the bottom of the last fretboard page
-  const noteTr = document.createElement('tr');
-  const noteTd = document.createElement('td');
-  noteTd.colSpan = 2;
-  noteTd.style.cssText = 'text-align:center;padding-top:20px;font-size:0.8rem;font-weight:600;color:#e07820;letter-spacing:0.02em;border:none';
-  noteTd.textContent = 'This tool is free — and it always will be. If you had a good practice time using it, consider supporting the developer by trying JumpMarkers — a free browser extension that can be handy when you\'re trying to learn or transcribe music from YouTube videos.';
-  noteTr.appendChild(noteTd);
-  table.appendChild(noteTr);
 
-  container.appendChild(table);
-  window._printTable = { table, cards };
+  if (container.classList.contains('cols-2')) {
+    // 2-column: build <table> — tr with page-break-inside:avoid is reliable in Chrome
+    const table = document.createElement('table');
+    table.className = 'print-table';
+    for (let i = 0; i < cards.length; i += 2) {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.appendChild(cards[i]);
+      tr.appendChild(td1);
+      if (cards[i + 1]) {
+        const td2 = document.createElement('td');
+        td2.appendChild(cards[i + 1]);
+        tr.appendChild(td2);
+      } else { td1.colSpan = 2; }
+      table.appendChild(tr);
+    }
+    const noteTr = document.createElement('tr');
+    const noteTd = document.createElement('td');
+    noteTd.colSpan = 2; noteTd.style.cssText = _NOTE_STYLE;
+    noteTd.textContent = _PRINT_NOTE;
+    noteTr.appendChild(noteTd); table.appendChild(noteTr);
+    container.appendChild(table);
+    window._printState = { table, cards };
+  } else {
+    // 1-column: append note div after boards
+    const noteDiv = document.createElement('div');
+    noteDiv.style.cssText = _NOTE_STYLE.replace('border:none;', '');
+    noteDiv.textContent = _PRINT_NOTE;
+    container.appendChild(noteDiv);
+    window._printState = { noteDiv };
+  }
 });
 window.addEventListener('afterprint', () => {
-  if (!window._printTable) return;
-  const { table, cards } = window._printTable;
-  const container = table.parentNode;
-  cards.forEach(card => container.insertBefore(card, table));
-  table.remove();
-  window._printTable = null;
+  if (!window._printState) return;
+  const { table, noteDiv, cards } = window._printState;
+  if (table) {
+    const container = table.parentNode;
+    cards.forEach(card => container.insertBefore(card, table));
+    table.remove();
+  }
+  if (noteDiv) noteDiv.remove();
+  window._printState = null;
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
