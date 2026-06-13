@@ -606,7 +606,11 @@
       .board-header, .range-wrap, .add-board-wrap, .fret-sticker, footer,
       .vis-row, .support-banner { display: none !important; }
 
-      body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
+      body, html {
+        background: #fff !important; color: #000 !important; margin: 0; padding: 0;
+        height: auto !important; overflow: visible !important; display: block !important;
+      }
+      .content-wrap { height: auto !important; overflow: visible !important; }
       main { max-width: 100% !important; padding: 10px 14px !important; display: block !important; }
 
       /* Block flow — removes flex so break-inside: avoid works across pages */
