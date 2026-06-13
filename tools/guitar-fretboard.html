@@ -1838,12 +1838,22 @@ function buildFbOuter(b) {
 
       // Alt+click: cycle pin → unpin / show → hide on this specific cell
       cell.addEventListener('click', e => {
-        if (!e.altKey) return;
+        if (!e.altKey || e.shiftKey) return;
         e.stopPropagation();
         if (b.pinnedCells.has(cellKey))       b.pinnedCells.delete(cellKey);
-        else if (b.hiddenCells.has(cellKey))  { b.hiddenCells.delete(cellKey); b.pinnedCells.add(cellKey); }
+        else if (b.hiddenCells.has(cellKey))  b.hiddenCells.delete(cellKey);
         else if (b.visibleNotes.has(noteIdx)) b.hiddenCells.add(cellKey);
         else { b.pinnedCells.add(cellKey); }
+        pushHistory();
+        refreshBoard(b.id);
+      });
+
+      // Alt+Shift+click: toggle color-pin on a note at this exact position
+      cell.addEventListener('click', e => {
+        if (!e.altKey || !e.shiftKey) return;
+        e.stopPropagation();
+        if (b.pinnedCells.has(cellKey)) b.pinnedCells.delete(cellKey);
+        else b.pinnedCells.add(cellKey);
         pushHistory();
         refreshBoard(b.id);
       });
