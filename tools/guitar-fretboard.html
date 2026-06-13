@@ -605,19 +605,22 @@
       nav, .page-header, .toolbar, .note-palette,
       .board-header, .range-wrap, .add-board-wrap, .fret-sticker, footer { display: none !important; }
 
-      body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; height: 100%; }
-      main { max-width: 100% !important; padding: 10px 14px !important; min-height: 100vh; display: flex !important; flex-direction: column !important; }
+      body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
+      main { max-width: 100% !important; padding: 10px 14px !important; display: block !important; }
 
-      /* Each board card gets an equal share of the page height */
-      .boards-container { flex: 1 !important; display: flex !important; flex-direction: column !important; gap: 6px !important; }
+      /* Block flow so break-inside: avoid works across pages */
+      .boards-container, #boards-container.cols-2 {
+        display: block !important;
+        column-count: unset !important;
+        gap: 0 !important;
+      }
 
       .board-card {
-        flex: 1 !important;
-        margin: 0 !important;
+        display: block !important;
+        margin: 0 0 12px !important;
         page-break-inside: avoid; break-inside: avoid;
         background: #fff !important; border: 1px solid #ccc !important;
         border-radius: 4px !important; overflow: hidden;
-        display: flex !important; flex-direction: column !important;
       }
 
       /* Keep fretboard outer from expanding — content stays compact */
