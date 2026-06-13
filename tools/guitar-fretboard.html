@@ -604,7 +604,7 @@
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       nav, .page-header, .toolbar, .note-palette,
       .board-header, .range-wrap, .add-board-wrap, .fret-sticker, footer,
-      .vis-row { display: none !important; }
+      .vis-row, .support-banner { display: none !important; }
 
       body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
       main { max-width: 100% !important; padding: 10px 14px !important; display: block !important; }
@@ -616,8 +616,15 @@
         gap: 0 !important;
       }
 
-      /* 2-column: JS beforeprint wraps pairs in .print-row-wrap for reliable page-break */
-      #boards-container.cols-2 { display: block !important; }
+      /* 2-column: disable CSS columns so JS row-wrap controls layout */
+      #boards-container.cols-2 {
+        display: block !important;
+        column-count: 1 !important;
+      }
+      #boards-container.cols-2 .board-card {
+        display: block !important;
+        width: 100% !important;
+      }
 
       .print-row-wrap {
         display: flex !important;
