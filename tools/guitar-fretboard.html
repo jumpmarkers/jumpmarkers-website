@@ -608,19 +608,31 @@
       body, html { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
       main { max-width: 100% !important; padding: 10px 14px !important; display: block !important; }
 
-      /* Block flow so break-inside: avoid works across pages */
-      .boards-container, #boards-container.cols-2 {
+      /* Remove flex so break-inside: avoid works; CSS columns still handles cols-2 */
+      .boards-container {
         display: block !important;
-        column-count: unset !important;
+        flex: unset !important;
         gap: 0 !important;
       }
 
+      /* Re-assert 2-column layout (CSS columns support page-break properly) */
+      #boards-container.cols-2 {
+        column-count: 2 !important;
+        column-gap: 16px !important;
+      }
+
       .board-card {
-        display: block !important;
-        margin: 0 0 12px !important;
-        page-break-inside: avoid; break-inside: avoid;
+        flex: unset !important;
+        margin: 0 0 10px !important;
+        page-break-inside: avoid !important; break-inside: avoid !important;
         background: #fff !important; border: 1px solid #ccc !important;
         border-radius: 4px !important; overflow: hidden;
+        display: block !important;
+      }
+
+      #boards-container.cols-2 .board-card {
+        display: inline-block !important;
+        width: 100% !important;
       }
 
       /* Keep fretboard outer from expanding — content stays compact */
