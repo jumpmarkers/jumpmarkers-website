@@ -705,6 +705,20 @@
       .nc.on { color: rgba(255,255,255,0.95) !important; border: none !important; }
     }
 
+    /* ── Print-only note ── */
+    .print-note { display: none; }
+    @media print {
+      .print-note {
+        display: block !important;
+        margin-top: 24px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #e07820 !important;
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+    }
+
     /* ── Support banner ── */
     .support-banner {
       display: flex; align-items: center; justify-content: space-between;
@@ -929,6 +943,7 @@
   </div>
 </div>
 
+<div class="print-note">This tool is free — and it always will be.</div>
 <div class="support-banner">
   <div class="support-banner-text">
     <p>
