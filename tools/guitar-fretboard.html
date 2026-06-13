@@ -627,9 +627,10 @@
       }
 
       /* Table rows with page-break-inside:avoid work reliably in Chrome */
-      .print-table { width: 100% !important; border-collapse: separate !important; border-spacing: 0 !important; }
+      .print-table { width: 100% !important; border-collapse: collapse !important; border: none !important; }
       .print-table tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-      .print-table td { width: 50% !important; vertical-align: top !important; padding: 0 5px 10px !important; }
+      .print-table td { width: 50% !important; vertical-align: top !important; padding: 0 5px 10px !important; border: none !important; }
+      .print-note { display: none !important; }
 
       .board-card {
         flex: unset !important;
@@ -2535,6 +2536,15 @@ window.addEventListener('beforeprint', () => {
     }
     table.appendChild(tr);
   }
+  // Note row at the bottom of the last fretboard page
+  const noteTr = document.createElement('tr');
+  const noteTd = document.createElement('td');
+  noteTd.colSpan = 2;
+  noteTd.style.cssText = 'text-align:center;padding-top:20px;font-size:0.8rem;font-weight:600;color:#e07820;letter-spacing:0.02em;border:none';
+  noteTd.textContent = 'This tool is free — and it always will be. If you find it useful, support the developer by trying JumpMarkers — a free browser extension for learning music from YouTube.';
+  noteTr.appendChild(noteTd);
+  table.appendChild(noteTr);
+
   container.appendChild(table);
   window._printTable = { table, cards };
 });
