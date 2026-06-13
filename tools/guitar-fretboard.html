@@ -616,13 +616,17 @@
         gap: 0 !important;
       }
 
-      /* 2-column: use grid (more reliable page-break than column-count in Chrome) */
-      #boards-container.cols-2 {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
+      /* 2-column: JS beforeprint wraps pairs in .print-row-wrap for reliable page-break */
+      #boards-container.cols-2 { display: block !important; }
+
+      .print-row-wrap {
+        display: flex !important;
         gap: 10px !important;
-        align-content: start !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        margin-bottom: 10px !important;
       }
+      .print-row-wrap .board-card { flex: 1 !important; margin: 0 !important; }
 
       .board-card {
         flex: unset !important;
@@ -2490,6 +2494,31 @@ document.addEventListener('keydown', e => {
   btn.addEventListener('click', () => applySplit(!open));
   applySplit(open);
 })();
+
+// ─── Print: wrap card pairs into rows for reliable 2-col page-break in Chrome ──
+window.addEventListener('beforeprint', () => {
+  const container = document.getElementById('boards-container');
+  if (!container || !container.classList.contains('cols-2')) return;
+  const cards = [...container.querySelectorAll(':scope > .board-card')];
+  const rows = [];
+  for (let i = 0; i < cards.length; i += 2) {
+    const row = document.createElement('div');
+    row.className = 'print-row-wrap';
+    container.insertBefore(row, cards[i]);
+    row.appendChild(cards[i]);
+    if (cards[i + 1]) row.appendChild(cards[i + 1]);
+    rows.push(row);
+  }
+  window._printRowWraps = rows;
+});
+window.addEventListener('afterprint', () => {
+  if (!window._printRowWraps) return;
+  window._printRowWraps.forEach(row => {
+    while (row.firstChild) row.parentNode.insertBefore(row.firstChild, row);
+    row.remove();
+  });
+  window._printRowWraps = null;
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 addBoard();
