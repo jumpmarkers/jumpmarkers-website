@@ -1841,7 +1841,7 @@ function buildFbOuter(b) {
         if (!e.altKey) return;
         e.stopPropagation();
         if (b.pinnedCells.has(cellKey))       b.pinnedCells.delete(cellKey);
-        else if (b.hiddenCells.has(cellKey))  b.hiddenCells.delete(cellKey);
+        else if (b.hiddenCells.has(cellKey))  { b.hiddenCells.delete(cellKey); b.pinnedCells.add(cellKey); }
         else if (b.visibleNotes.has(noteIdx)) b.hiddenCells.add(cellKey);
         else { b.pinnedCells.add(cellKey); }
         pushHistory();
