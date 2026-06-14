@@ -147,6 +147,78 @@
     .preset-load-btn { flex:1;text-align:left;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .preset-del-btn  { padding:4px 8px;font-size:0.75rem;color:var(--accent2);flex-shrink:0; }
 
+    /* ── Banks / Preset system ── */
+    .banks-section {
+      background: var(--bg-section); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 18px 14px; margin-bottom: 16px;
+    }
+    .banks-header {
+      display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .banks-label {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.2px;
+      color: var(--text-sub); font-weight: 700; white-space: nowrap; margin-right: 2px;
+    }
+    .banks-set-name {
+      background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px 10px; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; flex: 1; min-width: 60px; max-width: 180px;
+      text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+      transition: border-color .15s; text-align: left;
+    }
+    .banks-set-name:hover { border-color: var(--accent); }
+    .banks-nav-btn {
+      background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px 9px; font-size: 0.82rem; cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s; flex-shrink: 0; line-height: 1.4;
+    }
+    .banks-nav-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--accent); }
+    .banks-add-btn {
+      background: var(--bg-card); color: var(--accent); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px 9px; font-size: 0.9rem; cursor: pointer;
+      transition: background .12s, border-color .12s; flex-shrink: 0; font-weight: 700; line-height: 1.4;
+    }
+    .banks-add-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+    .banks-del-btn {
+      background: none; color: var(--text-sub); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px 7px; font-size: 0.72rem; cursor: pointer;
+      transition: color .12s, border-color .12s; flex-shrink: 0; opacity: .5; line-height: 1.4;
+    }
+    .banks-del-btn:hover { color: var(--accent2); border-color: var(--accent2); opacity: 1; }
+    .slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .slot {
+      position: relative; overflow: hidden;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 7px; padding: 6px 7px 8px; cursor: pointer;
+      user-select: none; touch-action: none;
+      transition: border-color .12s, background .12s;
+      min-height: 52px; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .slot:hover { border-color: var(--border2); background: var(--bg-hover); }
+    .slot.slot-active { border-color: var(--accent); background: rgba(99,102,241,.11); }
+    .slot-progress {
+      position: absolute; bottom: 0; left: 0; height: 3px;
+      background: var(--accent); width: 0%;
+      border-radius: 0 0 7px 7px; pointer-events: none;
+    }
+    .slot-num {
+      font-size: 0.57rem; color: var(--text-sub); font-weight: 700;
+      line-height: 1; opacity: .7;
+    }
+    .slot-content { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
+    .slot-scale {
+      font-size: 0.6rem; color: var(--text); font-weight: 600;
+      line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .slot-key { font-size: 0.68rem; color: var(--accent); font-weight: 700; line-height: 1; }
+    .slot.slot-empty .slot-scale { color: var(--text-sub); opacity: .35; font-weight: 400; }
+    @keyframes slotFlash {
+      0%   { background: rgba(99,102,241,.45); border-color: var(--accent); }
+      100% { background: var(--bg-card); }
+    }
+    .slot-saved-flash { animation: slotFlash .5s ease-out forwards; }
+    @media (max-width: 540px) { .slot-grid { grid-template-columns: repeat(3, 1fr); } }
+
     /* ── Info bar ── */
     .info-bar {
       display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
@@ -401,6 +473,19 @@
   </div>
 </div>
 
+<!-- Banks / Preset System -->
+<div class="banks-section" id="banksSection">
+  <div class="banks-header">
+    <span class="banks-label" id="banksLabel">Presets</span>
+    <button class="banks-nav-btn" onclick="navigateBank(-1)">◀</button>
+    <button class="banks-set-name" id="banksSetName" onclick="renameCurrentBank()">Set 1</button>
+    <button class="banks-nav-btn" onclick="navigateBank(1)">▶</button>
+    <button class="banks-add-btn" onclick="addBankSet()" title="+">+</button>
+    <button class="banks-del-btn" id="banksDelBtn" onclick="deleteCurrentBank()">✕</button>
+  </div>
+  <div class="slot-grid" id="slotGrid"></div>
+</div>
+
 <!-- Custom Scale Panel -->
 <div id="customPanel" class="section" style="display:none">
   <div class="section-title" id="customPanelTitle">Escala Personalizada</div>
@@ -632,6 +717,11 @@ const TRANSLATIONS = {
     },
     scaleNoResults: 'Sin resultados',
     scaleSearchHint: 'Buscar escalas…',
+    bankHoldToSave: 'Mantén pulsado para guardar',
+    bankNewSetPrompt: 'Nombre del nuevo conjunto:',
+    bankRenamePrompt: 'Renombrar conjunto:',
+    bankDeleteConfirm: '¿Eliminar este conjunto de presets?',
+    bankDeleteLast: 'No se puede eliminar el último conjunto.',
     customPanelTitle: 'Escala Personalizada',
     customNotesLabel: 'Seleccionar Notas',
     savePreset: '💾 Guardar',
@@ -684,6 +774,11 @@ const TRANSLATIONS = {
     },
     scaleNoResults: 'No results',
     scaleSearchHint: 'Search scales…',
+    bankHoldToSave: 'Long press to save',
+    bankNewSetPrompt: 'Name for new preset set:',
+    bankRenamePrompt: 'Rename set:',
+    bankDeleteConfirm: 'Delete this preset set?',
+    bankDeleteLast: 'Cannot delete the last set.',
     customPanelTitle: 'Custom Scale',
     customNotesLabel: 'Select Notes',
     savePreset: '💾 Save',
@@ -730,6 +825,210 @@ function savePresets() {
   try { localStorage.setItem('harmonica_presets', JSON.stringify(customPresets)); } catch(e) {}
 }
 loadPresets();
+
+// ═══════════════════════════════════════════════════════
+// BANKS (15-slot preset system)
+// ═══════════════════════════════════════════════════════
+
+const SLOT_COUNT = 15;
+let bankSets = [];
+let activeBankSet = 0;
+let activeSlot = -1;
+
+function loadBanks() {
+  try { bankSets = JSON.parse(localStorage.getItem('harmonica_banks') || '[]'); } catch(e) { bankSets = []; }
+  try { activeBankSet = parseInt(localStorage.getItem('harmonica_active_bank') || '0', 10) || 0; } catch(e) { activeBankSet = 0; }
+  if (!bankSets.length) bankSets = [{ name: 'Set 1', slots: Array(SLOT_COUNT).fill(null) }];
+  activeBankSet = Math.min(activeBankSet, bankSets.length - 1);
+}
+function saveBanks() {
+  try {
+    localStorage.setItem('harmonica_banks', JSON.stringify(bankSets));
+    localStorage.setItem('harmonica_active_bank', String(activeBankSet));
+  } catch(e) {}
+}
+function currentBankSet() { return bankSets[activeBankSet]; }
+
+function slotShortLabel(slot) {
+  if (!slot) return '';
+  const name = (T.scales[slot.scaleId] || slot.scaleId).split(/[ (]/)[0];
+  return name.length > 9 ? name.slice(0, 9) + '…' : name;
+}
+
+function renderBankSetName() {
+  const bsn = document.getElementById('banksSetName');
+  const bdd = document.getElementById('banksDelBtn');
+  if (!bsn) return;
+  const bs = currentBankSet();
+  bsn.textContent = `${bs.name}  (${activeBankSet + 1}/${bankSets.length})`;
+  if (bdd) bdd.style.opacity = bankSets.length > 1 ? '1' : '0.25';
+}
+
+function renderSlots() {
+  const grid = document.getElementById('slotGrid');
+  if (!grid) return;
+  renderBankSetName();
+  const bs = currentBankSet();
+  grid.innerHTML = bs.slots.map((slot, i) => {
+    const isActive = i === activeSlot;
+    const isEmpty = !slot;
+    const scale = isEmpty ? '—' : slotShortLabel(slot);
+    const key   = isEmpty ? '' : KEY_LABELS[slot.keyIdx ?? 0];
+    const tip   = isEmpty
+      ? (T.bankHoldToSave || 'Long press to save')
+      : `${T.scales[slot.scaleId] || slot.scaleId} / ${KEY_LABELS[slot.keyIdx ?? 0]}`;
+    return `<div class="slot${isActive ? ' slot-active' : ''}${isEmpty ? ' slot-empty' : ''}" data-slot="${i}" title="${tip}">
+      <div class="slot-progress" id="slotProg_${i}"></div>
+      <div class="slot-num">${i + 1}</div>
+      <div class="slot-content">
+        <div class="slot-scale">${scale}</div>
+        ${isEmpty ? '' : `<div class="slot-key">${key}</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveToSlot(idx) {
+  const bs = currentBankSet();
+  bs.slots[idx] = {
+    scaleId: state.scaleId,
+    keyIdx: state.keyIdx,
+    harpKey: state.harpKey,
+    arpMode: state.arpMode,
+    customIntervals: state.customIntervals ? [...state.customIntervals] : [],
+  };
+  activeSlot = idx;
+  saveBanks();
+  renderSlots();
+  const slotEl = document.querySelector(`.slot[data-slot="${idx}"]`);
+  if (slotEl) {
+    slotEl.classList.add('slot-saved-flash');
+    slotEl.addEventListener('animationend', () => slotEl.classList.remove('slot-saved-flash'), { once: true });
+  }
+}
+
+function loadFromSlot(idx) {
+  const bs = currentBankSet();
+  const slot = bs.slots[idx];
+  if (!slot) return;
+  state.scaleId = slot.scaleId || 'major';
+  state.keyIdx  = slot.keyIdx  ?? 0;
+  state.harpKey = slot.harpKey ?? 0;
+  state.arpMode = slot.arpMode || '1357';
+  state.pathVariant = 0;
+  if (slot.customIntervals) state.customIntervals = [...slot.customIntervals];
+  activeSlot = idx;
+  saveState();
+  applyLang();
+  render();
+  document.querySelectorAll('#keyBtns .btn').forEach(b => b.classList.toggle('active', +b.dataset.i === state.keyIdx));
+  document.querySelectorAll('#arpBtns .btn').forEach(b => b.classList.toggle('active', b.dataset.m === state.arpMode));
+  document.querySelectorAll('#harpKeyBtns .btn').forEach(b => b.classList.toggle('active', +b.dataset.hk === state.harpKey));
+  document.getElementById('pageSubtitle').textContent = T.pageSubtitle(KEY_LABELS[state.harpKey], state.numHoles);
+  document.getElementById('scalePickerLabel').textContent = T.scales[state.scaleId] || state.scaleId;
+}
+
+function navigateBank(dir) {
+  activeBankSet = (activeBankSet + dir + bankSets.length) % bankSets.length;
+  activeSlot = -1;
+  saveBanks();
+  renderSlots();
+}
+
+function addBankSet() {
+  const name = prompt(T.bankNewSetPrompt || 'Name for new preset set:', `Set ${bankSets.length + 1}`);
+  if (name == null) return;
+  bankSets.push({ name: name.trim() || `Set ${bankSets.length + 1}`, slots: Array(SLOT_COUNT).fill(null) });
+  activeBankSet = bankSets.length - 1;
+  activeSlot = -1;
+  saveBanks();
+  renderSlots();
+}
+
+function renameCurrentBank() {
+  const bs = currentBankSet();
+  const name = prompt(T.bankRenamePrompt || 'Rename set:', bs.name);
+  if (name == null) return;
+  bs.name = name.trim() || bs.name;
+  saveBanks();
+  renderBankSetName();
+}
+
+function deleteCurrentBank() {
+  if (bankSets.length <= 1) { alert(T.bankDeleteLast || 'Cannot delete the last set.'); return; }
+  if (!confirm((T.bankDeleteConfirm || 'Delete this preset set?'))) return;
+  bankSets.splice(activeBankSet, 1);
+  activeBankSet = Math.min(activeBankSet, bankSets.length - 1);
+  activeSlot = -1;
+  saveBanks();
+  renderSlots();
+}
+
+function initBanks() {
+  loadBanks();
+  renderSlots();
+
+  const grid = document.getElementById('slotGrid');
+  const HOLD_MS = 500;
+  let pressIdx = -1, pressTimer = null, isLongPress = false;
+
+  function startProgress(idx) {
+    const prog = document.getElementById(`slotProg_${idx}`);
+    if (!prog) return;
+    prog.style.transition = 'none';
+    prog.style.width = '0%';
+    requestAnimationFrame(() => {
+      prog.style.transition = `width ${HOLD_MS}ms linear`;
+      prog.style.width = '100%';
+    });
+  }
+  function stopProgress(idx) {
+    const prog = document.getElementById(`slotProg_${idx}`);
+    if (!prog) return;
+    prog.style.transition = 'width 0.15s ease';
+    prog.style.width = '0%';
+  }
+  function cancelPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (pressIdx >= 0) stopProgress(pressIdx);
+    pressIdx = -1;
+    isLongPress = false;
+  }
+
+  grid.addEventListener('pointerdown', e => {
+    const slotEl = e.target.closest('.slot');
+    if (!slotEl) return;
+    e.preventDefault();
+    grid.setPointerCapture(e.pointerId);
+    const idx = +slotEl.dataset.slot;
+    pressIdx = idx;
+    isLongPress = false;
+    startProgress(idx);
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      saveToSlot(idx);
+      cancelPress();
+    }, HOLD_MS);
+  });
+
+  grid.addEventListener('pointerup', e => {
+    if (pressIdx < 0) return;
+    const idx = pressIdx;
+    clearTimeout(pressTimer);
+    pressTimer = null;
+    stopProgress(idx);
+    if (!isLongPress) loadFromSlot(idx);
+    pressIdx = -1;
+    isLongPress = false;
+  });
+
+  grid.addEventListener('pointercancel', cancelPress);
+  grid.addEventListener('pointermove', e => {
+    if (pressIdx < 0) return;
+    const slotEl = e.target.closest('.slot');
+    if (!slotEl || +slotEl.dataset.slot !== pressIdx) cancelPress();
+  });
+}
 
 function customArp5(iv) {
   if (!iv || !iv.length) return [];
@@ -883,6 +1182,7 @@ function applyLang() {
   document.getElementById('scalePickerLabel').textContent = T.scales[state.scaleId];
   document.getElementById('scaleSearch').placeholder = T.scaleSearchHint;
   rebuildScaleList('');
+  renderSlots();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1350,6 +1650,8 @@ function initControls() {
     applyLang();
     render();
   });
+
+  initBanks();
 }
 
 // Re-render on orientation change (updates grid-template-columns)
