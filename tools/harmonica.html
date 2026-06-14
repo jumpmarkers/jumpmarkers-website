@@ -34,7 +34,7 @@
     /* ── Header ── */
     /* ── Nav ── */
     nav {
-      display: flex; align-items: center; justify-content: space-between;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
       padding: 13px 24px; border-bottom: 1px solid rgba(255,255,255,0.07);
       background: var(--bg-section); position: sticky; top: 0; z-index: 50;
     }
@@ -52,7 +52,8 @@
     }
     .nav-back:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
     /* ── Ukulele Ko-fi button ── */
-    .uke-wrap { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
+    .uke-wrap { display: flex; align-items: center; gap: 8px; justify-self: center; }
+    nav .nav-back { justify-self: end; }
     .uke-btn {
       display: inline-flex; align-items: center; justify-content: center;
       background: none; border: none; cursor: pointer; padding: 0;
@@ -427,8 +428,8 @@
       <img class="uke-broken" src="../assets/uke_broken.png" alt="Support">
     </a>
     <span class="uke-label">buy me ukulele strings</span>
-    <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
   </div>
+  <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
 </nav>
 
 
