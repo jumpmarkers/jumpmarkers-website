@@ -1028,6 +1028,23 @@ function initBanks() {
     const slotEl = e.target.closest('.slot');
     if (!slotEl || +slotEl.dataset.slot !== pressIdx) cancelPress();
   });
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (document.getElementById('scalePicker').classList.contains('open')) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' ? 1 : -1;
+    const next = activeSlot < 0
+      ? (dir > 0 ? 0 : SLOT_COUNT - 1)
+      : (activeSlot + dir + SLOT_COUNT) % SLOT_COUNT;
+    if (currentBankSet().slots[next]) {
+      loadFromSlot(next);
+    } else {
+      activeSlot = next;
+      renderSlots();
+    }
+  });
 }
 
 function customArp5(iv) {
