@@ -52,25 +52,28 @@
     }
     .nav-back:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
     /* ── Ukulele Ko-fi button ── */
-    .uke-wrap { display: flex; align-items: center; gap: 8px; justify-self: center; }
+    .uke-wrap {
+      display: inline-flex; align-items: center; gap: 10px; justify-self: center;
+      text-decoration: none; cursor: pointer;
+      opacity: .8; transition: opacity .2s, transform .2s;
+      padding: 6px 14px; border-radius: 8px;
+    }
+    .uke-wrap:hover { opacity: 1; transform: scale(1.04); }
     nav .nav-back { justify-self: end; }
     .uke-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      background: none; border: none; cursor: pointer; padding: 0;
-      position: relative; width: 52px; height: 52px;
-      opacity: .75; transition: opacity .2s, transform .25s; flex-shrink: 0;
+      position: relative; width: 60px; height: 60px; flex-shrink: 0;
     }
-    .uke-btn:hover { opacity: 1; transform: scale(1.12) rotate(-6deg); }
     .uke-btn img {
-      width: 52px; height: 52px; object-fit: contain;
+      width: 60px; height: 60px; object-fit: contain;
       position: absolute; top: 0; left: 0; transition: opacity .2s;
       filter: brightness(0) invert(1);
     }
     .uke-btn .uke-normal { opacity: 1; }
     .uke-btn .uke-broken { opacity: 0; }
-    .uke-btn:hover .uke-normal { opacity: 0; }
-    .uke-btn:hover .uke-broken { opacity: 1; }
-    .uke-label { font-size: 0.65rem; color: var(--text-sub); white-space: nowrap; opacity: .8; }
+    .uke-wrap:hover .uke-normal { opacity: 0; }
+    .uke-wrap:hover .uke-broken { opacity: 1; }
+    .uke-label { font-size: 0.78rem; color: var(--text-sub); white-space: nowrap; }
 
     header { text-align: center; padding: 24px 0 20px; }
     header h1 {
@@ -422,13 +425,13 @@
   <a class="nav-brand" href="../index.html">
     JumpMarkers <span class="nav-sep">/</span> <span class="nav-tool">Chromatic Harmonica</span>
   </a>
-  <div class="uke-wrap">
-    <a href="https://ko-fi.com/jumpmarkers" target="_blank" class="uke-btn" title="Buy me ukulele strings ☕">
+  <a href="https://ko-fi.com/jumpmarkers" target="_blank" class="uke-wrap" title="Buy me ukulele strings ☕">
+    <span class="uke-btn">
       <img class="uke-normal" src="../assets/uke_normal.png" alt="Support">
       <img class="uke-broken" src="../assets/uke_broken.png" alt="Support">
-    </a>
+    </span>
     <span class="uke-label">buy me ukulele strings</span>
-  </div>
+  </a>
   <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
 </nav>
 
