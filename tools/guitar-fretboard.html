@@ -121,16 +121,16 @@
     .nav-back:hover { color: var(--text); border-color: var(--border2); }
     .uke-wrap {
       display: inline-flex; align-items: center; gap: 10px; justify-self: center;
-      text-decoration: none; cursor: pointer;
+      align-self: stretch; text-decoration: none; cursor: pointer;
       opacity: .8; transition: opacity .2s, transform .25s;
-      padding: 6px 14px; border-radius: 8px;
+      padding: 0 28px; border-radius: 0;
     }
     .uke-wrap:hover { opacity: 1; transform: scale(1.04); }
     .uke-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      position: relative; width: 60px; height: 60px; flex-shrink: 0;
+      position: relative; width: 69px; height: 69px; flex-shrink: 0;
     }
-    .uke-btn img { width: 60px; height: 60px; object-fit: contain;
+    .uke-btn img { width: 69px; height: 69px; object-fit: contain;
       position: absolute; top: 0; left: 0; transition: opacity .2s;
       filter: brightness(0) invert(1); }
     html[data-fbtheme="maple"]  .uke-btn img { filter: brightness(0) saturate(100%) invert(30%) sepia(60%) saturate(800%) hue-rotate(8deg) brightness(80%) contrast(110%); }
@@ -141,7 +141,7 @@
     .uke-wrap:hover .uke-normal { opacity: 0; }
     .uke-wrap:hover .uke-broken { opacity: 1; }
     .uke-label {
-      font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
+      font-family: var(--mono); font-size: 0.78rem; color: var(--muted);
       white-space: nowrap; opacity: .8;
     }
 

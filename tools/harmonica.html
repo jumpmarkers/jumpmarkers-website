@@ -54,18 +54,18 @@
     /* ── Ukulele Ko-fi button ── */
     .uke-wrap {
       display: inline-flex; align-items: center; gap: 10px; justify-self: center;
-      align-self: stretch; text-decoration: none; cursor: pointer;
+      text-decoration: none; cursor: pointer;
       opacity: .8; transition: opacity .2s, transform .2s;
-      padding: 0 28px; border-radius: 0;
+      padding: 6px 14px; border-radius: 8px;
     }
     .uke-wrap:hover { opacity: 1; transform: scale(1.04); }
     nav .nav-back { justify-self: end; }
     .uke-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      position: relative; width: 69px; height: 69px; flex-shrink: 0;
+      position: relative; width: 60px; height: 60px; flex-shrink: 0;
     }
     .uke-btn img {
-      width: 69px; height: 69px; object-fit: contain;
+      width: 60px; height: 60px; object-fit: contain;
       position: absolute; top: 0; left: 0; transition: opacity .2s;
       filter: brightness(0) invert(1);
     }
@@ -73,7 +73,7 @@
     .uke-btn .uke-broken { opacity: 0; }
     .uke-wrap:hover .uke-normal { opacity: 0; }
     .uke-wrap:hover .uke-broken { opacity: 1; }
-    .uke-label { font-size: 0.94rem; color: var(--text-sub); white-space: nowrap; }
+    .uke-label { font-size: 0.78rem; color: var(--text-sub); white-space: nowrap; }
 
     header { text-align: center; padding: 24px 0 20px; }
     header h1 {
