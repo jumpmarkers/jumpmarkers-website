@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>if (localStorage.getItem('ga_opt_out')) window['ga-disable-G-H1167STKMG'] = true;</script>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-H1167STKMG"></script>
   <script>
@@ -1510,6 +1511,7 @@ function savePreset() {
   if (idx >= 0) presets[idx] = data; else presets.push(data);
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
   currentPresetName = name;
+  localStorage.setItem('gfv-last-preset', name);
   input.value = '';
   renderPresets();
 }
@@ -1518,6 +1520,7 @@ function loadPreset(name) {
   const p = presets.find(p => p.name === name);
   if (!p) return;
   currentPresetName = name;
+  localStorage.setItem('gfv-last-preset', name);
   boards = []; nextId = 1;
   p.boards.forEach(o => boards.push(mkBoard(o)));
   pushHistory();
@@ -1527,7 +1530,7 @@ function loadPreset(name) {
 function deletePreset(name) {
   pushHistory();
   presets = presets.filter(p => p.name !== name);
-  if (currentPresetName === name) currentPresetName = null;
+  if (currentPresetName === name) { currentPresetName = null; localStorage.removeItem('gfv-last-preset'); }
   localStorage.setItem('gfv-presets', JSON.stringify(presets));
   renderPresets();
 }
@@ -2562,8 +2565,12 @@ window.addEventListener('afterprint', () => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-addBoard();
-// Save initial state so Ctrl+Z can return to blank board
+const _lastPreset = localStorage.getItem('gfv-last-preset');
+if (_lastPreset && presets.find(p => p.name === _lastPreset)) {
+  loadPreset(_lastPreset);
+} else {
+  addBoard();
+}
 _history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
 applyLayout();
