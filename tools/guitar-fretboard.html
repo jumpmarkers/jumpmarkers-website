@@ -2533,7 +2533,7 @@ window.addEventListener('beforeprint', () => {
         const td2 = document.createElement('td');
         td2.appendChild(cards[i + 1]);
         tr.appendChild(td2);
-      } else { td1.colSpan = 2; }
+      } else { tr.appendChild(document.createElement('td')); }
       table.appendChild(tr);
     }
     const noteTr = document.createElement('tr');
