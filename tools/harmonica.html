@@ -204,6 +204,13 @@
       transition: color .12s, border-color .12s; flex-shrink: 0; opacity: .5; line-height: 1.4;
     }
     .banks-del-btn:hover { color: var(--accent2); border-color: var(--accent2); opacity: 1; }
+    .banks-io-btn {
+      background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 4px 10px; font-size: 0.72rem; cursor: pointer;
+      transition: background .12s, color .12s, border-color .12s; flex-shrink: 0; line-height: 1.4;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .banks-io-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--accent); }
     .slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
     .slot {
       position: relative; overflow: hidden;
@@ -510,6 +517,11 @@
     <button class="banks-nav-btn" onclick="navigateBank(1)">▶</button>
     <button class="banks-add-btn" onclick="addBankSet()" title="+">+</button>
     <button class="banks-del-btn" id="banksDelBtn" onclick="deleteCurrentBank()">✕</button>
+    <label class="banks-io-btn" title="Import presets from JSON file">
+      ⬆ Import
+      <input type="file" id="banksImportInput" accept=".json" style="display:none">
+    </label>
+    <button class="banks-io-btn" id="banksExportBtn" title="Export presets as JSON file">⬇ Export</button>
   </div>
   <div class="slot-grid" id="slotGrid"></div>
 </div>
@@ -993,9 +1005,44 @@ function deleteCurrentBank() {
   renderSlots();
 }
 
+function exportBanks() {
+  const data = JSON.stringify({ version: 1, bankSets }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'harmonica_presets.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function importBanks(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      let sets = Array.isArray(parsed) ? parsed : (parsed.bankSets || []);
+      sets = sets.filter(s => s && typeof s.name === 'string' && Array.isArray(s.slots));
+      if (!sets.length) throw new Error('No valid sets found');
+      // Ensure each set has exactly SLOT_COUNT slots
+      sets = sets.map(s => ({
+        name: s.name,
+        slots: Array.from({ length: SLOT_COUNT }, (_, i) => s.slots[i] ?? null),
+      }));
+      bankSets = sets;
+      activeBankSet = 0; activeSlot = -1;
+      saveBanks(); renderSlots();
+    } catch(err) { alert('Error importing: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
 function initBanks() {
   loadBanks();
   renderSlots();
+  document.getElementById('banksExportBtn').addEventListener('click', exportBanks);
+  document.getElementById('banksImportInput').addEventListener('change', e => {
+    const f = e.target.files[0]; if (f) importBanks(f);
+    e.target.value = '';
+  });
 
   const grid = document.getElementById('slotGrid');
   const HOLD_MS = 500;
