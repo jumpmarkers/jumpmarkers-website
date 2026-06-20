@@ -30,8 +30,19 @@
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg); color: var(--text);
-      min-height: 100vh; padding: 0 16px 40px;
+      display: flex; height: 100vh; overflow: hidden; padding: 0;
     }
+    /* ── Metronome split panel ── */
+    .metro-panel {
+      flex-shrink: 0; width: 440px;
+      border-right: 2px solid var(--border);
+      height: 100vh; display: none;
+    }
+    .metro-panel.open { display: flex; flex-direction: column; }
+    .metro-panel iframe { flex: 1; width: 100%; border: none; display: block; min-height: 0; }
+    .content-wrap { flex: 1; overflow-y: auto; min-width: 0; height: 100vh; padding: 0 16px 40px; }
+    #btn-metronome.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+    @media print { .metro-panel { display: none !important; } }
 
     /* ── Header ── */
     /* ── Nav ── */
@@ -197,10 +208,10 @@
     .slot {
       position: relative; overflow: hidden;
       background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 7px; padding: 6px 7px 8px; cursor: pointer;
+      border-radius: 7px; padding: 4px 6px 6px; cursor: pointer;
       user-select: none; touch-action: none;
       transition: border-color .12s, background .12s;
-      min-height: 52px; display: flex; flex-direction: column; justify-content: space-between;
+      min-height: 40px; display: flex; flex-direction: column; justify-content: space-between;
     }
     .slot:hover { border-color: var(--border2); background: var(--bg-hover); }
     .slot.slot-active { border-color: var(--accent); background: rgba(99,102,241,.11); }
@@ -218,11 +229,11 @@
       align-items: center; text-align: center; width: 100%;
     }
     .slot-scale {
-      font-size: 0.9rem; color: var(--text); font-weight: 600;
+      font-size: 0.72rem; color: var(--text); font-weight: 600;
       line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       width: 100%;
     }
-    .slot-key { font-size: 1.02rem; color: var(--accent); font-weight: 700; line-height: 1; }
+    .slot-key { font-size: 0.82rem; color: var(--accent); font-weight: 700; line-height: 1; }
     .slot.slot-empty .slot-scale { color: var(--text-sub); opacity: .35; font-weight: 400; }
     @keyframes slotFlash {
       0%   { background: rgba(99,102,241,.45); border-color: var(--accent); }
@@ -428,6 +439,10 @@
   </style>
 </head>
 <body>
+<div class="metro-panel" id="metro-panel">
+  <iframe id="metro-iframe"></iframe>
+</div>
+<main class="content-wrap">
 
 <nav>
   <a class="nav-brand" href="../index.html">
@@ -475,6 +490,7 @@
   <div class="ctrl-group" style="margin-left:auto;align-self:flex-end">
     <div class="btn-row">
       <button class="btn" id="pathBtn" onclick="togglePath()">⟿ Recorrido</button>
+      <button class="btn" id="btn-metronome">🥁 Metronomo</button>
       <button class="btn settings-btn" id="settingsBtn" onclick="openSettings()">⚙ Config.</button>
     </div>
     <div id="pathNavRow" style="display:none;align-items:center;gap:4px">
@@ -577,6 +593,7 @@
   </a>
 </div>
 
+</main>
 <script>
 // ═══════════════════════════════════════════════════════
 // DATA
@@ -1811,6 +1828,28 @@ initControls();
 applyLang();
 applyZoom();
 render();
+
+// ─── Metronome split panel ───────────────────────────────────────────────────
+(function() {
+  const btn    = document.getElementById('btn-metronome');
+  const panel  = document.getElementById('metro-panel');
+  const iframe = document.getElementById('metro-iframe');
+  let open = false;
+  try { open = localStorage.getItem('harm-split') === '1'; } catch(e) {}
+
+  iframe.src = 'metronome.html';
+
+  function applySplit(state) {
+    open = state;
+    panel.classList.toggle('open', open);
+    btn.classList.toggle('active', open);
+    btn.textContent = open ? '✕ Metronomo' : '🥁 Metronomo';
+    try { localStorage.setItem('harm-split', open ? '1' : '0'); } catch(e) {}
+  }
+
+  applySplit(open);
+  btn.addEventListener('click', () => applySplit(!open));
+})();
 
 // Hide scroll hint once user scrolls
 (function() {
