@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <script>if (localStorage.getItem('ga_opt_out')) window['ga-disable-G-H1167STKMG'] = true;</script>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-H1167STKMG"></script>
   <script>
@@ -15,6 +16,7 @@
   <title>Armónica Cromática C · Escalas y Arpegios</title>
   <style>
     :root {
+      font-size: 120%;
       --bg: #0d0d1a; --bg-section: #141428; --bg-card: #1e1e38;
       --bg-hover: #252548; --border: #2a2a50;
       --text: #e0e0f0; --text-sub: #8888b0; --text-dim: #44446a;
@@ -22,7 +24,7 @@
       --blow:  #43a047; --draw:  #1565c0; --sblow: #e65100; --sdraw: #6a1b9a;
       --blow-arp: #00E676; --draw-arp: #00E5FF; --sblow-arp: #FF6D00; --sdraw-arp: #FF4081;
       --no-chrom: #1e1e3a; --no-nat: #1e1e3a; --no-text: #3a3a60;
-      --radius: 6px; --cell-w: 68px; --cell-h: 54px;
+      --radius: 6px; --cell-w: 82px; --cell-h: 65px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -1701,8 +1703,8 @@ window.addEventListener('resize', () => { if (state.showPath) requestAnimationFr
 // Ctrl + scroll wheel zoom
 function applyZoom() {
   const r = document.documentElement;
-  r.style.setProperty('--cell-w', `${Math.round(68 * state.zoomLevel * state.zoomX)}px`);
-  r.style.setProperty('--cell-h', `${Math.round(54 * state.zoomLevel)}px`);
+  r.style.setProperty('--cell-w', `${Math.round(82 * state.zoomLevel * state.zoomX)}px`);
+  r.style.setProperty('--cell-h', `${Math.round(65 * state.zoomLevel)}px`);
 }
 window.addEventListener('wheel', e => {
   if (!e.ctrlKey && !e.shiftKey) return;
