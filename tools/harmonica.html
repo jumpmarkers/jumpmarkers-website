@@ -241,7 +241,10 @@
       width: 100%;
     }
     .slot-key { font-size: 0.82rem; color: var(--accent); font-weight: 700; line-height: 1; }
-    .slot.slot-empty .slot-scale { color: var(--text-sub); opacity: .35; font-weight: 400; }
+    .slot.slot-empty .slot-scale {
+      color: var(--text-sub); opacity: .35; font-weight: 400;
+      white-space: normal; font-size: 0.6rem; line-height: 1.3;
+    }
     @keyframes slotFlash {
       0%   { background: rgba(99,102,241,.45); border-color: var(--accent); }
       100% { background: var(--bg-card); }
@@ -913,7 +916,7 @@ function renderSlots() {
   grid.innerHTML = bs.slots.map((slot, i) => {
     const isActive = i === activeSlot;
     const isEmpty = !slot;
-    const scale = isEmpty ? '—' : slotShortLabel(slot);
+    const scale = isEmpty ? (T.bankHoldToSave || 'Long press to save') : slotShortLabel(slot);
     const key   = isEmpty ? '' : KEY_LABELS[slot.keyIdx ?? 0];
     const tip   = isEmpty
       ? (T.bankHoldToSave || 'Long press to save')
