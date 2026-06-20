@@ -860,6 +860,9 @@ function loadState() {
   } catch(e) {}
 }
 loadState();
+// Always reset zoom to defaults — don't let accidental Ctrl+scroll persist across reloads
+state.zoomLevel = DEFAULTS.zoomLevel;
+state.zoomX     = DEFAULTS.zoomX;
 
 let customPresets = [];
 function loadPresets() {
