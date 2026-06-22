@@ -846,7 +846,7 @@ async function exportWAV() {
 
 async function exportAAC() {
   const buf = await mixDown(); if (!buf) return;
-  const tmpCtx = new AudioContext();
+  const tmpCtx = new AudioContext({ sampleRate: actx.sampleRate });
   const src = tmpCtx.createBufferSource(); src.buffer = buf;
   const dest = tmpCtx.createMediaStreamDestination();
   src.connect(dest);
