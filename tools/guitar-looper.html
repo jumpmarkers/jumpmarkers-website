@@ -234,7 +234,7 @@ select{cursor:pointer}
 
   <!-- Setup -->
   <div class="card">
-    <div class="card-title">Setup</div>
+    <div class="card-title">Mode</div>
     <div class="mode-switch" id="mode-switch">
       <button class="mode-btn active" data-mode="instant">⚡ Instant</button>
       <button class="mode-btn" data-mode="metro">🎵 Metronome</button>
@@ -728,7 +728,6 @@ async function handleRecInstant() {
 async function handleRecMetro() {
   if (phase === 'cd' || phase === 'rec' || phase === 'ovd') return;
   loopDur = calcDur();
-  const maxSmp = Math.round(loopDur * actx.sampleRate);
   if (phase === 'idle') {
     setPhase('cd');
     const loopStart = await doCountdown();
@@ -736,14 +735,22 @@ async function handleRecMetro() {
     buildBeatRow(false, numMeasures * bpMeasure);
     _dotTotal = numMeasures * bpMeasure;
     loopT0 = loopStart;
-    startWorklet(maxSmp, (loopStart - actx.currentTime) * 1000);
+    // Start worklet at loopStart; stop it from the main thread after exactly loopDur
+    // (more reliable than the worklet's sample counter across devices/rates)
+    const startDelay = Math.max(0, (loopStart - actx.currentTime) * 1000);
+    startWorklet(Infinity, startDelay);
+    setTimeout(() => { if (phase === 'rec') worklet.port.postMessage({cmd:'stop'}); },
+               startDelay + loopDur * 1000);
     startMetro(loopStart);
     startPos();
   } else if (phase === 'play') {
     const elapsed = (actx.currentTime - loopT0) % loopDur;
     const toNext  = loopDur - elapsed;
     setPhase('ovd');
-    startWorklet(maxSmp, toNext * 1000 - 20);
+    const startDelay = Math.max(0, toNext * 1000 - 20);
+    startWorklet(Infinity, startDelay);
+    setTimeout(() => { if (phase === 'ovd') worklet.port.postMessage({cmd:'stop'}); },
+               startDelay + loopDur * 1000);
   }
 }
 
