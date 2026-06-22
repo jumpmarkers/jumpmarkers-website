@@ -194,6 +194,11 @@ select{cursor:pointer}
 }
 .midi-bdg.ok{color:var(--green);border-color:rgba(82,199,125,.4)}
 
+/* ── Mode switch ── */
+.mode-switch{display:flex;background:var(--bg3);border-radius:8px;padding:3px;margin-bottom:14px}
+.mode-btn{flex:1;border:none;cursor:pointer;background:none;color:var(--text-sub);padding:8px 14px;border-radius:6px;font-size:.82rem;font-weight:600;transition:background .15s,color .15s}
+.mode-btn.active{background:var(--surface2);color:var(--text)}
+
 @media(max-width:600px){
   .setup-grid{grid-template-columns:1fr}
   .setup-full{grid-column:1}
@@ -218,7 +223,7 @@ select{cursor:pointer}
 
 <main>
   <div class="page-header">
-    <h1>🎸 Guitar Looper</h1>
+    <h1>🔄 Guitar Looper</h1>
     <p>Record, layer, and practice — right in your browser · Free forever</p>
   </div>
 
@@ -230,6 +235,10 @@ select{cursor:pointer}
   <!-- Setup -->
   <div class="card">
     <div class="card-title">Setup</div>
+    <div class="mode-switch" id="mode-switch">
+      <button class="mode-btn active" data-mode="instant">⚡ Instant</button>
+      <button class="mode-btn" data-mode="metro">🎵 Metronome</button>
+    </div>
     <div class="setup-grid">
 
       <div class="setup-row setup-full">
@@ -254,7 +263,7 @@ select{cursor:pointer}
         </select>
       </div>
 
-      <div class="setup-row">
+      <div class="setup-row" id="row-measures" style="display:none">
         <span class="setup-label">Measures</span>
         <input type="number" id="in-measures" value="2" min="1" max="64">
       </div>
@@ -264,7 +273,7 @@ select{cursor:pointer}
         <div class="tog-wrap" id="tw-metro"><div class="tog on" id="tog-metro"></div><span class="tog-lbl">On</span></div>
       </div>
 
-      <div class="setup-row">
+      <div class="setup-row" id="row-countdown" style="display:none">
         <span class="setup-label">Countdown</span>
         <div class="tog-wrap" id="tw-cd"><div class="tog on" id="tog-cd"></div></div>
         <input type="number" id="in-cd" value="4" min="1" max="16" style="width:56px">
@@ -343,6 +352,7 @@ let metroOn = true, nextBeatT = 0, beatIdx = 0, schedId = null;
 // Settings
 let bpm = 120, bpMeasure = 4, numMeasures = 2, cdBeats = 4, cdOn = true;
 let pedalCode = 'Space', midiObj = null;
+let mode = 'instant'; // 'instant' | 'metro'
 
 // Recording guard
 let _discardRec = false;
@@ -433,10 +443,11 @@ const sleep = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
 const calcDur = () => numMeasures * bpMeasure * (60 / bpm);
 
 // ─── Beat row ─────────────────────────────────────────────────────────────────
-function buildBeatRow(isCD = false) {
+function buildBeatRow(isCD = false, totalBeats = null) {
   const row = document.getElementById('beat-row');
   row.innerHTML = '';
-  const total = isCD ? cdBeats : numMeasures * bpMeasure;
+  const total = isCD ? cdBeats
+    : (totalBeats ?? (mode === 'instant' ? bpMeasure : numMeasures * bpMeasure));
   for (let i = 0; i < total; i++) {
     if (!isCD && i > 0 && i % bpMeasure === 0) {
       const sep = document.createElement('div'); sep.className = 'm-sep'; row.appendChild(sep);
@@ -468,7 +479,7 @@ function click(t, isFirst, isCD) {
 
 function scheduleTick() {
   while (nextBeatT < actx.currentTime + LOOK_AHEAD) {
-    const local = beatIdx % (numMeasures * bpMeasure);
+    const local = (_dotTotal > 0 ? beatIdx % _dotTotal : beatIdx % bpMeasure);
     click(nextBeatT, local % bpMeasure === 0, false);
     const t = nextBeatT, li = local;
     setTimeout(() => activateDot(li), Math.max(0, (t - actx.currentTime) * 1000));
@@ -522,6 +533,8 @@ function onRecData(samples) {
   if (phase !== 'rec' && phase !== 'ovd') return;
   const wasOvd = phase === 'ovd';
   const sr = actx.sampleRate;
+  // In instant mode, loop length is determined by how long the user recorded
+  if (!wasOvd && mode === 'instant') loopDur = samples.length / sr;
   const targetLen = Math.round(loopDur * sr);
   const buf = actx.createBuffer(1, targetLen, sr);
   const dst = buf.getChannelData(0);
@@ -531,6 +544,7 @@ function onRecData(samples) {
   setPhase('play');
   if (!wasOvd) startPlayback();
   updateIO();
+  updateInfo();
 }
 
 // ─── Playback ─────────────────────────────────────────────────────────────────
@@ -573,8 +587,12 @@ function startPos() {
   const el = document.getElementById('s-pos');
   (function f() {
     if (actx && (phase === 'play' || phase === 'rec' || phase === 'ovd')) {
-      const p = (actx.currentTime - loopT0) % loopDur;
-      el.textContent = `${p.toFixed(2)}s / ${loopDur.toFixed(2)}s`;
+      if (phase === 'rec' && mode === 'instant') {
+        el.textContent = `${(actx.currentTime - loopT0).toFixed(2)}s recording…`;
+      } else if (loopDur > 0) {
+        const p = (actx.currentTime - loopT0) % loopDur;
+        el.textContent = `${p.toFixed(2)}s / ${loopDur.toFixed(2)}s`;
+      }
     }
     _posRaf = requestAnimationFrame(f);
   })();
@@ -644,8 +662,16 @@ function setPhase(p) {
   setPill(p, PHASE_LABELS[p]);
   const rec = document.getElementById('btn-rec');
   rec.className = 'btn-rec' + (p === 'rec' ? ' on' : p === 'ovd' ? ' on ovd' : '');
-  rec.textContent = {idle:'⏺ Record', cd:'⏺ Record', rec:'⏺ Recording…', play:'⏺ Overdub', ovd:'⏺ Overdubbing…'}[p] || '⏺';
-  rec.disabled = (p === 'cd');
+  const labels = {
+    idle: '⏺ Record',
+    cd:   '⏺ Record',
+    rec:  mode === 'instant' ? '⏹ Stop & Loop' : '⏺ Recording…',
+    play: '⏺ Overdub',
+    ovd:  mode === 'instant' ? '⏹ Stop Overdub' : '⏺ Overdubbing…'
+  };
+  rec.textContent = labels[p] || '⏺';
+  // In metro mode, record is locked during rec/ovd (auto-stops); in instant mode it's the stop trigger
+  rec.disabled = (p === 'cd') || (mode === 'metro' && (p === 'rec' || p === 'ovd'));
   document.getElementById('btn-stop').disabled = (p === 'idle');
 }
 
@@ -656,9 +682,11 @@ function setPill(p, txt) {
 }
 
 function updateInfo() {
-  loopDur = calcDur();
-  document.getElementById('s-info').textContent =
-    `${numMeasures} × ${bpMeasure}/${document.getElementById('in-nv').value} @ ${bpm} BPM · ${loopDur.toFixed(2)}s`;
+  const nv = document.getElementById('in-nv').value;
+  if (mode === 'metro') loopDur = calcDur();
+  document.getElementById('s-info').textContent = mode === 'metro'
+    ? `${numMeasures} × ${bpMeasure}/${nv} @ ${bpm} BPM · ${loopDur.toFixed(2)}s`
+    : loopDur > 0 ? `${loopDur.toFixed(2)}s loop · ${bpm} BPM` : `Free length · ${bpm} BPM`;
 }
 
 function updateIO() {
@@ -672,22 +700,45 @@ async function handleRecord() {
   if (!actx) await initAudio();
   if (!actx) return;
   if (actx.state === 'suspended') await actx.resume();
-  if (phase === 'cd' || phase === 'rec' || phase === 'ovd') return;
+  if (mode === 'instant') await handleRecInstant();
+  else await handleRecMetro();
+}
 
+async function handleRecInstant() {
+  if (phase === 'cd') return;
+  if (phase === 'idle') {
+    loopDur = 0; loopT0 = actx.currentTime;
+    setPhase('rec');
+    buildBeatRow(false, bpMeasure);
+    _dotTotal = bpMeasure;
+    worklet.port.postMessage({cmd:'start', max: Infinity});
+    if (metroOn) startMetro(actx.currentTime);
+    startPos();
+  } else if (phase === 'rec') {
+    worklet.port.postMessage({cmd:'stop'}); // onRecData → sets loopDur, → play
+  } else if (phase === 'play') {
+    const maxSmp = Math.round(loopDur * actx.sampleRate);
+    setPhase('ovd');
+    worklet.port.postMessage({cmd:'start', max: maxSmp}); // overdub one loop, auto-stops
+  } else if (phase === 'ovd') {
+    worklet.port.postMessage({cmd:'stop'}); // onRecData → play
+  }
+}
+
+async function handleRecMetro() {
+  if (phase === 'cd' || phase === 'rec' || phase === 'ovd') return;
   loopDur = calcDur();
   const maxSmp = Math.round(loopDur * actx.sampleRate);
-
   if (phase === 'idle') {
     setPhase('cd');
     const loopStart = await doCountdown();
     setPhase('rec');
-    buildBeatRow(false);
+    buildBeatRow(false, numMeasures * bpMeasure);
     _dotTotal = numMeasures * bpMeasure;
     loopT0 = loopStart;
     startWorklet(maxSmp, (loopStart - actx.currentTime) * 1000);
     startMetro(loopStart);
     startPos();
-
   } else if (phase === 'play') {
     const elapsed = (actx.currentTime - loopT0) % loopDur;
     const toNext  = loopDur - elapsed;
@@ -700,6 +751,7 @@ function handleStop() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
   setPhase('idle');
+  updateInfo();
 }
 
 function handleClear() {
@@ -707,13 +759,12 @@ function handleClear() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
   layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); });
-  layers = []; nextId = 1;
-  setPhase('idle'); renderLayers(); updateIO(); stopPos();
+  layers = []; nextId = 1; loopDur = 0;
+  setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
 
 function handlePedal() {
-  if (phase === 'idle' || phase === 'play') handleRecord();
-  else if (phase === 'rec' || phase === 'ovd') worklet?.port.postMessage({cmd:'stop'});
+  handleRecord(); // handleRecord handles all phases for both modes
 }
 
 // ─── Render layers ────────────────────────────────────────────────────────────
@@ -903,6 +954,23 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-aac').addEventListener('click', exportAAC);
+
+// ─── Mode switch ──────────────────────────────────────────────────────────────
+document.getElementById('mode-switch').addEventListener('click', e => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn || btn.dataset.mode === mode) return;
+  if (phase !== 'idle') { handleStop(); }
+  mode = btn.dataset.mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  const isMetro = mode === 'metro';
+  document.getElementById('row-measures').style.display  = isMetro ? '' : 'none';
+  document.getElementById('row-countdown').style.display = isMetro ? '' : 'none';
+  if (isMetro) loopDur = calcDur();
+  else { loopDur = 0; }
+  buildBeatRow();
+  updateInfo();
+  setPhase('idle');
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 buildBeatRow();
