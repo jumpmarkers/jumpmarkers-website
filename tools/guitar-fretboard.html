@@ -230,6 +230,14 @@
       border-radius: 4px; line-height: 1;
     }
     .del-preset:hover { color: var(--red); background: rgba(255,107,107,.1); }
+    .preset-search-input {
+      background: var(--bg2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; font-family: var(--body); font-size: 0.78rem; outline: none;
+      width: 200px; transition: border-color .15s;
+    }
+    .preset-search-input:focus { border-color: var(--accent); }
+    .preset-search-input::placeholder { color: var(--muted); }
 
     /* ── Two-column layout (column-first flow: 1,2,3 ↓ col1  then 4,5,6 ↓ col2) ── */
     #boards-container.cols-2 {
@@ -837,6 +845,9 @@
             ⬆ Import<input type="file" id="preset-file-input" accept=".json" style="display:none">
           </label>
         </div>
+      </div>
+      <div id="preset-search-wrap" style="display:none">
+        <input class="preset-search-input" id="preset-search" type="search" placeholder="🔍 Filter presets…" autocomplete="off" spellcheck="false">
       </div>
       <div class="preset-list" id="preset-list"></div>
     </div>
@@ -1647,14 +1658,38 @@ function setPresetColor(name, color) {
   renderPresets();
 }
 
+function filterPresets() {
+  const q = (document.getElementById('preset-search')?.value || '').toLowerCase().trim();
+  const list = document.getElementById('preset-list');
+  if (!list) return;
+  let visible = 0;
+  list.querySelectorAll('.preset-chip').forEach(chip => {
+    const match = !q || chip.dataset.name.toLowerCase().includes(q);
+    chip.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  let noMatch = document.getElementById('preset-no-match');
+  if (!noMatch) {
+    noMatch = document.createElement('span');
+    noMatch.id = 'preset-no-match';
+    noMatch.style.cssText = 'font-family:var(--mono);font-size:.7rem;color:var(--muted);opacity:.6';
+    noMatch.textContent = 'No matches';
+    list.appendChild(noMatch);
+  }
+  noMatch.style.display = (q && visible === 0) ? '' : 'none';
+}
+
 function renderPresets() {
   const list = document.getElementById('preset-list');
   if (!list) return;
+  const searchWrap = document.getElementById('preset-search-wrap');
   if (presets.length === 0) {
     list.innerHTML = '<span style="font-family:var(--mono);font-size:.7rem;color:var(--muted);opacity:.6">No saved presets</span>';
+    if (searchWrap) searchWrap.style.display = 'none';
     return;
   }
   list.innerHTML = '';
+  if (searchWrap) searchWrap.style.display = presets.length >= 5 ? '' : 'none';
   presets.forEach(p => {
     const chip = document.createElement('span');
     chip.className = 'preset-chip' + (p.name === currentPresetName ? ' active' : '');
@@ -1714,6 +1749,7 @@ function renderPresets() {
 
     list.appendChild(chip);
   });
+  filterPresets();
 }
 
 // ─── Full re-render ───────────────────────────────────────────────────────────
@@ -2390,6 +2426,7 @@ document.getElementById('btn-save-preset').addEventListener('click', savePreset)
 document.getElementById('preset-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') savePreset();
 });
+document.getElementById('preset-search').addEventListener('input', filterPresets);
 
 // ── Export presets ──
 document.getElementById('btn-export-presets').addEventListener('click', () => {
