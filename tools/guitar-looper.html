@@ -143,6 +143,15 @@ select{cursor:pointer}
 
 /* ── Status ── */
 .status-bar{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.toast{display:none;flex:1;min-width:160px;padding:8px 12px;border-radius:8px;font-size:.83rem;line-height:1.4}
+.toast.show{display:block}
+.toast.t-error{background:#4a1010;color:#ff9a9a;border:1px solid #7a2a2a}
+.toast.t-warn{background:#3a2d00;color:#ffd060;border:1px solid #6a5200}
+.toast.t-confirm{background:#1a2535;color:#9bbbd8;border:1px solid #2d4a6a}
+.toast-actions{display:flex;gap:8px;margin-top:8px}
+.toast-btn{padding:3px 14px;border-radius:6px;border:none;cursor:pointer;font-size:.8rem;font-weight:600}
+.toast-btn.t-ok{background:#c94444;color:#fff}
+.toast-btn.t-cancel{background:#3a3a3a;color:#bbb}
 .s-pill{
   padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;
   text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono);
@@ -304,6 +313,7 @@ select{cursor:pointer}
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
       <button class="btn-tr" id="btn-stop" disabled>⏹ Stop</button>
       <button class="btn-tr danger" id="btn-clear">🗑 Clear All</button>
+      <div id="toast" class="toast"></div>
     </div>
     <div class="status-bar">
       <span class="s-pill s-idle" id="s-pill">Idle</span>
@@ -386,11 +396,38 @@ class Rec extends AudioWorkletProcessor {
 registerProcessor('rec', Rec);
 `;
 
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg, type = 'error', dur = 5000) {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.className = 'toast t-' + type + ' show';
+  clearTimeout(_toastTimer);
+  if (dur) _toastTimer = setTimeout(hideToast, dur);
+}
+function hideToast() {
+  document.getElementById('toast').className = 'toast';
+}
+function showConfirm(msg) {
+  return new Promise(resolve => {
+    const t = document.getElementById('toast');
+    t.innerHTML = `${msg}<div class="toast-actions">
+      <button class="toast-btn t-ok" id="toast-ok">OK</button>
+      <button class="toast-btn t-cancel" id="toast-cancel">Cancel</button>
+    </div>`;
+    t.className = 'toast t-confirm show';
+    clearTimeout(_toastTimer);
+    const done = v => { hideToast(); resolve(v); };
+    document.getElementById('toast-ok').onclick     = () => done(true);
+    document.getElementById('toast-cancel').onclick = () => done(false);
+  });
+}
+
 // ─── Audio init ──────────────────────────────────────────────────────────────
 async function initAudio() {
   if (actx) return;
   actx = new (window.AudioContext || window.webkitAudioContext)();
-  if (!actx.audioWorklet) { alert('AudioWorklet not supported. Please use Chrome, Edge, or Firefox 76+.'); return; }
+  if (!actx.audioWorklet) { showToast('AudioWorklet not supported. Use Chrome, Edge, or Firefox 76+.', 'warn', 0); return; }
   const blob = new Blob([WORKLET_CODE], {type:'application/javascript'});
   const url = URL.createObjectURL(blob);
   await actx.audioWorklet.addModule(url);
@@ -763,8 +800,8 @@ function handleStop() {
   updateInfo();
 }
 
-function handleClear() {
-  if (layers.length > 0 && !confirm('Clear all layers?')) return;
+async function handleClear() {
+  if (layers.length > 0 && !await showConfirm('Clear all layers?')) return;
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
   layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); });
@@ -959,9 +996,9 @@ document.getElementById('btn-rec').addEventListener('click', handleRecord);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
 document.getElementById('btn-midi').addEventListener('click', async () => {
-  if (!navigator.requestMIDIAccess) { alert('Web MIDI not supported. Use Chrome or Edge.'); return; }
+  if (!navigator.requestMIDIAccess) { showToast('Web MIDI not supported. Use Chrome or Edge.', 'warn', 0); return; }
   try { wireMIDI(await navigator.requestMIDIAccess()); }
-  catch(e) { alert('MIDI access denied: ' + e.message); }
+  catch(e) { showToast('MIDI access denied: ' + e.message, 'error'); }
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-aac').addEventListener('click', exportAAC);
@@ -1006,7 +1043,7 @@ async function detectDevices() {
       ).join('');
     if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
   } catch(e) {
-    alert('Could not access microphone.\n' + e.message);
+    showToast('Could not access microphone. ' + e.message, 'error');
   }
   btn.textContent = '🔄 Detect'; btn.disabled = false;
 }
