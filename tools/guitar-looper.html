@@ -1062,12 +1062,11 @@ function handleStop() {
   updateInfo();
 }
 
-async function handleClear() {
-  if (layers.length > 0 && !await showConfirm('Clear all layers?')) return;
+function handleClear() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
   layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); });
-  layers = []; nextId = 1; loopDur = 0;
+  layers = []; history = []; nextId = 1; loopDur = 0;
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
 
