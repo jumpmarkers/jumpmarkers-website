@@ -214,6 +214,13 @@ select{cursor:pointer}
 .btn-rr:hover{opacity:1;background:rgba(224,82,82,.12)!important}
 .btn-rr.rr-active{opacity:1;animation:blink .8s infinite}
 #btn-merge{padding:3px 10px;font-size:.75rem;margin-left:auto}
+/* ── Feedback widget ── */
+#fb-wrap{position:relative}
+#fb-text{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;font-family:inherit;padding:9px 12px;resize:none;height:68px;outline:none;transition:border-color .15s}
+#fb-text:focus{border-color:var(--accent)}
+#fb-text::placeholder{color:var(--muted)}
+#fb-count{position:absolute;bottom:8px;right:10px;font-size:.68rem;color:var(--muted);pointer-events:none;transition:color .15s}
+#fb-count.warn{color:var(--red)}
 
 /* ── IO ── */
 .io-row{display:flex;gap:10px;flex-wrap:wrap}
@@ -416,6 +423,18 @@ select{cursor:pointer}
         ⬆ Import Audio
         <input type="file" id="in-import" accept="audio/*" style="display:none">
       </label>
+    </div>
+  </div>
+  <!-- Feedback -->
+  <div class="card">
+    <div class="card-title">💬 Say hi / suggest a feature</div>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px">Saluda al programador, sugiere el próximo tool gratuito, o pide un feature que quisieras ver.</p>
+    <div id="fb-wrap">
+      <textarea id="fb-text" maxlength="140" placeholder="Write here… (140 chars max)"></textarea>
+      <span id="fb-count">140</span>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <button class="btn-io" id="fb-send" style="padding:5px 16px">Send →</button>
     </div>
   </div>
 </main>
@@ -1595,6 +1614,42 @@ document.getElementById('btn-monitor').addEventListener('click', () => {
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-merge').addEventListener('click', doMerge);
+
+// ─── Feedback widget ───────────────────────────────────────────────────────────
+document.getElementById('fb-text').addEventListener('input', e => {
+  const rem = 140 - e.target.value.length;
+  const counter = document.getElementById('fb-count');
+  counter.textContent = rem;
+  counter.classList.toggle('warn', rem < 20);
+});
+document.getElementById('fb-send').addEventListener('click', async () => {
+  const text = document.getElementById('fb-text').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('fb-send');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('https://formsubmit.co/ajax/emillpolog@gmail.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        _subject: 'Guitar Looper — feedback',
+        _captcha: 'false'
+      })
+    });
+    const d = await r.json();
+    if (d.success === 'true' || d.success === true) {
+      document.getElementById('fb-text').value = '';
+      document.getElementById('fb-count').textContent = '140';
+      document.getElementById('fb-count').classList.remove('warn');
+      btn.textContent = '✓ Sent!';
+      setTimeout(() => { btn.textContent = 'Send →'; btn.disabled = false; }, 2500);
+    } else { throw new Error(); }
+  } catch {
+    btn.textContent = 'Error — try again';
+    btn.disabled = false;
+  }
+});
 
 // ─── Mode switch ──────────────────────────────────────────────────────────────
 document.getElementById('mode-switch').addEventListener('click', e => {
