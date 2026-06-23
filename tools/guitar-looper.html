@@ -297,6 +297,12 @@ select{cursor:pointer}
       </div>
 
       <div class="setup-row">
+        <span class="setup-label">Quantize</span>
+        <div class="tog-wrap" id="tw-quantize"><div class="tog" id="tog-quantize"></div><span class="tog-lbl" id="lbl-quantize">Off</span></div>
+        <span class="dim" style="font-size:.78rem;opacity:.7">snap rec to beat · Q</span>
+      </div>
+
+      <div class="setup-row">
         <span class="setup-label">Latency comp</span>
         <input type="number" id="in-latency" value="0" min="-200" max="500" style="width:68px">
         <span class="dim">ms</span>
@@ -328,7 +334,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · Q: quantize · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -391,6 +397,7 @@ let _pauseOffset = 0, _ovdT0 = 0;
 let latencyMs = 0;
 let _measuringLatency = false, _measureMeta = null;
 let mode = 'metro'; // 'instant' | 'metro'
+let autoQuantize = false, _pendingQuantizeDur = 0;
 
 // Recording guard
 let _discardRec = false;
@@ -731,7 +738,10 @@ function onRecData(samples) {
   const wasOvd = phase === 'ovd';
   const sr = actx.sampleRate;
   // In instant mode, loop length is determined by how long the user recorded
-  if (!wasOvd && mode === 'instant') loopDur = samples.length / sr;
+  if (!wasOvd && mode === 'instant') {
+    if (_pendingQuantizeDur) { loopDur = _pendingQuantizeDur; _pendingQuantizeDur = 0; }
+    else loopDur = samples.length / sr;
+  }
   const targetLen = Math.round(loopDur * sr);
   const buf = actx.createBuffer(1, targetLen, sr);
   const dst = buf.getChannelData(0);
@@ -977,12 +987,25 @@ async function handleRecInstant() {
     if (metroOn) startMetro(actx.currentTime);
     startPos();
   } else if (phase === 'rec') {
+    if (autoQuantize) {
+      const beatDur = 60 / bpm;
+      const elapsed = actx.currentTime - loopT0;
+      _pendingQuantizeDur = Math.max(beatDur, Math.round(elapsed / beatDur) * beatDur);
+    }
     worklet.port.postMessage({cmd:'stop'}); // onRecData → sets loopDur → play
   } else if (phase === 'play') {
-    const ovdStart = actx.currentTime;
+    let ovdStart;
+    if (autoQuantize) {
+      const beatDur = 60 / bpm;
+      const sinceLast = (actx.currentTime - loopT0) % beatDur;
+      const toNext = beatDur - sinceLast;
+      ovdStart = actx.currentTime + (toNext < 0.04 ? toNext + beatDur : toNext);
+    } else {
+      ovdStart = actx.currentTime;
+    }
     _ovdT0 = ovdStart;
     setPhase('ovd');
-    worklet.port.postMessage({cmd:'start', stopAt: ovdStart + loopDur}); // sample-accurate stop
+    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
   } else if (phase === 'ovd') {
     worklet.port.postMessage({cmd:'stop'}); // onRecData → play
   }
@@ -1225,6 +1248,9 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyM' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
     e.preventDefault(); document.getElementById('tw-metro').click();
   }
+  if (e.code === 'KeyQ' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault(); document.getElementById('tw-quantize').click();
+  }
   const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
   if (e.code === 'KeyX'   && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
   if (e.code === 'Comma'  && !e.repeat && noInput) { e.preventDefault(); handleOverdub(); }
@@ -1276,6 +1302,10 @@ function makeToggle(wrapId, togId, init, cb) {
   return v;
 }
 metroOn = makeToggle('tw-metro','tog-metro', true, v => metroOn = v);
+autoQuantize = makeToggle('tw-quantize','tog-quantize', false, v => {
+  autoQuantize = v;
+  document.getElementById('lbl-quantize').textContent = v ? 'On' : 'Off';
+});
 cdOn    = makeToggle('tw-cd',   'tog-cd',    true, v => { cdOn = v; document.getElementById('in-cd').disabled = !v; });
 
 // ─── Transport listeners ──────────────────────────────────────────────────────
