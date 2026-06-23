@@ -443,10 +443,6 @@
       70%  { transform: scale(1.2); }
       100% { transform: scale(1);   opacity: 1; }
     }
-    @keyframes bounce-down{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
-    .scroll-hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;opacity:1;transition:opacity .5s;z-index:40}
-    .scroll-hint.hidden{opacity:0}
-    .scroll-hint span{animation:bounce-down .85s ease-in-out infinite;line-height:1}
     .nc.pop { animation: popIn .2s ease-out; }
 
     /* ── Fretboard sticker — base ── */
@@ -2615,22 +2611,8 @@ if (_lastPreset && presets.find(p => p.name === _lastPreset)) {
 _history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
 applyLayout();
-(function() {
-  const el = document.getElementById('scroll-hint');
-  function hide() {
-    el.classList.add('hidden');
-    scroller && scroller.removeEventListener('scroll', onScroll);
-  }
-  const scroller = document.querySelector('.content-wrap');
-  function onScroll() { if (scroller.scrollTop > 30) hide(); }
-  if (scroller) scroller.addEventListener('scroll', onScroll, { passive: true });
-  setTimeout(hide, 5000);
-})();
 </script>
 </div><!-- /.content-wrap -->
 
-<div class="scroll-hint" id="scroll-hint">
-  <span style="font-size:1.9rem">👇</span>
-</div>
 </body>
 </html>
