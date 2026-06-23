@@ -512,6 +512,21 @@
   #msg-send{padding:5px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem;cursor:pointer;transition:border-color .15s,color .15s}
   #msg-send:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
   #msg-send:disabled{opacity:.4;cursor:default}
+
+  /* ── Scroll hint ── */
+  .scroll-hint {
+    position: fixed; bottom: 26px; font-size: 1.55rem;
+    opacity: .55; pointer-events: none; z-index: 200;
+    transition: opacity .5s ease;
+    animation: hint-bob 1.5s ease-in-out infinite;
+  }
+  .scroll-hint-l { left: 22px; }
+  .scroll-hint-r { right: 22px; }
+  .scroll-hint.hidden { opacity: 0; }
+  @keyframes hint-bob {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(9px); }
+  }
   </style>
   <script>if (window.self !== window.top) document.documentElement.classList.add('in-iframe');</script>
 </head>
@@ -1534,6 +1549,22 @@ document.getElementById('msg-send').addEventListener('click', async () => {
     } else { throw new Error(); }
   } catch { btn.textContent = 'Error — try again'; btn.disabled = false; }
 });
+
+// ─── Scroll hints ─────────────────────────────────────────────────────────────
+(function () {
+  const hints = document.querySelectorAll('.scroll-hint');
+  function check() {
+    const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
+    const noScroll = document.documentElement.scrollHeight <= window.innerHeight + 10;
+    hints.forEach(h => h.classList.toggle('hidden', atBottom || noScroll));
+  }
+  window.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check);
+  check();
+})();
 </script>
+
+<div class="scroll-hint scroll-hint-l">👇</div>
+<div class="scroll-hint scroll-hint-r">👇</div>
 </body>
 </html>
