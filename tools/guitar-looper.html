@@ -412,7 +412,7 @@ select{cursor:pointer}
     <div class="card-title">Import / Export</div>
     <div class="io-row">
       <button class="btn-io" id="btn-wav" disabled>⬇ Export WAV</button>
-      <button class="btn-io" id="btn-aac" disabled>⬇ Export AAC</button>
+      <button class="btn-io" id="btn-aac" disabled>⬇ Export OGG</button>
       <label class="btn-io" style="cursor:pointer">
         ⬆ Import Audio
         <input type="file" id="in-import" accept="audio/*" style="display:none">
@@ -1450,13 +1450,14 @@ async function exportAAC() {
   const src = tmpCtx.createBufferSource(); src.buffer = buf;
   const dest = tmpCtx.createMediaStreamDestination();
   src.connect(dest);
-  const mime = ['audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm']
+  const mime = ['audio/ogg;codecs=vorbis','audio/ogg;codecs=opus','audio/ogg',
+                'audio/webm;codecs=opus','audio/webm','audio/mp4']
     .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
   const mr = new MediaRecorder(dest.stream, {mimeType:mime});
   const chunks = [];
   mr.ondataavailable = e => chunks.push(e.data);
   mr.onstop = () => {
-    const ext = mime.includes('mp4')||mime.includes('aac') ? 'm4a' : 'webm';
+    const ext = mime.startsWith('audio/ogg') ? 'ogg' : (mime.includes('mp4') ? 'm4a' : 'webm');
     dl(new Blob(chunks, {type:mime}), 'loop.'+ext);
     tmpCtx.close();
   };
