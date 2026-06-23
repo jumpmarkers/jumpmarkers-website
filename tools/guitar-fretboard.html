@@ -2683,14 +2683,12 @@ document.getElementById('msg-send').addEventListener('click', async () => {
 // ─── Scroll hints ─────────────────────────────────────────────────────────────
 (function () {
   const hints = document.querySelectorAll('.scroll-hint');
-  function check() {
-    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-    const atBottom = scrollable < 10 || window.scrollY >= scrollable - 150;
-    hints.forEach(h => h.classList.toggle('hidden', atBottom));
-  }
-  window.addEventListener('scroll', check, { passive: true });
-  window.addEventListener('resize', check);
-  check();
+  const banner = document.querySelector('.support-banner');
+  if (!banner) return;
+  const obs = new IntersectionObserver(([e]) => {
+    hints.forEach(h => h.classList.toggle('hidden', e.isIntersecting));
+  }, { threshold: 0.05 });
+  obs.observe(banner);
 })();
 </script>
 
