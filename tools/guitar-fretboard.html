@@ -2684,17 +2684,22 @@ document.getElementById('msg-send').addEventListener('click', async () => {
 (function () {
   const hints = document.querySelectorAll('.scroll-hint');
   const banner = document.querySelector('.support-banner');
+  const scroller = document.querySelector('.content-wrap') || window;
   if (!banner) return;
-  const obs = new IntersectionObserver(([e]) => {
-    hints.forEach(h => h.classList.toggle('hidden', e.isIntersecting));
-  }, { threshold: 0.05 });
-  obs.observe(banner);
+  function check() {
+    const rect = banner.getBoundingClientRect();
+    hints.forEach(h => h.classList.toggle('hidden', rect.top < window.innerHeight));
+  }
+  scroller.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check);
+  check();
 })();
 </script>
 
+</div><!-- /.content-wrap -->
+
 <div class="scroll-hint scroll-hint-l">👇</div>
 <div class="scroll-hint scroll-hint-r">👇</div>
-</div><!-- /.content-wrap -->
 
 </body>
 </html>
