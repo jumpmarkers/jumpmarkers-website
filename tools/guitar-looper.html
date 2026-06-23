@@ -1094,7 +1094,7 @@ function handleStop() {
 function handleClear() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
-  layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); });
+  [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} });
   layers = []; history = []; nextId = 1; loopDur = 0;
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
