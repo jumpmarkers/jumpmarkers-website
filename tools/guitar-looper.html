@@ -204,6 +204,16 @@ select{cursor:pointer}
 .btn-i.del:hover{color:var(--red);background:rgba(224,82,82,.1)}
 .empty-layers{text-align:center;padding:24px;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
 
+/* ── Layer extras: select / pan / re-record ── */
+.layer-item.l-sel{border-color:rgba(245,166,35,.45);background:rgba(245,166,35,.06)}
+.l-check{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin-right:2px}
+.l-pan-wrap{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.l-pan-lbl{font-size:.6rem;color:var(--muted);line-height:1;user-select:none}
+.l-pan{width:50px;accent-color:var(--blue);cursor:pointer}
+.btn-rr{color:var(--muted)!important}
+.btn-rr.rr-active{color:var(--red)!important;animation:blink .8s infinite}
+#btn-merge{padding:3px 10px;font-size:.75rem;margin-left:auto}
+
 /* ── IO ── */
 .io-row{display:flex;gap:10px;flex-wrap:wrap}
 .btn-io{
@@ -390,7 +400,7 @@ select{cursor:pointer}
 
   <!-- Layers -->
   <div class="card">
-    <div class="card-title">Layers</div>
+    <div class="card-title" style="display:flex;align-items:center;gap:8px">Layers <button class="btn-io" id="btn-merge" disabled>⊕ Merge</button></div>
     <div id="layers-wrap">
       <div class="empty-layers">No layers yet — press Record to start</div>
     </div>
@@ -471,6 +481,7 @@ let autoQuantize = false, _pendingQuantizeDur = 0;
 
 // Recording guard
 let _discardRec = false;
+let _replaceTarget = null; // layer id being re-recorded, or null
 
 // ─── Worklet code (inlined as blob) ──────────────────────────────────────────
 const WORKLET_CODE = `
@@ -818,9 +829,24 @@ function onRecData(samples) {
   const src = new Float32Array(samples);
   dst.set(src.subarray(0, Math.min(src.length, targetLen)));
   applyCrossfade(buf);
-  addLayer(buf, wasOvd);
-  setPhase('play');
-  if (!wasOvd) startPlayback();
+  if (_replaceTarget !== null) {
+    const l = layers.find(x => x.id === _replaceTarget);
+    _replaceTarget = null;
+    history = [];
+    if (l) {
+      stopLayerSrc(l);
+      l.buf = buf;
+      l.imported = false;
+      const off = (actx.currentTime - loopT0) % loopDur;
+      playLayer(l, off);
+      renderLayers();
+    }
+    setPhase('play');
+  } else {
+    addLayer(buf, wasOvd);
+    setPhase('play');
+    if (!wasOvd) startPlayback();
+  }
   updateIO();
   updateInfo();
 }
@@ -903,14 +929,14 @@ function applyCrossfade(buf, xfadeMs = 8, fadeinMs = 3) {
 
 // ─── Layer management ─────────────────────────────────────────────────────────
 function addLayer(buf, wasOvd, imported = false) {
-  history = []; // new recording invalidates redo history
+  history = [];
   const id = nextId++;
-  const gain = actx.createGain(); gain.connect(actx.destination);
-  const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported};
+  const gain = actx.createGain();
+  const panner = actx.createStereoPanner();
+  gain.connect(panner); panner.connect(actx.destination);
+  const l = {id, name:'Layer '+id, buf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
   layers.push(l);
   if (wasOvd) {
-    // Use actx.currentTime (not _ovdT0): the JS epsilon in each callback
-    // cancels itself out, keeping all layers phase-locked to loopT0.
     const offset = (actx.currentTime - loopT0) % loopDur;
     playLayer(l, offset);
   }
@@ -922,6 +948,7 @@ function removeLayer(id) {
   if (i < 0) return;
   stopLayerSrc(layers[i]);
   layers[i].gain.disconnect();
+  try { layers[i].panner?.disconnect(); } catch(e){}
   layers.splice(i, 1);
   refreshSolo();
   renderLayers();
@@ -936,6 +963,7 @@ function doUndo(overdubOnly = false) {
   const l = layers.pop();
   stopLayerSrc(l);
   l.gain.disconnect();
+  try { l.panner?.disconnect(); } catch(e){}
   history.push(l);
   refreshSolo();
   renderLayers();
@@ -948,7 +976,7 @@ function doRedo() {
   if (history.length === 0) { showToast('Nothing to redo', 'warn', 1500); return; }
   if (!actx) return;
   const l = history.pop();
-  l.gain.connect(actx.destination);
+  l.gain.connect(l.panner); l.panner.connect(actx.destination);
   layers.push(l);
   if (layers.length === 1) {
     loopDur = l.buf.duration;
@@ -987,6 +1015,12 @@ function setVol(id, v) {
   const l = layers.find(l => l.id === id); if (!l) return;
   l.vol = v;
   if (!layers.some(x => x.solo) || l.solo) l.gain.gain.setTargetAtTime(v, actx.currentTime, 0.01);
+}
+
+function setPan(id, v) {
+  const l = layers.find(l => l.id === id); if (!l) return;
+  l.pan = v;
+  if (l.panner) l.panner.pan.setTargetAtTime(v, actx?.currentTime || 0, 0.01);
 }
 
 // ─── Phase helpers ────────────────────────────────────────────────────────────
@@ -1127,6 +1161,7 @@ function resumePlayback() {
 
 function handleStop() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+  _replaceTarget = null;
   stopPlayback();
   setPhase('idle');
   updateInfo();
@@ -1134,8 +1169,9 @@ function handleStop() {
 
 function handleClear() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+  _replaceTarget = null;
   stopPlayback();
-  [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} });
+  [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
   layers = []; history = []; nextId = 1; loopDur = 0;
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
@@ -1155,30 +1191,104 @@ function handleOverdub() {
   else if (phase === 'ovd' && mode === 'instant') { handleRecord(); }
 }
 
+function handleReRecord(id) {
+  if (phase !== 'play' || !actx) return;
+  _replaceTarget = id;
+  renderLayers();
+  if (mode === 'metro') {
+    const elapsed = (actx.currentTime - loopT0) % loopDur;
+    const ovdStart = actx.currentTime + (loopDur - elapsed);
+    _ovdT0 = ovdStart;
+    setPhase('ovd');
+    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
+  } else {
+    let ovdStart = actx.currentTime;
+    if (autoQuantize) {
+      const beatDur = 60 / bpm;
+      const sinceLast = (actx.currentTime - loopT0) % beatDur;
+      const toNext = beatDur - sinceLast;
+      ovdStart = actx.currentTime + (toNext < 0.04 ? toNext + beatDur : toNext);
+    }
+    _ovdT0 = ovdStart;
+    setPhase('ovd');
+    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
+  }
+}
+
+async function doMerge() {
+  const sel = layers.filter(l => l.selected);
+  if (sel.length < 2) { showToast('Select 2 or more layers to merge', 'warn', 2000); return; }
+  if (phase === 'rec' || phase === 'ovd') return;
+  const sr = actx.sampleRate;
+  const len = Math.round(loopDur * sr);
+  const comp = latencyMs / 1000;
+  const offset = loopDur > 0 ? ((comp % loopDur) + loopDur) % loopDur : 0;
+  const off = new OfflineAudioContext(2, len, sr);
+  sel.forEach(l => {
+    const src = off.createBufferSource();
+    src.buffer = l.buf;
+    src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
+    const g = off.createGain(); g.gain.value = l.vol;
+    const p = off.createStereoPanner(); p.pan.value = l.pan ?? 0;
+    src.connect(g); g.connect(p); p.connect(off.destination);
+    src.start(0, l.imported ? 0 : offset);
+  });
+  const mergedBuf = await off.startRendering();
+  const insertIdx = layers.indexOf(sel[0]);
+  sel.forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
+  layers = layers.filter(l => !l.selected);
+  const id = nextId++;
+  const gain = actx.createGain();
+  const panner = actx.createStereoPanner();
+  gain.connect(panner); panner.connect(actx.destination);
+  const ml = {id, name:'Merged', buf:mergedBuf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported:true, selected:false};
+  layers.splice(Math.min(insertIdx, layers.length), 0, ml);
+  history = [];
+  if (phase === 'play') playLayer(ml, (actx.currentTime - loopT0) % loopDur);
+  refreshSolo(); renderLayers(); updateIO();
+}
+
+function updateMergeButton() {
+  const btn = document.getElementById('btn-merge');
+  if (!btn) return;
+  btn.disabled = layers.filter(l => l.selected).length < 2;
+}
+
 // ─── Render layers ────────────────────────────────────────────────────────────
 function renderLayers() {
   const wrap = document.getElementById('layers-wrap');
-  if (!layers.length) { wrap.innerHTML = '<div class="empty-layers">No layers yet — press Record to start</div>'; return; }
+  if (!layers.length) { wrap.innerHTML = '<div class="empty-layers">No layers yet — press Record to start</div>'; updateMergeButton(); return; }
   wrap.innerHTML = '';
   layers.forEach(l => {
-    const div = document.createElement('div'); div.className = 'layer-item';
+    const div = document.createElement('div');
+    div.className = 'layer-item' + (l.selected ? ' l-sel' : '');
     const safeName = l.name.replace(/"/g, '&quot;');
+    const rrActive = _replaceTarget === l.id;
     div.innerHTML = `
+      <input type="checkbox" class="l-check" data-sel="${l.id}"${l.selected ? ' checked' : ''} title="Select for merge">
       <div class="l-bar" style="background:${l.color}" title="Click to change color">
         <input type="color" value="${l.color}" data-color="${l.id}">
       </div>
       <input class="l-name" type="text" value="${safeName}" data-rename="${l.id}" spellcheck="false" title="Click to rename">
       <span class="l-dur">${l.buf ? l.buf.duration.toFixed(2)+'s' : '–'}</span>
-      <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}">
+      <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}" title="Volume">
+      <span class="l-pan-wrap" title="Pan · double-click to center">
+        <span class="l-pan-lbl">L</span>
+        <input type="range" class="l-pan" min="-1" max="1" step="0.01" value="${l.pan ?? 0}" data-pan="${l.id}">
+        <span class="l-pan-lbl">R</span>
+      </span>
       <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">${l.muted?'🔇':'🔊'}</button>
       <button class="btn-i${l.solo?' solo-on':''}" data-solo="${l.id}" title="Solo">S</button>
+      <button class="btn-i btn-rr${rrActive?' rr-active':''}" data-rr="${l.id}" title="Re-record this layer">⏺</button>
       <button class="btn-i del" data-del="${l.id}" title="Delete">✕</button>`;
     wrap.appendChild(div);
   });
+  updateMergeButton();
 }
 
 document.getElementById('layers-wrap').addEventListener('input', e => {
-  if (e.target.dataset.id) setVol(+e.target.dataset.id, +e.target.value);
+  if (e.target.dataset.id)    setVol(+e.target.dataset.id, +e.target.value);
+  if (e.target.dataset.pan)   setPan(+e.target.dataset.pan, +e.target.value);
   if (e.target.dataset.color) {
     const l = layers.find(x => x.id === +e.target.dataset.color);
     if (l) { l.color = e.target.value; e.target.parentElement.style.background = e.target.value; }
@@ -1188,6 +1298,20 @@ document.getElementById('layers-wrap').addEventListener('click', e => {
   if (e.target.dataset.mute) toggleMute(+e.target.dataset.mute);
   if (e.target.dataset.solo) toggleSolo(+e.target.dataset.solo);
   if (e.target.dataset.del)  removeLayer(+e.target.dataset.del);
+  if (e.target.dataset.rr)   handleReRecord(+e.target.dataset.rr);
+});
+document.getElementById('layers-wrap').addEventListener('change', e => {
+  if (e.target.type === 'checkbox' && e.target.dataset.sel) {
+    const l = layers.find(x => x.id === +e.target.dataset.sel);
+    if (l) { l.selected = e.target.checked; updateMergeButton(); }
+    // toggle l-sel class without full re-render
+    e.target.closest('.layer-item')?.classList.toggle('l-sel', e.target.checked);
+  }
+});
+document.getElementById('layers-wrap').addEventListener('dblclick', e => {
+  if (e.target.type === 'range' && e.target.dataset.pan !== undefined) {
+    e.target.value = 0; setPan(+e.target.dataset.pan, 0);
+  }
 });
 document.getElementById('layers-wrap').addEventListener('focusin', e => {
   if (e.target.dataset.rename) e.target.dataset.pre = e.target.value;
@@ -1213,15 +1337,15 @@ async function mixDown() {
   const len = Math.round(loopDur * sr);
   const comp = latencyMs / 1000;
   const offset = loopDur > 0 ? ((comp % loopDur) + loopDur) % loopDur : 0;
-  const off = new OfflineAudioContext(1, len, sr);
+  const off = new OfflineAudioContext(2, len, sr); // stereo to preserve pan
   layers.forEach(l => {
     if (l.muted) return;
     const src = off.createBufferSource();
     src.buffer = l.buf;
     src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
     const g = off.createGain(); g.gain.value = l.vol;
-    src.connect(g); g.connect(off.destination);
-    // Apply same comp offset as live playback; imported layers already at beat 0
+    const p = off.createStereoPanner(); p.pan.value = l.pan ?? 0;
+    src.connect(g); g.connect(p); p.connect(off.destination);
     src.start(0, l.imported ? 0 : offset);
   });
   return off.startRendering();
@@ -1408,6 +1532,7 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-aac').addEventListener('click', exportAAC);
+document.getElementById('btn-merge').addEventListener('click', doMerge);
 
 // ─── Mode switch ──────────────────────────────────────────────────────────────
 document.getElementById('mode-switch').addEventListener('click', e => {
