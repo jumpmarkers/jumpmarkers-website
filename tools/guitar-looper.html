@@ -730,6 +730,7 @@ function onRecData(samples) {
   const dst = buf.getChannelData(0);
   const src = new Float32Array(samples);
   dst.set(src.subarray(0, Math.min(src.length, targetLen)));
+  applyCrossfade(buf);
   addLayer(buf, wasOvd);
   setPhase('play');
   if (!wasOvd) startPlayback();
@@ -791,6 +792,26 @@ function startPos() {
 function stopPos() {
   if (_posRaf) { cancelAnimationFrame(_posRaf); _posRaf = null; }
   document.getElementById('s-pos').textContent = '';
+}
+
+// ─── Loop crossfade ───────────────────────────────────────────────────────────
+function applyCrossfade(buf, xfadeMs = 8, fadeinMs = 3) {
+  const sr  = buf.sampleRate;
+  const n   = buf.length;
+  const xfSmp = Math.min(Math.round(sr * xfadeMs / 1000), Math.floor(n / 4));
+  const fiSmp = Math.min(Math.round(sr * fadeinMs / 1000), Math.floor(n / 8));
+  if (xfSmp < 2) return;
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    const beginOrig = d.slice(0, xfSmp); // snapshot before any edits
+    // tiny fade-in to kill worklet-onset click
+    for (let i = 0; i < fiSmp; i++) d[i] *= i / fiSmp;
+    // crossfade: end of buffer blends into beginning — seamless loop boundary
+    for (let i = 0; i < xfSmp; i++) {
+      const t = i / (xfSmp - 1);          // 0 → 1
+      d[n - xfSmp + i] = d[n - xfSmp + i] * (1 - t) + beginOrig[i] * t;
+    }
+  }
 }
 
 // ─── Layer management ─────────────────────────────────────────────────────────
