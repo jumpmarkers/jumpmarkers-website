@@ -110,7 +110,9 @@ select{cursor:pointer}
 .tog-lbl{font-size:.82rem;color:var(--text-sub)}
 
 /* ── VU ── */
-.vu-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:100px;max-width:200px}
+.vu-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:100px;max-width:240px}
+#btn-monitor{padding:2px 7px;font-size:.8rem;flex-shrink:0}
+#btn-monitor.mon-on{color:var(--green)!important;border-color:var(--green)}
 .vu-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
 
@@ -206,12 +208,11 @@ select{cursor:pointer}
 
 /* ── Layer extras: select / pan / re-record ── */
 .layer-item.l-sel{border-color:rgba(245,166,35,.45);background:rgba(245,166,35,.06)}
-.l-check{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin-right:2px}
-.l-pan-wrap{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.l-pan-lbl{font-size:.6rem;color:var(--muted);line-height:1;user-select:none}
-.l-pan{width:50px;accent-color:var(--blue);cursor:pointer}
-.btn-rr{color:var(--muted)!important}
-.btn-rr.rr-active{color:var(--red)!important;animation:blink .8s infinite}
+.l-check{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.pan-knob{cursor:ns-resize;display:block;user-select:none;flex-shrink:0}
+.btn-rr{color:var(--red)!important;opacity:.7}
+.btn-rr:hover{opacity:1;background:rgba(224,82,82,.12)!important}
+.btn-rr.rr-active{opacity:1;animation:blink .8s infinite}
 #btn-merge{padding:3px 10px;font-size:.75rem;margin-left:auto}
 
 /* ── IO ── */
@@ -312,7 +313,7 @@ select{cursor:pointer}
         <span class="setup-label">🎙 Input</span>
         <select id="sel-device" style="flex:1;max-width:240px"><option value="">Default microphone</option></select>
         <button class="btn-io" id="btn-detect" style="padding:5px 12px;font-size:.82rem;flex-shrink:0" title="Detect audio devices">🔄 Detect</button>
-        <div class="vu-wrap"><span class="dim">Level</span><div class="vu-bar"><div class="vu-fill" id="vu"></div></div></div>
+        <div class="vu-wrap"><span class="dim">Level</span><div class="vu-bar"><div class="vu-fill" id="vu"></div></div><button class="btn-io" id="btn-monitor" title="Monitor mic input" disabled>👂</button></div>
       </div>
 
       <div class="setup-row">
@@ -482,6 +483,8 @@ let autoQuantize = false, _pendingQuantizeDur = 0;
 // Recording guard
 let _discardRec = false;
 let _replaceTarget = null; // layer id being re-recorded, or null
+let _draggingPan = null;  // { id, startY, startVal } during knob drag
+let monitorGain = null;
 
 // ─── Worklet code (inlined as blob) ──────────────────────────────────────────
 const WORKLET_CODE = `
@@ -648,9 +651,11 @@ async function openMic(deviceId) {
   if (micSrc) micSrc.disconnect();
   micSrc = actx.createMediaStreamSource(stream);
   analyser = actx.createAnalyser(); analyser.fftSize = 256;
+  monitorGain = actx.createGain(); monitorGain.gain.value = 0;
   micSrc.connect(analyser);
   micSrc.connect(worklet);
-  // worklet NOT connected to destination — no monitoring
+  micSrc.connect(monitorGain); monitorGain.connect(actx.destination);
+  document.getElementById('btn-monitor').disabled = false;
   await populateDevices(stream);
   const inputLat  = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
   const outputLat = actx.outputLatency || 0;
@@ -1017,10 +1022,57 @@ function setVol(id, v) {
   if (!layers.some(x => x.solo) || l.solo) l.gain.gain.setTargetAtTime(v, actx.currentTime, 0.01);
 }
 
+function panKnobSVG(pan, id) {
+  const r = 13, ri = 11;
+  const angle = (-90 + pan * 150) * Math.PI / 180;
+  const ix = (18 + ri * Math.cos(angle)).toFixed(2);
+  const iy = (18 + ri * Math.sin(angle)).toFixed(2);
+  let fill = '';
+  if (Math.abs(pan) > 0.015) {
+    const ex = (18 + r * Math.cos(angle)).toFixed(2);
+    const ey = (18 + r * Math.sin(angle)).toFixed(2);
+    const col = pan < 0 ? 'var(--accent)' : 'var(--blue)';
+    fill = `<path class="knob-fill" d="M 18 5 A ${r} ${r} 0 0 ${pan>0?1:0} ${ex} ${ey}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  return `<svg class="pan-knob" viewBox="0 0 36 36" width="34" height="34" data-pan="${id}" title="Pan · drag ↕ · scroll · dbl-click=center">
+  <circle cx="18" cy="18" r="15" fill="var(--bg2)" stroke="var(--border)" stroke-width="1.5"/>
+  <path d="M 11.5 29.26 A ${r} ${r} 0 1 1 24.5 29.26" fill="none" stroke="var(--bg3)" stroke-width="3" stroke-linecap="round"/>
+  ${fill}
+  <line class="knob-line" x1="18" y1="18" x2="${ix}" y2="${iy}" stroke="var(--text-sub)" stroke-width="2.5" stroke-linecap="round"/>
+</svg>`;
+}
+
+function updateKnobDisplay(id, pan) {
+  const svg = document.querySelector(`svg.pan-knob[data-pan="${id}"]`);
+  if (!svg) return;
+  const r = 13, ri = 11;
+  const angle = (-90 + pan * 150) * Math.PI / 180;
+  const ix = 18 + ri * Math.cos(angle);
+  const iy = 18 + ri * Math.sin(angle);
+  const line = svg.querySelector('.knob-line');
+  if (line) { line.setAttribute('x2', ix.toFixed(2)); line.setAttribute('y2', iy.toFixed(2)); }
+  let fill = svg.querySelector('.knob-fill');
+  if (Math.abs(pan) > 0.015) {
+    const ex = 18 + r * Math.cos(angle);
+    const ey = 18 + r * Math.sin(angle);
+    const d = `M 18 5 A ${r} ${r} 0 0 ${pan>0?1:0} ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+    const col = pan < 0 ? 'var(--accent)' : 'var(--blue)';
+    if (fill) { fill.setAttribute('d', d); fill.setAttribute('stroke', col); }
+    else {
+      fill = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      fill.setAttribute('class', 'knob-fill'); fill.setAttribute('d', d);
+      fill.setAttribute('stroke', col); fill.setAttribute('fill', 'none');
+      fill.setAttribute('stroke-width', '3'); fill.setAttribute('stroke-linecap', 'round');
+      if (line) svg.insertBefore(fill, line); else svg.appendChild(fill);
+    }
+  } else { if (fill) fill.remove(); }
+}
+
 function setPan(id, v) {
   const l = layers.find(l => l.id === id); if (!l) return;
   l.pan = v;
   if (l.panner) l.panner.pan.setTargetAtTime(v, actx?.currentTime || 0, 0.01);
+  updateKnobDisplay(id, v);
 }
 
 // ─── Phase helpers ────────────────────────────────────────────────────────────
@@ -1267,22 +1319,18 @@ function renderLayers() {
     const safeName = l.name.replace(/"/g, '&quot;');
     const rrActive = _replaceTarget === l.id;
     div.innerHTML = `
-      <input type="checkbox" class="l-check" data-sel="${l.id}"${l.selected ? ' checked' : ''} title="Select for merge">
       <div class="l-bar" style="background:${l.color}" title="Click to change color">
         <input type="color" value="${l.color}" data-color="${l.id}">
       </div>
       <input class="l-name" type="text" value="${safeName}" data-rename="${l.id}" spellcheck="false" title="Click to rename">
       <span class="l-dur">${l.buf ? l.buf.duration.toFixed(2)+'s' : '–'}</span>
       <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}" title="Volume">
-      <span class="l-pan-wrap" title="Pan · double-click to center">
-        <span class="l-pan-lbl">L</span>
-        <input type="range" class="l-pan" min="-1" max="1" step="0.01" value="${l.pan ?? 0}" data-pan="${l.id}">
-        <span class="l-pan-lbl">R</span>
-      </span>
+      ${panKnobSVG(l.pan ?? 0, l.id)}
       <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">${l.muted?'🔇':'🔊'}</button>
       <button class="btn-i${l.solo?' solo-on':''}" data-solo="${l.id}" title="Solo">S</button>
       <button class="btn-i btn-rr${rrActive?' rr-active':''}" data-rr="${l.id}" title="Re-record this layer">⏺</button>
-      <button class="btn-i del" data-del="${l.id}" title="Delete">✕</button>`;
+      <button class="btn-i del" data-del="${l.id}" title="Delete">✕</button>
+      <input type="checkbox" class="l-check" data-sel="${l.id}"${l.selected ? ' checked' : ''} title="Select for merge" style="margin-left:auto">`;
     wrap.appendChild(div);
   });
   updateMergeButton();
@@ -1290,7 +1338,6 @@ function renderLayers() {
 
 document.getElementById('layers-wrap').addEventListener('input', e => {
   if (e.target.dataset.id)    setVol(+e.target.dataset.id, +e.target.value);
-  if (e.target.dataset.pan)   setPan(+e.target.dataset.pan, +e.target.value);
   if (e.target.dataset.color) {
     const l = layers.find(x => x.id === +e.target.dataset.color);
     if (l) { l.color = e.target.value; e.target.parentElement.style.background = e.target.value; }
@@ -1311,10 +1358,31 @@ document.getElementById('layers-wrap').addEventListener('change', e => {
   }
 });
 document.getElementById('layers-wrap').addEventListener('dblclick', e => {
-  if (e.target.type === 'range' && e.target.dataset.pan !== undefined) {
-    e.target.value = 0; setPan(+e.target.dataset.pan, 0);
-  }
+  const knob = e.target.closest('svg.pan-knob');
+  if (knob) setPan(+knob.dataset.pan, 0);
 });
+document.getElementById('layers-wrap').addEventListener('mousedown', e => {
+  const knob = e.target.closest('svg.pan-knob');
+  if (!knob) return;
+  e.preventDefault();
+  const id = +knob.dataset.pan;
+  const l = layers.find(x => x.id === id);
+  if (l) _draggingPan = { id, startY: e.clientY, startVal: l.pan };
+}, { passive: false });
+document.getElementById('layers-wrap').addEventListener('wheel', e => {
+  const knob = e.target.closest('svg.pan-knob');
+  if (!knob) return;
+  e.preventDefault();
+  const id = +knob.dataset.pan;
+  const l = layers.find(x => x.id === id);
+  if (l) setPan(id, Math.max(-1, Math.min(1, l.pan - e.deltaY / 500)));
+}, { passive: false });
+document.addEventListener('mousemove', e => {
+  if (!_draggingPan) return;
+  const v = Math.max(-1, Math.min(1, _draggingPan.startVal + (_draggingPan.startY - e.clientY) / 100));
+  setPan(_draggingPan.id, v);
+});
+document.addEventListener('mouseup', () => { _draggingPan = null; });
 document.getElementById('layers-wrap').addEventListener('focusin', e => {
   if (e.target.dataset.rename) e.target.dataset.pre = e.target.value;
 });
@@ -1423,6 +1491,7 @@ document.getElementById('in-import').addEventListener('change', async e => {
     loopDur = buf.duration; // restore: updateInfo recalculates from BPM when layers is empty
   }
   addLayer(buf, false, true);
+  updateInfo(); // refresh transport to show actual loopDur (not stale calcDur value)
   if (layers.length === 1 && phase === 'idle') {
     loopT0 = actx.currentTime; setPhase('play'); startPlayback();
   } else if (phase === 'play') {
@@ -1446,27 +1515,25 @@ document.addEventListener('keydown', e => {
     _cap = false;
     return;
   }
-  if (e.code === pedalCode && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
-    e.preventDefault(); handlePedal();
+  const ae = document.activeElement;
+  const inRename = ae?.dataset?.rename !== undefined;
+  const inText   = !inRename && (ae?.tagName === 'INPUT' || ae?.tagName === 'TEXTAREA' || ae?.tagName === 'SELECT');
+  if (e.code === pedalCode && !e.repeat && !inRename) {
+    e.preventDefault();
+    if (ae?.tagName === 'BUTTON') ae.blur(); // clear focus ring from any button
+    handlePedal();
   }
-  if (e.code === 'KeyT' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
-    e.preventDefault(); doTap();
-  }
-  if (e.code === 'KeyP' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
-    e.preventDefault(); toggleMetroPreview();
-  }
-  if (e.code === 'KeyM' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
-    e.preventDefault(); document.getElementById('tw-metro').click();
-  }
-  if (e.code === 'KeyQ' && !e.repeat && mode === 'instant' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+  if (e.code === 'KeyT' && !e.repeat && !inText && !inRename) { e.preventDefault(); doTap(); }
+  if (e.code === 'KeyP' && !e.repeat && !inText && !inRename) { e.preventDefault(); toggleMetroPreview(); }
+  if (e.code === 'KeyM' && !e.repeat && !inText && !inRename) { e.preventDefault(); document.getElementById('tw-metro').click(); }
+  if (e.code === 'KeyQ' && !e.repeat && mode === 'instant' && !inText && !inRename) {
     e.preventDefault(); document.getElementById('tw-quantize').click();
   }
-  const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
-  if (e.code === 'KeyX'   && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
-  if (e.code === 'Comma'  && !e.repeat && noInput) { e.preventDefault(); handleOverdub(); }
-  if (e.code === 'Period' && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
-  if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && noInput) { e.preventDefault(); doUndo(false); }
-  if (e.ctrlKey && e.code === 'KeyY' && !e.repeat && noInput) { e.preventDefault(); doRedo(); }
+  if (e.code === 'KeyX'   && !e.repeat && !inText && !inRename) { e.preventDefault(); doUndo(true); }
+  if (e.code === 'Comma'  && !e.repeat && !inText && !inRename) { e.preventDefault(); handleOverdub(); }
+  if (e.code === 'Period' && !e.repeat && !inText && !inRename) { e.preventDefault(); doUndo(true); }
+  if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && !inRename) { e.preventDefault(); doUndo(false); }
+  if (e.ctrlKey && e.code === 'KeyY' && !e.repeat && !inRename) { e.preventDefault(); doRedo(); }
 }, true);
 
 // ─── MIDI ─────────────────────────────────────────────────────────────────────
@@ -1537,6 +1604,14 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
   if (!navigator.requestMIDIAccess) { showToast('Web MIDI not supported. Use Chrome or Edge.', 'warn', 0); return; }
   try { wireMIDI(await navigator.requestMIDIAccess()); }
   catch(e) { showToast('MIDI access denied: ' + e.message, 'error'); }
+});
+document.getElementById('btn-monitor').addEventListener('click', () => {
+  if (!monitorGain) return;
+  const on = monitorGain.gain.value < 0.5;
+  monitorGain.gain.setTargetAtTime(on ? 1 : 0, actx.currentTime, 0.02);
+  const btn = document.getElementById('btn-monitor');
+  btn.classList.toggle('mon-on', on);
+  btn.title = on ? 'Monitor ON — click to mute' : 'Monitor mic input';
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-aac').addEventListener('click', exportAAC);
