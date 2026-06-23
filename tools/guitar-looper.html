@@ -131,6 +131,10 @@ select{cursor:pointer}
 .btn-rec.ovd{background:var(--purple)}
 .btn-rec:disabled{opacity:.4;cursor:default;animation:none}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes bounce-down{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+.scroll-hint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;opacity:1;transition:opacity .5s;z-index:40}
+.scroll-hint.hidden{opacity:0}
+.scroll-hint span{animation:bounce-down .85s ease-in-out infinite;line-height:1}
 
 .btn-tr{
   background:var(--surface2);color:var(--text);border:1px solid var(--border2);
@@ -423,6 +427,11 @@ select{cursor:pointer}
   <div class="sc-row"><span class="sc-key">Ctrl+Z</span><span class="sc-desc">undo</span></div>
   <div class="sc-row"><span class="sc-key">Ctrl+Y</span><span class="sc-desc">redo</span></div>
 </aside>
+
+<div class="scroll-hint" id="scroll-hint">
+  <span style="font-size:1.9rem">👇</span>
+  <span style="font-size:1.3rem;opacity:.45;animation-delay:.15s">👇</span>
+</div>
 
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1442,6 +1451,16 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
         inputs.map((d, i) => `<option value="${d.deviceId}">${d.label}</option>`).join('');
     }
   } catch(e) {}
+})();
+// ─── Scroll hint ──────────────────────────────────────────────────────────────
+(function() {
+  const el = document.getElementById('scroll-hint');
+  function check() {
+    const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 60;
+    el.classList.toggle('hidden', atBottom);
+  }
+  window.addEventListener('scroll', check, { passive: true });
+  check();
 })();
 </script>
 </body>
