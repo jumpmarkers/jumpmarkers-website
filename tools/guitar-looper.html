@@ -171,8 +171,12 @@ select{cursor:pointer}
   padding:9px 12px;background:var(--bg2);border-radius:8px;
   margin-bottom:8px;border:1px solid var(--border);
 }
-.l-bar{width:4px;height:32px;border-radius:2px;flex-shrink:0}
-.l-name{font-size:.82rem;font-weight:600;min-width:64px}
+.l-bar{width:10px;height:32px;border-radius:3px;flex-shrink:0;position:relative;cursor:pointer;transition:width .15s}
+.l-bar:hover{width:14px}
+.l-bar input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;padding:0}
+.l-name{font-size:.82rem;font-weight:600;min-width:64px;max-width:120px;background:transparent;border:none;border-bottom:1px solid transparent;color:inherit;outline:none;cursor:default;font-family:var(--body);padding:0}
+.l-name:hover{border-bottom-color:var(--muted)}
+.l-name:focus{border-bottom-color:var(--accent);cursor:text}
 .l-dur{font-family:var(--mono);font-size:.7rem;color:var(--muted);min-width:40px}
 .l-vol{flex:1;min-width:80px;max-width:140px;accent-color:var(--accent);cursor:pointer}
 .btn-i{
@@ -1065,9 +1069,12 @@ function renderLayers() {
   wrap.innerHTML = '';
   layers.forEach(l => {
     const div = document.createElement('div'); div.className = 'layer-item';
+    const safeName = l.name.replace(/"/g, '&quot;');
     div.innerHTML = `
-      <div class="l-bar" style="background:${l.color}"></div>
-      <span class="l-name">${l.name}</span>
+      <div class="l-bar" style="background:${l.color}" title="Click to change color">
+        <input type="color" value="${l.color}" data-color="${l.id}">
+      </div>
+      <input class="l-name" type="text" value="${safeName}" data-rename="${l.id}" spellcheck="false" title="Click to rename">
       <span class="l-dur">${l.buf ? l.buf.duration.toFixed(2)+'s' : '–'}</span>
       <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}">
       <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">${l.muted?'🔇':'🔊'}</button>
@@ -1079,11 +1086,31 @@ function renderLayers() {
 
 document.getElementById('layers-wrap').addEventListener('input', e => {
   if (e.target.dataset.id) setVol(+e.target.dataset.id, +e.target.value);
+  if (e.target.dataset.color) {
+    const l = layers.find(x => x.id === +e.target.dataset.color);
+    if (l) { l.color = e.target.value; e.target.parentElement.style.background = e.target.value; }
+  }
 });
 document.getElementById('layers-wrap').addEventListener('click', e => {
   if (e.target.dataset.mute) toggleMute(+e.target.dataset.mute);
   if (e.target.dataset.solo) toggleSolo(+e.target.dataset.solo);
   if (e.target.dataset.del)  removeLayer(+e.target.dataset.del);
+});
+document.getElementById('layers-wrap').addEventListener('focusin', e => {
+  if (e.target.dataset.rename) e.target.dataset.pre = e.target.value;
+});
+document.getElementById('layers-wrap').addEventListener('keydown', e => {
+  if (!e.target.dataset.rename) return;
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Escape') { e.target.value = e.target.dataset.pre || ''; e.target.blur(); }
+  e.stopPropagation(); // keep looper shortcuts from firing while typing
+});
+document.getElementById('layers-wrap').addEventListener('focusout', e => {
+  if (!e.target.dataset.rename) return;
+  const l = layers.find(x => x.id === +e.target.dataset.rename);
+  if (!l) return;
+  l.name = e.target.value.trim() || l.name;
+  e.target.value = l.name;
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
