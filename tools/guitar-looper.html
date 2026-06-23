@@ -1514,9 +1514,10 @@ document.addEventListener('keydown', e => {
     return;
   }
   const ae = document.activeElement;
-  const inRename = ae?.dataset?.rename !== undefined;
-  const inText   = !inRename && (ae?.tagName === 'INPUT' || ae?.tagName === 'TEXTAREA' || ae?.tagName === 'SELECT');
-  if (e.code === pedalCode && !e.repeat && !inRename) {
+  const inRename   = ae?.dataset?.rename !== undefined;
+  const inFeedback = ae?.id === 'fb-text';
+  const inText     = !inRename && !inFeedback && (ae?.tagName === 'INPUT' || ae?.tagName === 'TEXTAREA' || ae?.tagName === 'SELECT');
+  if (e.code === pedalCode && !e.repeat && !inRename && !inFeedback) {
     e.preventDefault();
     if (ae?.tagName === 'BUTTON') ae.blur(); // clear focus ring from any button
     handlePedal();
