@@ -844,7 +844,7 @@ function playLayer(l, offset) {
   src.buffer = l.buf;
   src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
   src.connect(l.gain);
-  const comp = latencyMs / 1000;
+  const comp = l.imported ? 0 : latencyMs / 1000;
   src.start(actx.currentTime, ((offset + comp) % loopDur + loopDur) % loopDur);
   l.src = src;
 }
@@ -902,11 +902,11 @@ function applyCrossfade(buf, xfadeMs = 8, fadeinMs = 3) {
 }
 
 // ─── Layer management ─────────────────────────────────────────────────────────
-function addLayer(buf, wasOvd) {
+function addLayer(buf, wasOvd, imported = false) {
   history = []; // new recording invalidates redo history
   const id = nextId++;
   const gain = actx.createGain(); gain.connect(actx.destination);
-  const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length]};
+  const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported};
   layers.push(l);
   if (wasOvd) {
     // Use actx.currentTime (not _ovdT0): the JS epsilon in each callback
@@ -1211,14 +1211,18 @@ async function mixDown() {
   if (!layers.length || !actx) return null;
   const sr = actx.sampleRate;
   const len = Math.round(loopDur * sr);
+  const comp = latencyMs / 1000;
+  const offset = loopDur > 0 ? ((comp % loopDur) + loopDur) % loopDur : 0;
   const off = new OfflineAudioContext(1, len, sr);
   layers.forEach(l => {
     if (l.muted) return;
     const src = off.createBufferSource();
     src.buffer = l.buf;
+    src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
     const g = off.createGain(); g.gain.value = l.vol;
     src.connect(g); g.connect(off.destination);
-    src.start(0);
+    // Apply same comp offset as live playback; imported layers already at beat 0
+    src.start(0, l.imported ? 0 : offset);
   });
   return off.startRendering();
 }
@@ -1286,8 +1290,12 @@ document.getElementById('in-import').addEventListener('change', async e => {
     document.getElementById('in-measures').value = numMeasures;
     buildBeatRow(); updateInfo();
   }
-  addLayer(buf, false);
-  if (layers.length === 1 && phase === 'idle') { loopT0 = actx.currentTime; setPhase('play'); startPlayback(); }
+  addLayer(buf, false, true);
+  if (layers.length === 1 && phase === 'idle') {
+    loopT0 = actx.currentTime; setPhase('play'); startPlayback();
+  } else if (phase === 'play') {
+    playLayer(layers[layers.length - 1], (actx.currentTime - loopT0) % loopDur);
+  }
   updateIO(); e.target.value = '';
 });
 
