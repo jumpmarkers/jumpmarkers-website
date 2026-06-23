@@ -292,6 +292,13 @@ select{cursor:pointer}
         <span class="dim" id="metro-vol-lbl" style="min-width:32px;text-align:right">70%</span>
       </div>
 
+      <div class="setup-row">
+        <span class="setup-label">Latency comp</span>
+        <input type="number" id="in-latency" value="0" min="-200" max="500" style="width:68px">
+        <span class="dim">ms</span>
+        <span class="dim" id="latency-hint" style="font-size:.72rem;opacity:.55"></span>
+      </div>
+
       <div class="setup-row" id="row-countdown" style="display:none">
         <span class="setup-label">Countdown</span>
         <div class="tog-wrap" id="tw-cd"><div class="tog on" id="tog-cd"></div></div>
@@ -316,7 +323,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause · ,: overdub · .: del overdub · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause · ,: overdub · .: del overdub · M: metro · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -375,7 +382,8 @@ let pedalCode = 'Space', midiObj = null;
 let previewMetro = false, metroVol = 0.7;
 let tapTimes = [], tapTimer = null;
 let history = []; // layers removed by undo — available for redo
-let _pauseOffset = 0;
+let _pauseOffset = 0, _ovdT0 = 0;
+let latencyMs = 0;
 let mode = 'instant'; // 'instant' | 'metro'
 
 // Recording guard
@@ -386,23 +394,37 @@ const WORKLET_CODE = `
 class Rec extends AudioWorkletProcessor {
   constructor() {
     super();
-    this._on = false; this._buf = []; this._max = Infinity;
+    this._on = false; this._buf = []; this._startAt = null; this._stopAt = null;
     this.port.onmessage = ({data}) => {
-      if (data.cmd === 'start') { this._buf = []; this._max = data.max || Infinity; this._on = true; }
-      if (data.cmd === 'stop')  { this._on = false; this.port.postMessage({cmd:'data', s: this._buf}); this._buf = []; }
+      if (data.cmd === 'start') {
+        this._buf = [];
+        this._startAt = data.startAt ?? null;   // null = start immediately
+        this._stopAt  = data.stopAt  ?? null;   // null = stop manually
+        this._on = (this._startAt === null);
+      }
+      if (data.cmd === 'stop') { this._flush(); }
     };
   }
+  _flush() {
+    this._on = false; this._startAt = null; this._stopAt = null;
+    this.port.postMessage({cmd:'data', s: this._buf}); this._buf = [];
+  }
   process(inputs) {
+    // Scheduled start
+    if (!this._on && this._startAt !== null && currentTime >= this._startAt) {
+      this._on = true; this._startAt = null;
+    }
     if (!this._on) return true;
     const ch = inputs[0]?.[0];
-    if (ch) {
-      for (let i = 0; i < ch.length; i++) this._buf.push(ch[i]);
-      if (this._buf.length >= this._max) {
-        this._on = false;
-        this.port.postMessage({cmd:'data', s: this._buf.slice(0, this._max)});
-        this._buf = [];
-      }
+    if (!ch) return true;
+    // Scheduled stop — trim to exact boundary (sample-accurate)
+    if (this._stopAt !== null && currentTime + 128 / sampleRate >= this._stopAt) {
+      const keep = Math.max(0, Math.round((this._stopAt - currentTime) * sampleRate));
+      for (let i = 0; i < Math.min(keep, ch.length); i++) this._buf.push(ch[i]);
+      this._flush();
+      return true;
     }
+    for (let i = 0; i < ch.length; i++) this._buf.push(ch[i]);
     return true;
   }
 }
@@ -464,6 +486,13 @@ async function openMic(deviceId) {
   micSrc.connect(worklet);
   // worklet NOT connected to destination — no monitoring
   await populateDevices(stream);
+  const inputLat = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
+  const detected = Math.round(((actx.baseLatency || 0) + inputLat) * 1000);
+  if (detected > 0) {
+    latencyMs = detected;
+    document.getElementById('in-latency').value = detected;
+    document.getElementById('latency-hint').textContent = '(auto-detected)';
+  }
   startVU();
 }
 
@@ -611,11 +640,7 @@ async function doCountdown() {
 }
 
 // ─── Recording ────────────────────────────────────────────────────────────────
-function startWorklet(maxSamples, delayMs = 0) {
-  setTimeout(() => {
-    worklet.port.postMessage({cmd:'start', max: maxSamples});
-  }, Math.max(0, delayMs));
-}
+// (removed — worklet now uses startAt/stopAt audio times directly)
 
 function onRecData(samples) {
   if (_discardRec) { _discardRec = false; return; }
@@ -655,7 +680,8 @@ function playLayer(l, offset) {
   src.buffer = l.buf;
   src.loop = true; src.loopStart = 0; src.loopEnd = loopDur;
   src.connect(l.gain);
-  src.start(actx.currentTime, offset % loopDur);
+  const comp = latencyMs / 1000;
+  src.start(actx.currentTime, ((offset + comp) % loopDur + loopDur) % loopDur);
   l.src = src;
 }
 
@@ -699,7 +725,7 @@ function addLayer(buf, wasOvd) {
   const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length]};
   layers.push(l);
   if (wasOvd) {
-    const offset = (actx.currentTime - loopT0) % loopDur;
+    const offset = (_ovdT0 - loopT0 + loopDur * 1000) % loopDur;
     playLayer(l, offset);
   }
   renderLayers();
@@ -840,15 +866,16 @@ async function handleRecInstant() {
     setPhase('rec');
     buildBeatRow(false, bpMeasure);
     _dotTotal = bpMeasure;
-    worklet.port.postMessage({cmd:'start', max: Infinity});
+    worklet.port.postMessage({cmd:'start'}); // immediate, no stopAt → user stops manually
     if (metroOn) startMetro(actx.currentTime);
     startPos();
   } else if (phase === 'rec') {
-    worklet.port.postMessage({cmd:'stop'}); // onRecData → sets loopDur, → play
+    worklet.port.postMessage({cmd:'stop'}); // onRecData → sets loopDur → play
   } else if (phase === 'play') {
-    const maxSmp = Math.round(loopDur * actx.sampleRate);
+    const ovdStart = actx.currentTime;
+    _ovdT0 = ovdStart;
     setPhase('ovd');
-    worklet.port.postMessage({cmd:'start', max: maxSmp}); // overdub one loop, auto-stops
+    worklet.port.postMessage({cmd:'start', stopAt: ovdStart + loopDur}); // sample-accurate stop
   } else if (phase === 'ovd') {
     worklet.port.postMessage({cmd:'stop'}); // onRecData → play
   }
@@ -864,22 +891,16 @@ async function handleRecMetro() {
     buildBeatRow(false, numMeasures * bpMeasure);
     _dotTotal = numMeasures * bpMeasure;
     loopT0 = loopStart;
-    // Start worklet at loopStart; stop it from the main thread after exactly loopDur
-    // (more reliable than the worklet's sample counter across devices/rates)
-    const startDelay = Math.max(0, (loopStart - actx.currentTime) * 1000);
-    startWorklet(Infinity, startDelay);
-    setTimeout(() => { if (phase === 'rec') worklet.port.postMessage({cmd:'stop'}); },
-               startDelay + loopDur * 1000);
+    _ovdT0 = loopStart;
+    worklet.port.postMessage({cmd:'start', startAt: loopStart, stopAt: loopStart + loopDur});
     startMetro(loopStart);
     startPos();
   } else if (phase === 'play') {
-    const elapsed = (actx.currentTime - loopT0) % loopDur;
-    const toNext  = loopDur - elapsed;
+    const elapsed  = (actx.currentTime - loopT0) % loopDur;
+    const ovdStart = actx.currentTime + (loopDur - elapsed); // next loop boundary
+    _ovdT0 = ovdStart;
     setPhase('ovd');
-    const startDelay = Math.max(0, toNext * 1000 - 20);
-    startWorklet(Infinity, startDelay);
-    setTimeout(() => { if (phase === 'ovd') worklet.port.postMessage({cmd:'stop'}); },
-               startDelay + loopDur * 1000);
+    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
   }
 }
 
@@ -1070,6 +1091,9 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyP' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
     e.preventDefault(); toggleMetroPreview();
   }
+  if (e.code === 'KeyM' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault(); document.getElementById('tw-metro').click();
+  }
   const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
   if (e.code === 'KeyX'   && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
   if (e.code === 'Comma'  && !e.repeat && noInput) { e.preventDefault(); handleOverdub(); }
@@ -1125,6 +1149,10 @@ cdOn    = makeToggle('tw-cd',   'tog-cd',    true, v => { cdOn = v; document.get
 
 // ─── Transport listeners ──────────────────────────────────────────────────────
 document.getElementById('btn-metro-prev').addEventListener('click', toggleMetroPreview);
+document.getElementById('in-latency').addEventListener('input', e => {
+  latencyMs = +e.target.value || 0;
+  document.getElementById('latency-hint').textContent = '';
+});
 document.getElementById('in-metro-vol').addEventListener('input', e => {
   metroVol = e.target.value / 100;
   document.getElementById('metro-vol-lbl').textContent = e.target.value + '%';
