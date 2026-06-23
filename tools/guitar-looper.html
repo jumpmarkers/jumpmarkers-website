@@ -449,7 +449,6 @@ select{cursor:pointer}
     </div>
   </div>
 </main>
-<audio id="monitor-el" autoplay playsinline disableRemotePlayback style="display:none"></audio>
 
 <div class="support-banner">
   <div class="support-banner-text">
@@ -490,7 +489,7 @@ const SCHED_INT  = 50;   // ms — scheduler interval
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let actx = null, worklet = null, analyser = null, micSrc = null;
-let masterGain = null;
+let masterGain = null, monitorGain = null;
 let retimeRate = 1.0;
 let layers = [], nextId = 1;
 let phase = 'idle'; // idle | cd | rec | play | ovd
@@ -661,9 +660,12 @@ function showConfirm(msg) {
 // ─── Audio init ──────────────────────────────────────────────────────────────
 async function initAudio() {
   if (actx) return;
-  actx = new (window.AudioContext || window.webkitAudioContext)();
+  actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 0 });
   masterGain = actx.createGain();
   masterGain.connect(actx.destination);
+  monitorGain = actx.createGain();
+  monitorGain.gain.value = 0;
+  monitorGain.connect(actx.destination);
   if (!actx.audioWorklet) { showToast('AudioWorklet not supported. Use Chrome, Edge, or Firefox 76+.', 'warn', 0); return; }
   const blob = new Blob([WORKLET_CODE], {type:'application/javascript'});
   const url = URL.createObjectURL(blob);
@@ -687,12 +689,7 @@ async function openMic(deviceId) {
   analyser = actx.createAnalyser(); analyser.fftSize = 256;
   micSrc.connect(analyser);
   micSrc.connect(worklet);
-
-  // Direct MediaStream → <audio> element: bypasses Web Audio API entirely,
-  // lowest possible latency (only OS hardware buffers, no render quantum).
-  const monEl = document.getElementById('monitor-el');
-  monEl.srcObject = micStream;
-  monEl.muted = true;
+  micSrc.connect(monitorGain);
   document.getElementById('btn-monitor').disabled = false;
   await populateDevices(stream);
   const inputLat  = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
@@ -1648,13 +1645,12 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
   catch(e) { showToast('MIDI access denied: ' + e.message, 'error'); }
 });
 document.getElementById('btn-monitor').addEventListener('click', () => {
-  const monEl = document.getElementById('monitor-el');
-  if (!monEl.srcObject) return;
-  const on = monEl.muted;
-  monEl.muted = !on;
+  if (!monitorGain) return;
+  const isOn = monitorGain.gain.value > 0;
+  monitorGain.gain.setTargetAtTime(isOn ? 0 : 1, actx.currentTime, 0.005);
   const btn = document.getElementById('btn-monitor');
-  btn.classList.toggle('mon-on', on);
-  btn.title = on ? 'Monitor ON — click to mute' : 'Monitor mic input';
+  btn.classList.toggle('mon-on', !isOn);
+  btn.title = !isOn ? 'Monitor ON — click to mute' : 'Monitor mic input';
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-merge').addEventListener('click', doMerge);
