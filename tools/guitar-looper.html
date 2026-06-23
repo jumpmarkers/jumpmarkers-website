@@ -419,6 +419,7 @@ select{cursor:pointer}
     </div>
   </div>
 </main>
+<audio id="monitor-el" autoplay playsinline disableRemotePlayback style="display:none"></audio>
 
 <div class="support-banner">
   <div class="support-banner-text">
@@ -482,8 +483,6 @@ let autoQuantize = false, _pendingQuantizeDur = 0;
 let _discardRec = false;
 let _replaceTarget = null; // layer id being re-recorded, or null
 let _draggingPan = null;  // { id, startY, startVal } during knob drag
-let monitorGain = null;
-let monitorCtx  = null;
 let micStream   = null;
 
 // ─── Worklet code (inlined as blob) ──────────────────────────────────────────
@@ -655,14 +654,11 @@ async function openMic(deviceId) {
   micSrc.connect(analyser);
   micSrc.connect(worklet);
 
-  // Separate AudioContext for monitoring — latencyHint:0 requests minimum
-  // OS buffer size so the path mic→ear stays as close to 0ms as possible,
-  // independent of the worklet/recording buffer in actx.
-  if (monitorCtx) await monitorCtx.close();
-  monitorCtx = new AudioContext({ latencyHint: 0, sampleRate: actx.sampleRate });
-  const monSrc = monitorCtx.createMediaStreamSource(micStream);
-  monitorGain = monitorCtx.createGain(); monitorGain.gain.value = 0;
-  monSrc.connect(monitorGain); monitorGain.connect(monitorCtx.destination);
+  // Direct MediaStream → <audio> element: bypasses Web Audio API entirely,
+  // lowest possible latency (only OS hardware buffers, no render quantum).
+  const monEl = document.getElementById('monitor-el');
+  monEl.srcObject = micStream;
+  monEl.muted = true;
   document.getElementById('btn-monitor').disabled = false;
   await populateDevices(stream);
   const inputLat  = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
@@ -1589,9 +1585,10 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
   catch(e) { showToast('MIDI access denied: ' + e.message, 'error'); }
 });
 document.getElementById('btn-monitor').addEventListener('click', () => {
-  if (!monitorGain || !monitorCtx) return;
-  const on = monitorGain.gain.value < 0.5;
-  monitorGain.gain.setTargetAtTime(on ? 1 : 0, monitorCtx.currentTime, 0.02);
+  const monEl = document.getElementById('monitor-el');
+  if (!monEl.srcObject) return;
+  const on = monEl.muted;
+  monEl.muted = !on;
   const btn = document.getElementById('btn-monitor');
   btn.classList.toggle('mon-on', on);
   btn.title = on ? 'Monitor ON — click to mute' : 'Monitor mic input';
