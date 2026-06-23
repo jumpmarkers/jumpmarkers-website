@@ -324,7 +324,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause · ,: overdub · .: del overdub · M: metro · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -1049,7 +1049,8 @@ function handlePedal() {
   else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
   else if (phase === 'play') { pausePlayback(); }
   else if (phase === 'paused') { resumePlayback(); }
-  // cd, rec(metro), ovd → Space does nothing
+  else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); } // commit partial overdub
+  // cd, rec(metro) → Space does nothing
 }
 
 function handleOverdub() {
