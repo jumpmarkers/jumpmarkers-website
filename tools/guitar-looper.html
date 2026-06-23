@@ -105,10 +105,10 @@ select{cursor:pointer}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
 
 /* ── Beat dots ── */
-.beat-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px;min-height:22px}
+.beat-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
 .beat-dot{
-  width:14px;height:14px;border-radius:50%;
-  background:var(--bg3);border:2px solid var(--border2);
+  width:42px;height:42px;border-radius:50%;
+  background:var(--bg3);border:3px solid var(--border2);
   transition:background .07s,border-color .07s;
 }
 .beat-dot.m1{border-color:var(--accent)}
@@ -334,7 +334,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · Q: quantize · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px;font-size:1.17rem" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6;font-size:1.17rem">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · Q: quantize · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
