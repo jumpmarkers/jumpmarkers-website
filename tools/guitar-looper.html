@@ -909,7 +909,6 @@ function playLayer(l, offset) {
   const src = actx.createBufferSource();
   src.buffer = l.buf;
   src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
-  src.playbackRate.value = retimeRate;
   src.connect(l.gain);
   const comp = l.imported ? 0 : latencyMs / 1000;
   src.start(actx.currentTime, ((offset + comp) % loopDur + loopDur) % loopDur);
@@ -920,11 +919,60 @@ function stopLayerSrc(l) {
   if (l.src) { try { l.src.stop(); } catch(e){} l.src.disconnect(); l.src = null; }
 }
 
+// ─── OLA pitch-preserving time stretch ───────────────────────────────────────
+function olaStretch(origBuf, rate) {
+  const nCh   = origBuf.numberOfChannels;
+  const inLen = origBuf.length;
+  const outLen = Math.max(1, Math.round(inLen / rate));
+  const out   = actx.createBuffer(nCh, outLen, origBuf.sampleRate);
+  const W  = 2048, Hs = 512;
+  const Ha = Math.max(1, Math.round(Hs * rate));
+  for (let c = 0; c < nCh; c++) {
+    const inp  = origBuf.getChannelData(c);
+    const outp = new Float32Array(outLen);
+    const norm = new Float32Array(outLen);
+    let inPos = 0, outPos = 0;
+    while (outPos < outLen) {
+      const wLen = Math.min(W, outLen - outPos);
+      const base = Math.floor(inPos);
+      for (let i = 0; i < wLen; i++) {
+        const idx = (base + i + inLen) % inLen;
+        const w   = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (W - 1));
+        outp[outPos + i] += inp[idx] * w;
+        norm[outPos + i] += w;
+      }
+      inPos  = (inPos + Ha) % inLen;
+      outPos += Hs;
+    }
+    for (let i = 0; i < outLen; i++)
+      if (norm[i] > 1e-4) outp[i] /= norm[i];
+    out.copyToChannel(outp, c);
+  }
+  return out;
+}
+
 function applyRetime(rate) {
   retimeRate = rate;
+  if (!actx || !layers.length) return;
+
+  const wasPlaying = phase === 'play' || phase === 'ovd';
+  const fraction   = (wasPlaying && loopDur > 0)
+    ? ((actx.currentTime - loopT0) % loopDur) / loopDur : 0;
+
+  layers.forEach(stopLayerSrc);
+
+  const origDur = (layers[0].origBuf || layers[0].buf).duration;
   layers.forEach(l => {
-    if (l.src) l.src.playbackRate.setValueAtTime(rate, actx.currentTime);
+    if (!l.origBuf) l.origBuf = l.buf;
+    l.buf = Math.abs(rate - 1) < 0.005 ? l.origBuf : olaStretch(l.origBuf, rate);
   });
+
+  loopDur = origDur / rate;
+  const newOffset = fraction * loopDur;
+  loopT0 = actx.currentTime - newOffset;
+
+  if (wasPlaying) layers.forEach(l => playLayer(l, newOffset));
+  updateInfo();
 }
 
 function stopPlayback() {
@@ -982,7 +1030,7 @@ function addLayer(buf, wasOvd, imported = false) {
   const gain = actx.createGain();
   const panner = actx.createStereoPanner();
   gain.connect(panner); panner.connect(masterGain || actx.destination);
-  const l = {id, name:'Layer '+id, buf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
+  const l = {id, name:'Layer '+id, buf, origBuf:buf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
   layers.push(l);
   if (wasOvd) {
     const offset = (actx.currentTime - loopT0) % loopDur;
@@ -1169,6 +1217,10 @@ function updateIO() {
 // ─── Main actions ─────────────────────────────────────────────────────────────
 async function handleRecord() {
   if (_measuringLatency) return;
+  if (Math.abs(retimeRate - 1) > 0.01) {
+    showToast('Set Speed to 1× before recording', 'warn', 2000);
+    return;
+  }
   if (!actx) await initAudio();
   if (!actx) return;
   if (actx.state === 'suspended') await actx.resume();
@@ -1630,10 +1682,13 @@ document.getElementById('in-master-vol').addEventListener('input', e => {
   if (masterGain) masterGain.gain.value = v;
   document.getElementById('master-vol-lbl').textContent = e.target.value + '%';
 });
+let _retimeTid = null;
 document.getElementById('in-retime').addEventListener('input', e => {
   const rate = e.target.value / 100;
+  retimeRate = rate;
   document.getElementById('retime-lbl').textContent = rate.toFixed(2) + '×';
-  if (actx) applyRetime(rate); else retimeRate = rate;
+  clearTimeout(_retimeTid);
+  _retimeTid = setTimeout(() => { if (actx) applyRetime(rate); }, 250);
 });
 document.getElementById('btn-tap').addEventListener('click', doTap);
 document.getElementById('btn-rec').addEventListener('click', handleRecord);
