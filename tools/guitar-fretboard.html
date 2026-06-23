@@ -2617,13 +2617,15 @@ renderPresets();
 applyLayout();
 (function() {
   const el = document.getElementById('scroll-hint');
+  const scroller = document.querySelector('.content-wrap');
+  if (!scroller) return;
   function check() {
-    if (window.scrollY > 30) {
+    if (scroller.scrollTop > 30) {
       el.classList.add('hidden');
-      window.removeEventListener('scroll', check);
+      scroller.removeEventListener('scroll', check);
     }
   }
-  window.addEventListener('scroll', check, { passive: true });
+  scroller.addEventListener('scroll', check, { passive: true });
 })();
 </script>
 </div><!-- /.content-wrap -->
