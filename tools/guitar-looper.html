@@ -217,6 +217,22 @@ select{cursor:pointer}
 .mode-btn{flex:1;border:none;cursor:pointer;background:none;color:var(--text-sub);padding:8px 14px;border-radius:6px;font-size:.82rem;font-weight:600;transition:background .15s,color .15s}
 .mode-btn.active{background:var(--surface2);color:var(--text)}
 
+/* ── Shortcut panel ── */
+.shortcut-panel{
+  position:fixed;right:20px;top:50%;transform:translateY(-50%);
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;min-width:192px;display:none;
+}
+@media(min-width:1100px){.shortcut-panel{display:block}}
+.sc-title{font-family:var(--mono);font-size:.63rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:11px}
+.sc-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sc-key{
+  background:var(--bg3);border:1px solid var(--border2);border-radius:4px;
+  padding:2px 7px;font-family:var(--mono);font-size:.72rem;color:var(--text);
+  min-width:60px;text-align:center;flex-shrink:0;
+}
+.sc-desc{color:var(--text-sub);font-size:.8rem}
+
 @media(max-width:600px){
   .setup-grid{grid-template-columns:1fr}
   .setup-full{grid-column:1}
@@ -334,7 +350,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px;font-size:1.17rem" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6;font-size:1.17rem">· Space: rec/pause/stop ovd · ,: overdub · .: del overdub · M: metro · Q: quantize · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -371,6 +387,19 @@ select{cursor:pointer}
     <p style="margin-top:10px;font-size:.75rem;color:var(--muted)">AAC export uses the best format your browser supports (MP4/AAC or WebM/Opus).</p>
   </div>
 </main>
+
+<aside class="shortcut-panel">
+  <div class="sc-title">⌨ Shortcuts</div>
+  <div class="sc-row"><span class="sc-key">Space</span><span class="sc-desc">rec · pause · stop ovd</span></div>
+  <div class="sc-row"><span class="sc-key">,</span><span class="sc-desc">start overdub</span></div>
+  <div class="sc-row"><span class="sc-key">.</span><span class="sc-desc">delete last overdub</span></div>
+  <div class="sc-row"><span class="sc-key">M</span><span class="sc-desc">metro on / off</span></div>
+  <div class="sc-row"><span class="sc-key">Q</span><span class="sc-desc">quantize on / off</span></div>
+  <div class="sc-row"><span class="sc-key">T</span><span class="sc-desc">tap tempo</span></div>
+  <div class="sc-row"><span class="sc-key">P</span><span class="sc-desc">metro preview</span></div>
+  <div class="sc-row"><span class="sc-key">Ctrl+Z</span><span class="sc-desc">undo</span></div>
+  <div class="sc-row"><span class="sc-key">Ctrl+Y</span><span class="sc-desc">redo</span></div>
+</aside>
 
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
