@@ -1513,26 +1513,31 @@ document.addEventListener('keydown', e => {
     _cap = false;
     return;
   }
-  const ae = document.activeElement;
-  const inRename   = ae?.dataset?.rename !== undefined;
-  const inFeedback = ae?.id === 'fb-text';
-  const inText     = !inRename && !inFeedback && (ae?.tagName === 'INPUT' || ae?.tagName === 'TEXTAREA' || ae?.tagName === 'SELECT');
-  if (e.code === pedalCode && !e.repeat && !inRename && !inFeedback) {
+  const ae       = document.activeElement;
+  const inRename = ae?.dataset?.rename !== undefined;
+  // blockAll: typing context where every key must pass through unchanged
+  const blockAll = inRename || ae?.id === 'fb-text'
+                 || (ae?.tagName === 'TEXTAREA' && ae?.id !== 'fb-text')
+                 || ae?.tagName === 'SELECT';
+  // blockKeys: text inputs where letters are reserved but Space can still trigger pedal
+  const blockKeys = blockAll || (ae?.tagName === 'INPUT' && !inRename);
+
+  if (e.code === pedalCode && !e.repeat && !blockAll) {
     e.preventDefault();
-    if (ae?.tagName === 'BUTTON') ae.blur(); // clear focus ring from any button
+    if (ae?.tagName === 'BUTTON') ae.blur();
     handlePedal();
   }
-  if (e.code === 'KeyT' && !e.repeat && !inText && !inRename) { e.preventDefault(); doTap(); }
-  if (e.code === 'KeyP' && !e.repeat && !inText && !inRename) { e.preventDefault(); toggleMetroPreview(); }
-  if (e.code === 'KeyM' && !e.repeat && !inText && !inRename) { e.preventDefault(); document.getElementById('tw-metro').click(); }
-  if (e.code === 'KeyQ' && !e.repeat && mode === 'instant' && !inText && !inRename) {
-    e.preventDefault(); document.getElementById('tw-quantize').click();
+  if (!blockKeys && !e.repeat) {
+    if (e.code === 'KeyT') { e.preventDefault(); doTap(); }
+    if (e.code === 'KeyP') { e.preventDefault(); toggleMetroPreview(); }
+    if (e.code === 'KeyM') { e.preventDefault(); document.getElementById('tw-metro').click(); }
+    if (e.code === 'KeyQ' && mode === 'instant') { e.preventDefault(); document.getElementById('tw-quantize').click(); }
+    if (e.code === 'KeyX')   { e.preventDefault(); doUndo(true); }
+    if (e.code === 'Comma')  { e.preventDefault(); handleOverdub(); }
+    if (e.code === 'Period') { e.preventDefault(); doUndo(true); }
+    if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(false); }
+    if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); doRedo(); }
   }
-  if (e.code === 'KeyX'   && !e.repeat && !inText && !inRename) { e.preventDefault(); doUndo(true); }
-  if (e.code === 'Comma'  && !e.repeat && !inText && !inRename) { e.preventDefault(); handleOverdub(); }
-  if (e.code === 'Period' && !e.repeat && !inText && !inRename) { e.preventDefault(); doUndo(true); }
-  if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && !inRename) { e.preventDefault(); doUndo(false); }
-  if (e.ctrlKey && e.code === 'KeyY' && !e.repeat && !inRename) { e.preventDefault(); doRedo(); }
 }, true);
 
 // ─── MIDI ─────────────────────────────────────────────────────────────────────
