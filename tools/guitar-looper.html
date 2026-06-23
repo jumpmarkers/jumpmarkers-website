@@ -250,8 +250,8 @@ select{cursor:pointer}
   <div class="card">
     <div class="card-title">Mode</div>
     <div class="mode-switch" id="mode-switch">
-      <button class="mode-btn active" data-mode="instant">⚡ Instant</button>
-      <button class="mode-btn" data-mode="metro">🎵 Metronome</button>
+      <button class="mode-btn" data-mode="instant">⚡ Instant</button>
+      <button class="mode-btn active" data-mode="metro">🎵 Metronome</button>
     </div>
     <div class="setup-grid">
 
@@ -280,7 +280,7 @@ select{cursor:pointer}
         </select>
       </div>
 
-      <div class="setup-row" id="row-measures" style="display:none">
+      <div class="setup-row" id="row-measures">
         <span class="setup-label">Measures</span>
         <input type="number" id="in-measures" value="2" min="1" max="64">
       </div>
@@ -299,7 +299,7 @@ select{cursor:pointer}
         <span class="dim" id="latency-hint" style="font-size:.72rem;opacity:.55"></span>
       </div>
 
-      <div class="setup-row" id="row-countdown" style="display:none">
+      <div class="setup-row" id="row-countdown">
         <span class="setup-label">Countdown</span>
         <div class="tog-wrap" id="tw-cd"><div class="tog on" id="tog-cd"></div></div>
         <input type="number" id="in-cd" value="4" min="1" max="16" style="width:56px">
@@ -384,7 +384,7 @@ let tapTimes = [], tapTimer = null;
 let history = []; // layers removed by undo — available for redo
 let _pauseOffset = 0, _ovdT0 = 0;
 let latencyMs = 0;
-let mode = 'instant'; // 'instant' | 'metro'
+let mode = 'metro'; // 'instant' | 'metro'
 
 // Recording guard
 let _discardRec = false;
@@ -1190,6 +1190,7 @@ document.getElementById('mode-switch').addEventListener('click', e => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+loopDur = calcDur();
 buildBeatRow();
 updateInfo();
 setPhase('idle');
