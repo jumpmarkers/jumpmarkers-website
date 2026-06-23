@@ -486,13 +486,16 @@ async function openMic(deviceId) {
   micSrc.connect(worklet);
   // worklet NOT connected to destination — no monitoring
   await populateDevices(stream);
-  const inputLat = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
-  const detected = Math.round(((actx.baseLatency || 0) + inputLat) * 1000);
-  if (detected > 0) {
-    latencyMs = detected;
-    document.getElementById('in-latency').value = detected;
-    document.getElementById('latency-hint').textContent = '(auto-detected)';
-  }
+  const inputLat  = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
+  const outputLat = actx.outputLatency || 0;
+  const baseLat   = actx.baseLatency  || 0;
+  // Compensation needed = input latency only.
+  // outputLatency and baseLatency affect metro and playback equally → no relative drift.
+  const detected = Math.round(inputLat * 1000);
+  latencyMs = detected;
+  document.getElementById('in-latency').value = detected;
+  document.getElementById('latency-hint').textContent =
+    `in:${Math.round(inputLat*1000)}ms · out:${Math.round((outputLat+baseLat)*1000)}ms`;
   startVU();
 }
 
