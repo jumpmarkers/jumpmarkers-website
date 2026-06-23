@@ -430,7 +430,6 @@ select{cursor:pointer}
 
 <div class="scroll-hint" id="scroll-hint">
   <span style="font-size:1.9rem">👇</span>
-  <span style="font-size:1.3rem;opacity:.45;animation-delay:.15s">👇</span>
 </div>
 
 <script>
@@ -1456,8 +1455,7 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
 (function() {
   const el = document.getElementById('scroll-hint');
   function check() {
-    const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 60;
-    el.classList.toggle('hidden', atBottom);
+    el.classList.toggle('hidden', window.scrollY > 30);
   }
   window.addEventListener('scroll', check, { passive: true });
   check();
