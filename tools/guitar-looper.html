@@ -353,6 +353,12 @@ select{cursor:pointer}
         <span class="dim" id="metro-vol-lbl" style="min-width:32px;text-align:right">70%</span>
       </div>
 
+      <div class="setup-row">
+        <span class="setup-label">Output</span>
+        <input type="range" id="in-master-vol" min="100" max="400" step="1" value="100" style="width:90px;accent-color:var(--blue)">
+        <span class="dim" id="master-vol-lbl" style="min-width:42px;text-align:right">100%</span>
+      </div>
+
       <div class="setup-row" id="row-quantize" style="display:none">
         <span class="setup-label">Quantize</span>
         <div class="tog-wrap" id="tw-quantize"><div class="tog" id="tog-quantize"></div><span class="tog-lbl" id="lbl-quantize">Off</span></div>
@@ -411,6 +417,11 @@ select{cursor:pointer}
     <div class="card-title" style="display:flex;align-items:center;gap:8px">Layers <button class="btn-io" id="btn-merge" disabled>⊕ Merge</button></div>
     <div id="layers-wrap">
       <div class="empty-layers">No layers yet — press Record to start</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <span class="setup-label" style="min-width:46px">Speed</span>
+      <input type="range" id="in-retime" min="15" max="150" step="1" value="100" style="flex:1;accent-color:var(--accent2)">
+      <span class="dim" id="retime-lbl" style="min-width:42px;text-align:right">1.00×</span>
     </div>
   </div>
 
@@ -479,6 +490,8 @@ const SCHED_INT  = 50;   // ms — scheduler interval
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let actx = null, worklet = null, analyser = null, micSrc = null;
+let masterGain = null;
+let retimeRate = 1.0;
 let layers = [], nextId = 1;
 let phase = 'idle'; // idle | cd | rec | play | ovd
 let loopDur = 0, loopT0 = 0; // loopT0 = actx time when loop cycle last started
@@ -649,6 +662,8 @@ function showConfirm(msg) {
 async function initAudio() {
   if (actx) return;
   actx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = actx.createGain();
+  masterGain.connect(actx.destination);
   if (!actx.audioWorklet) { showToast('AudioWorklet not supported. Use Chrome, Edge, or Firefox 76+.', 'warn', 0); return; }
   const blob = new Blob([WORKLET_CODE], {type:'application/javascript'});
   const url = URL.createObjectURL(blob);
@@ -897,6 +912,7 @@ function playLayer(l, offset) {
   const src = actx.createBufferSource();
   src.buffer = l.buf;
   src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
+  src.playbackRate.value = retimeRate;
   src.connect(l.gain);
   const comp = l.imported ? 0 : latencyMs / 1000;
   src.start(actx.currentTime, ((offset + comp) % loopDur + loopDur) % loopDur);
@@ -905,6 +921,13 @@ function playLayer(l, offset) {
 
 function stopLayerSrc(l) {
   if (l.src) { try { l.src.stop(); } catch(e){} l.src.disconnect(); l.src = null; }
+}
+
+function applyRetime(rate) {
+  retimeRate = rate;
+  layers.forEach(l => {
+    if (l.src) l.src.playbackRate.setValueAtTime(rate, actx.currentTime);
+  });
 }
 
 function stopPlayback() {
@@ -961,7 +984,7 @@ function addLayer(buf, wasOvd, imported = false) {
   const id = nextId++;
   const gain = actx.createGain();
   const panner = actx.createStereoPanner();
-  gain.connect(panner); panner.connect(actx.destination);
+  gain.connect(panner); panner.connect(masterGain || actx.destination);
   const l = {id, name:'Layer '+id, buf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
   layers.push(l);
   if (wasOvd) {
@@ -1004,7 +1027,7 @@ function doRedo() {
   if (history.length === 0) { showToast('Nothing to redo', 'warn', 1500); return; }
   if (!actx) return;
   const l = history.pop();
-  l.gain.connect(l.panner); l.panner.connect(actx.destination);
+  l.gain.connect(l.panner); l.panner.connect(masterGain || actx.destination);
   layers.push(l);
   if (layers.length === 1) {
     loopDur = l.buf.duration;
@@ -1316,7 +1339,7 @@ async function doMerge() {
   const id = nextId++;
   const gain = actx.createGain();
   const panner = actx.createStereoPanner();
-  gain.connect(panner); panner.connect(actx.destination);
+  gain.connect(panner); panner.connect(masterGain || actx.destination);
   const ml = {id, name:'Merged', buf:mergedBuf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported:true, selected:false};
   layers.splice(Math.min(insertIdx, layers.length), 0, ml);
   history = [];
@@ -1348,7 +1371,7 @@ function renderLayers() {
       <span class="l-dur">${l.buf ? l.buf.duration.toFixed(2)+'s' : '–'}</span>
       <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}" title="Volume">
       ${panKnobSVG(l.pan ?? 0, l.id)}
-      <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">${l.muted?'🔇':'🔊'}</button>
+      <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">M</button>
       <button class="btn-i${l.solo?' solo-on':''}" data-solo="${l.id}" title="Solo">S</button>
       <button class="btn-i btn-rr${rrActive?' rr-active':''}" data-rr="${l.id}" title="Re-record this layer">⏺</button>
       <button class="btn-i del" data-del="${l.id}" title="Delete">✕</button>
@@ -1537,6 +1560,11 @@ document.addEventListener('keydown', e => {
     if (e.code === 'Period') { e.preventDefault(); doUndo(true); }
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(false); }
     if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); doRedo(); }
+    if (/^Digit[0-9]$/.test(e.code) && !e.ctrlKey) {
+      const n = +e.code[5];
+      const idx = n === 0 ? 9 : n - 1;
+      if (layers[idx]) { e.preventDefault(); toggleMute(layers[idx].id); }
+    }
   }
 }, true);
 
@@ -1599,6 +1627,16 @@ document.getElementById('btn-suggest').addEventListener('click', measureLatency)
 document.getElementById('in-metro-vol').addEventListener('input', e => {
   metroVol = e.target.value / 100;
   document.getElementById('metro-vol-lbl').textContent = e.target.value + '%';
+});
+document.getElementById('in-master-vol').addEventListener('input', e => {
+  const v = e.target.value / 100;
+  if (masterGain) masterGain.gain.value = v;
+  document.getElementById('master-vol-lbl').textContent = e.target.value + '%';
+});
+document.getElementById('in-retime').addEventListener('input', e => {
+  const rate = e.target.value / 100;
+  document.getElementById('retime-lbl').textContent = rate.toFixed(2) + '×';
+  if (actx) applyRetime(rate); else retimeRate = rate;
 });
 document.getElementById('btn-tap').addEventListener('click', doTap);
 document.getElementById('btn-rec').addEventListener('click', handleRecord);
