@@ -313,7 +313,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap tempo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap · X: undo overdub · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -371,6 +371,7 @@ let bpm = 120, bpMeasure = 4, numMeasures = 2, cdBeats = 4, cdOn = true;
 let pedalCode = 'Space', midiObj = null;
 let previewMetro = false;
 let tapTimes = [], tapTimer = null;
+let history = []; // layers removed by undo — available for redo
 let mode = 'instant'; // 'instant' | 'metro'
 
 // Recording guard
@@ -688,6 +689,7 @@ function stopPos() {
 
 // ─── Layer management ─────────────────────────────────────────────────────────
 function addLayer(buf, wasOvd) {
+  history = []; // new recording invalidates redo history
   const id = nextId++;
   const gain = actx.createGain(); gain.connect(actx.destination);
   const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length]};
@@ -709,6 +711,40 @@ function removeLayer(id) {
   renderLayers();
   updateIO();
   if (layers.length === 0) { stopPlayback(); setPhase('idle'); }
+}
+
+function doUndo(overdubOnly = false) {
+  if (phase === 'rec' || phase === 'cd' || phase === 'ovd') return;
+  if (layers.length === 0) { showToast('Nothing to undo', 'warn', 1500); return; }
+  if (overdubOnly && layers.length <= 1) { showToast('No overdub to undo', 'warn', 1500); return; }
+  const l = layers.pop();
+  stopLayerSrc(l);
+  l.gain.disconnect();
+  history.push(l);
+  refreshSolo();
+  renderLayers();
+  updateIO();
+  if (layers.length === 0) { stopPlayback(); setPhase('idle'); loopDur = 0; }
+}
+
+function doRedo() {
+  if (phase === 'rec' || phase === 'cd' || phase === 'ovd') return;
+  if (history.length === 0) { showToast('Nothing to redo', 'warn', 1500); return; }
+  if (!actx) return;
+  const l = history.pop();
+  l.gain.connect(actx.destination);
+  layers.push(l);
+  if (layers.length === 1) {
+    loopDur = l.buf.duration;
+    loopT0 = actx.currentTime;
+    setPhase('play');
+    startPlayback();
+  } else if (phase === 'play' || phase === 'ovd') {
+    playLayer(l, (actx.currentTime - loopT0) % loopDur);
+  }
+  refreshSolo();
+  renderLayers();
+  updateIO();
 }
 
 function toggleMute(id) {
@@ -997,6 +1033,10 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyT' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
     e.preventDefault(); doTap();
   }
+  const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
+  if (e.code === 'KeyX' && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
+  if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && noInput) { e.preventDefault(); doUndo(false); }
+  if (e.ctrlKey && e.code === 'KeyY' && !e.repeat && noInput) { e.preventDefault(); doRedo(); }
 }, true);
 
 // ─── MIDI ─────────────────────────────────────────────────────────────────────
