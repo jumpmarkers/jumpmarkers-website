@@ -195,6 +195,10 @@ select{cursor:pointer}
 }
 .btn-io:hover{border-color:var(--accent)}
 .btn-io:disabled{opacity:.35;cursor:default}
+.btn-metro-prev{padding:4px 10px;font-size:.82rem;min-width:32px;justify-content:center}
+.btn-metro-prev.active{border-color:var(--accent);color:var(--accent)}
+.btn-tap{padding:4px 14px;font-size:.82rem}
+.btn-tap.flash{background:var(--accent);color:#fff;transition:background .05s}
 
 /* ── MIDI badge ── */
 .midi-bdg{
@@ -259,8 +263,10 @@ select{cursor:pointer}
 
       <div class="setup-row">
         <span class="setup-label">Tempo</span>
+        <button class="btn-io btn-metro-prev" id="btn-metro-prev" title="Preview metronome">▶</button>
         <input type="number" id="in-bpm" value="120" min="30" max="300">
         <span class="dim">BPM</span>
+        <button class="btn-io btn-tap" id="btn-tap" title="Tap Tempo (press T)">Tap</button>
       </div>
 
       <div class="setup-row">
@@ -307,7 +313,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal key: Space</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap tempo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -363,6 +369,8 @@ let metroOn = true, nextBeatT = 0, beatIdx = 0, schedId = null;
 // Settings
 let bpm = 120, bpMeasure = 4, numMeasures = 2, cdBeats = 4, cdOn = true;
 let pedalCode = 'Space', midiObj = null;
+let previewMetro = false;
+let tapTimes = [], tapTimer = null;
 let mode = 'instant'; // 'instant' | 'metro'
 
 // Recording guard
@@ -507,7 +515,7 @@ function activateDot(n) {
 
 // ─── Metronome ────────────────────────────────────────────────────────────────
 function click(t, isFirst, isCD) {
-  if (!metroOn) return;
+  if (!metroOn && !previewMetro) return;
   const o = actx.createOscillator(), g = actx.createGain();
   o.connect(g); g.connect(actx.destination);
   o.frequency.value = isCD ? (isFirst ? 1400 : 1000) : (isFirst ? 1100 : 800);
@@ -537,6 +545,43 @@ function startMetro(startT) {
 function stopMetro() {
   if (schedId) { clearInterval(schedId); schedId = null; }
   activateDot(-1);
+}
+
+async function toggleMetroPreview() {
+  const btn = document.getElementById('btn-metro-prev');
+  if (previewMetro) {
+    previewMetro = false;
+    stopMetro();
+    btn.textContent = '▶';
+    btn.classList.remove('active');
+  } else {
+    if (!actx) await initAudio();
+    if (!actx) return;
+    if (actx.state === 'suspended') await actx.resume();
+    previewMetro = true;
+    startMetro(actx.currentTime);
+    btn.textContent = '⏹';
+    btn.classList.add('active');
+  }
+}
+
+function doTap() {
+  const now = performance.now();
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => { tapTimes = []; }, 2500);
+  tapTimes.push(now);
+  if (tapTimes.length > 8) tapTimes.shift();
+  const btn = document.getElementById('btn-tap');
+  btn.classList.add('flash');
+  setTimeout(() => btn.classList.remove('flash'), 80);
+  if (tapTimes.length >= 2) {
+    let sum = 0;
+    for (let i = 1; i < tapTimes.length; i++) sum += tapTimes[i] - tapTimes[i-1];
+    const newBpm = Math.max(30, Math.min(300, Math.round(60000 / (sum / (tapTimes.length - 1)))));
+    bpm = newBpm;
+    document.getElementById('in-bpm').value = newBpm;
+    if (previewMetro) startMetro(actx.currentTime);
+  }
 }
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
@@ -697,6 +742,11 @@ const PHASE_LABELS = {idle:'Idle', cd:'Countdown', rec:'Recording', play:'Playin
 const PHASE_CSS    = {idle:'s-idle', cd:'s-cd', rec:'s-rec', play:'s-play', ovd:'s-ovd'};
 
 function setPhase(p) {
+  if ((p === 'cd' || p === 'rec') && previewMetro) {
+    previewMetro = false;
+    const btn = document.getElementById('btn-metro-prev');
+    btn.textContent = '▶'; btn.classList.remove('active');
+  }
   phase = p;
   setPill(p, PHASE_LABELS[p]);
   const rec = document.getElementById('btn-rec');
@@ -944,6 +994,9 @@ document.addEventListener('keydown', e => {
   if (e.code === pedalCode && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
     e.preventDefault(); handlePedal();
   }
+  if (e.code === 'KeyT' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault(); doTap();
+  }
 }, true);
 
 // ─── MIDI ─────────────────────────────────────────────────────────────────────
@@ -992,6 +1045,8 @@ metroOn = makeToggle('tw-metro','tog-metro', true, v => metroOn = v);
 cdOn    = makeToggle('tw-cd',   'tog-cd',    true, v => { cdOn = v; document.getElementById('in-cd').disabled = !v; });
 
 // ─── Transport listeners ──────────────────────────────────────────────────────
+document.getElementById('btn-metro-prev').addEventListener('click', toggleMetroPreview);
+document.getElementById('btn-tap').addEventListener('click', doTap);
 document.getElementById('btn-rec').addEventListener('click', handleRecord);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
