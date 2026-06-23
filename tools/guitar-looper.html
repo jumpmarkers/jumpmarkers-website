@@ -412,7 +412,6 @@ select{cursor:pointer}
     <div class="card-title">Import / Export</div>
     <div class="io-row">
       <button class="btn-io" id="btn-wav" disabled>⬇ Export WAV</button>
-      <button class="btn-io" id="btn-aac" disabled>⬇ Export OGG</button>
       <label class="btn-io" style="cursor:pointer">
         ⬆ Import Audio
         <input type="file" id="in-import" accept="audio/*" style="display:none">
@@ -1131,7 +1130,6 @@ function updateInfo() {
 function updateIO() {
   const has = layers.length > 0;
   document.getElementById('btn-wav').disabled = !has;
-  document.getElementById('btn-aac').disabled = !has;
 }
 
 // ─── Main actions ─────────────────────────────────────────────────────────────
@@ -1454,31 +1452,6 @@ async function exportWAV() {
   dl(bufToWav(buf), 'loop.wav');
 }
 
-async function exportAAC() {
-  const buf = await mixDown(); if (!buf) return;
-  const tmpCtx = new AudioContext({ sampleRate: actx.sampleRate });
-  const src = tmpCtx.createBufferSource(); src.buffer = buf;
-  const dest = tmpCtx.createMediaStreamDestination();
-  src.connect(dest);
-  const mime = ['audio/ogg;codecs=vorbis','audio/ogg;codecs=opus','audio/ogg',
-                'audio/webm;codecs=opus','audio/webm','audio/mp4']
-    .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
-  const mr = new MediaRecorder(dest.stream, {mimeType:mime});
-  const chunks = [];
-  mr.ondataavailable = e => chunks.push(e.data);
-  mr.onstop = () => {
-    const ext = mime.startsWith('audio/ogg') ? 'ogg' : (mime.includes('mp4') ? 'm4a' : 'webm');
-    dl(new Blob(chunks, {type:mime}), 'loop.'+ext);
-    tmpCtx.close();
-  };
-  mr.start(); src.start();
-  src.onended = () => {
-    // outputLatency + baseLatency worth of audio is still in the output pipeline
-    // when onended fires — wait for it to drain before stopping the recorder.
-    const drainMs = Math.ceil(((tmpCtx.outputLatency || 0) + (tmpCtx.baseLatency || 0)) * 1000) + 180;
-    setTimeout(() => { try { mr.stop(); } catch(e){} }, drainMs);
-  };
-}
 
 function dl(blob, name) {
   const a = document.createElement('a');
@@ -1625,7 +1598,6 @@ document.getElementById('btn-monitor').addEventListener('click', () => {
   btn.title = on ? 'Monitor ON — click to mute' : 'Monitor mic input';
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
-document.getElementById('btn-aac').addEventListener('click', exportAAC);
 document.getElementById('btn-merge').addEventListener('click', doMerge);
 
 // ─── Mode switch ──────────────────────────────────────────────────────────────
