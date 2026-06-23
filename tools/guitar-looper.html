@@ -217,6 +217,15 @@ select{cursor:pointer}
 .mode-btn{flex:1;border:none;cursor:pointer;background:none;color:var(--text-sub);padding:8px 14px;border-radius:6px;font-size:.82rem;font-weight:600;transition:background .15s,color .15s}
 .mode-btn.active{background:var(--surface2);color:var(--text)}
 
+/* ── Support banner ── */
+.support-banner{display:flex;flex-wrap:wrap;align-items:center;gap:16px;background:var(--surface);border-top:1px solid var(--border);padding:20px 24px;margin-top:8px}
+.support-banner-text{flex:1;min-width:200px}
+.support-banner-text p{font-size:.85rem;line-height:1.65;color:var(--muted);margin:0}
+.support-banner-text strong{color:var(--text);font-weight:600}
+.support-banner-text .brand{color:var(--accent);font-weight:700}
+.support-banner-cta{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:8px;text-decoration:none;transition:filter .2s,transform .15s}
+.support-banner-cta:hover{filter:brightness(1.15);transform:translateY(-1px)}
+
 /* ── Shortcut panel ── */
 .shortcut-panel{
   position:fixed;right:20px;top:50%;transform:translateY(-50%);
@@ -387,6 +396,20 @@ select{cursor:pointer}
     <p style="margin-top:10px;font-size:.75rem;color:var(--muted)">AAC export uses the best format your browser supports (MP4/AAC or WebM/Opus).</p>
   </div>
 </main>
+
+<div class="support-banner">
+  <div class="support-banner-text">
+    <p>
+      <strong>This tool is free — and it always will be.</strong>
+      If you've found it useful, or you simply enjoy seeing independent developers build things like this, the best way to support this work is to give <span class="brand">JumpMarkers</span> a try. It's a free Chrome extension built for people who learn music from YouTube — mark exact moments in a song, loop sections while you work out the notes, scrub frame by frame with audio to catch every detail, and organize everything into folders by song or technique.
+    </p>
+  </div>
+  <a class="support-banner-cta"
+     href="https://chromewebstore.google.com/detail/jumpmarkers/mhoegmpedkbeokpldinhbnibikkkefjn"
+     target="_blank">
+    🔖 Try JumpMarkers — Free
+  </a>
+</div>
 
 <aside class="shortcut-panel">
   <div class="sc-title">⌨ Shortcuts</div>
