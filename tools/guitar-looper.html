@@ -755,7 +755,7 @@ function playLayer(l, offset) {
   if (l.muted) return;
   const src = actx.createBufferSource();
   src.buffer = l.buf;
-  src.loop = true; src.loopStart = 0; src.loopEnd = loopDur;
+  src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
   src.connect(l.gain);
   const comp = latencyMs / 1000;
   src.start(actx.currentTime, ((offset + comp) % loopDur + loopDur) % loopDur);
@@ -822,7 +822,9 @@ function addLayer(buf, wasOvd) {
   const l = {id, name:'Layer '+id, buf, gain, src:null, vol:1, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length]};
   layers.push(l);
   if (wasOvd) {
-    const offset = (_ovdT0 - loopT0 + loopDur * 1000) % loopDur;
+    // Use actx.currentTime (not _ovdT0): the JS epsilon in each callback
+    // cancels itself out, keeping all layers phase-locked to loopT0.
+    const offset = (actx.currentTime - loopT0) % loopDur;
     playLayer(l, offset);
   }
   renderLayers();
