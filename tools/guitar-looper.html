@@ -1102,6 +1102,7 @@ function handleClear() {
 function handlePedal() {
   if (phase === 'idle') { handleRecord(); }
   else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
+  else if (phase === 'rec') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); stopMetro(); setPhase('idle'); buildBeatRow(); updateInfo(); } // cancel metro recording
   else if (phase === 'play') { pausePlayback(); }
   else if (phase === 'paused') { resumePlayback(); }
   else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); } // commit partial overdub
