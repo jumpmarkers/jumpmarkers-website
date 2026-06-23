@@ -296,6 +296,7 @@ select{cursor:pointer}
         <span class="setup-label">Latency comp</span>
         <input type="number" id="in-latency" value="0" min="-200" max="500" style="width:68px">
         <span class="dim">ms</span>
+        <button class="btn-io" id="btn-suggest" style="padding:4px 10px;font-size:.78rem" title="Play a click and measure round-trip latency via mic">🎯 Suggest</button>
         <span class="dim" id="latency-hint" style="font-size:.72rem;opacity:.55"></span>
       </div>
 
@@ -384,6 +385,7 @@ let tapTimes = [], tapTimer = null;
 let history = []; // layers removed by undo — available for redo
 let _pauseOffset = 0, _ovdT0 = 0;
 let latencyMs = 0;
+let _measuringLatency = false, _measureMeta = null;
 let mode = 'metro'; // 'instant' | 'metro'
 
 // Recording guard
@@ -430,6 +432,76 @@ class Rec extends AudioWorkletProcessor {
 }
 registerProcessor('rec', Rec);
 `;
+
+// ─── Latency measurement ─────────────────────────────────────────────────────
+async function measureLatency() {
+  if (phase !== 'idle') { showToast('Stop playback before measuring', 'warn', 2500); return; }
+  if (!actx) await initAudio();
+  if (!actx) return;
+  if (actx.state === 'suspended') await actx.resume();
+
+  const btn = document.getElementById('btn-suggest');
+  btn.textContent = '…'; btn.disabled = true;
+  showToast('Hold mic near speakers/headphones — measuring…', 'warn', 3000);
+
+  const prePad = 0.30;  // silence before click (gives pre-noise sample for floor calc)
+  const recLen = 0.80;  // total recording window
+  const startAt = actx.currentTime + 0.25;
+  const clickT  = startAt + prePad;
+  const stopAt  = startAt + recLen;
+
+  // Loud 1 kHz click burst through output
+  const osc = actx.createOscillator(), env = actx.createGain();
+  osc.connect(env); env.connect(actx.destination);
+  osc.frequency.value = 1000;
+  env.gain.setValueAtTime(0, clickT);
+  env.gain.linearRampToValueAtTime(1.0, clickT + 0.001);
+  env.gain.exponentialRampToValueAtTime(0.001, clickT + 0.05);
+  osc.start(clickT); osc.stop(clickT + 0.06);
+
+  _measureMeta = { startAt, clickT };
+  _measuringLatency = true;
+  worklet.port.postMessage({ cmd: 'start', startAt, stopAt });
+}
+
+function _analyzeMeasurement(samples) {
+  const btn = document.getElementById('btn-suggest');
+  btn.textContent = '🎯 Suggest'; btn.disabled = false;
+
+  const { startAt, clickT } = _measureMeta; _measureMeta = null;
+  const sr = actx.sampleRate;
+  const expectedIdx = Math.round((clickT - startAt) * sr);
+  const winSz = Math.round(sr * 0.005); // 5 ms RMS window
+
+  // Noise floor from pre-click silence
+  let noiseSum = 0;
+  const noiseLen = Math.max(1, expectedIdx - winSz * 4);
+  for (let i = 0; i < noiseLen; i++) noiseSum += samples[i] * samples[i];
+  const noiseRms = Math.sqrt(noiseSum / noiseLen);
+  const threshold = Math.max(noiseRms * 6, 0.002);
+
+  // First onset after expected click position
+  let detectedIdx = null;
+  for (let i = expectedIdx; i < samples.length - winSz; i++) {
+    let rms = 0;
+    for (let j = 0; j < winSz; j++) rms += samples[i + j] * samples[i + j];
+    if (Math.sqrt(rms / winSz) > threshold) { detectedIdx = i; break; }
+  }
+
+  if (detectedIdx === null) {
+    showToast('Click not detected — hold mic closer to speakers and try again.', 'warn', 6000);
+    return;
+  }
+
+  const rttMs     = Math.round((detectedIdx / sr - (clickT - startAt)) * 1000);
+  const outMs     = Math.round(((actx.outputLatency || 0) + (actx.baseLatency || 0)) * 1000);
+  const suggested = Math.max(0, rttMs - outMs);
+
+  latencyMs = suggested;
+  document.getElementById('in-latency').value = suggested;
+  document.getElementById('latency-hint').textContent = `RTT ${rttMs}ms → ${suggested}ms`;
+  showToast(`Round-trip: ${rttMs}ms · Output: ${outMs}ms → Compensation: ${suggested}ms`, 'confirm', 6000);
+}
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 let _toastTimer = null;
@@ -646,6 +718,7 @@ async function doCountdown() {
 // (removed — worklet now uses startAt/stopAt audio times directly)
 
 function onRecData(samples) {
+  if (_measuringLatency) { _measuringLatency = false; _analyzeMeasurement(samples); return; }
   if (_discardRec) { _discardRec = false; return; }
   if (phase !== 'rec' && phase !== 'ovd') return;
   const wasOvd = phase === 'ovd';
@@ -855,6 +928,7 @@ function updateIO() {
 
 // ─── Main actions ─────────────────────────────────────────────────────────────
 async function handleRecord() {
+  if (_measuringLatency) return;
   if (!actx) await initAudio();
   if (!actx) return;
   if (actx.state === 'suspended') await actx.resume();
@@ -1156,6 +1230,7 @@ document.getElementById('in-latency').addEventListener('input', e => {
   latencyMs = +e.target.value || 0;
   document.getElementById('latency-hint').textContent = '';
 });
+document.getElementById('btn-suggest').addEventListener('click', measureLatency);
 document.getElementById('in-metro-vol').addEventListener('input', e => {
   metroVol = e.target.value / 100;
   document.getElementById('metro-vol-lbl').textContent = e.target.value + '%';
