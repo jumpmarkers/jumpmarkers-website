@@ -1465,10 +1465,12 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
 (function() {
   const el = document.getElementById('scroll-hint');
   function check() {
-    el.classList.toggle('hidden', window.innerHeight + window.scrollY >= document.body.scrollHeight - 60);
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 60) {
+      el.classList.add('hidden');
+      window.removeEventListener('scroll', check);
+    }
   }
   window.addEventListener('scroll', check, { passive: true });
-  check();
 })();
 </script>
 </body>
