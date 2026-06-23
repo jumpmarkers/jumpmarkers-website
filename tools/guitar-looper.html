@@ -201,8 +201,8 @@ select{cursor:pointer}
   font-family:var(--body);
 }
 .btn-i:hover{background:var(--surface2);color:var(--text)}
-.btn-i.muted{color:var(--muted)}
-.btn-i.solo-on{color:var(--accent);background:rgba(245,166,35,.15)}
+.btn-i.muted{color:var(--accent);background:rgba(245,166,35,.15)}
+.btn-i.solo-on{color:var(--green);background:rgba(82,199,125,.15)}
 .btn-i.del:hover{color:var(--red);background:rgba(224,82,82,.1)}
 .empty-layers{text-align:center;padding:24px;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
 
@@ -421,7 +421,7 @@ select{cursor:pointer}
     <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
       <span class="setup-label" style="min-width:46px">Speed</span>
       <input type="range" id="in-retime" min="15" max="150" step="1" value="100" style="flex:1;accent-color:var(--accent2)">
-      <span class="dim" id="retime-lbl" style="min-width:42px;text-align:right">1.00×</span>
+      <button id="retime-lbl" title="Reset to 1×" style="min-width:46px;padding:3px 8px;font-size:.75rem;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-sub);cursor:pointer;font-family:var(--mono)">1.00×</button>
     </div>
   </div>
 
@@ -1683,6 +1683,13 @@ document.getElementById('in-master-vol').addEventListener('input', e => {
   document.getElementById('master-vol-lbl').textContent = e.target.value + '%';
 });
 let _retimeTid = null;
+document.getElementById('retime-lbl').addEventListener('click', () => {
+  document.getElementById('in-retime').value = 100;
+  document.getElementById('retime-lbl').textContent = '1.00×';
+  retimeRate = 1;
+  clearTimeout(_retimeTid);
+  if (actx) applyRetime(1);
+});
 document.getElementById('in-retime').addEventListener('input', e => {
   const rate = e.target.value / 100;
   retimeRate = rate;
