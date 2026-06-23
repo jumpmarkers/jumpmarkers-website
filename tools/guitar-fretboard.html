@@ -795,7 +795,7 @@
     .help-table td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); font-weight: 600; width: 38%; }
     .help-section-title { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 0 4px; }
   /* ── Feedback widget ── */
-  .msg-card{background:var(--surface,#131a3d);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:14px auto;max-width:800px}
+  .msg-card{background:var(--surface,#131a3d);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:48px auto 14px;max-width:800px}
   .msg-card-title{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted,#888);margin-bottom:8px}
   .msg-card>p{font-size:.78rem;color:var(--muted,#888);margin:0 0 10px}
   #msg-wrap{position:relative}
@@ -807,6 +807,21 @@
   #msg-send{padding:5px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem;cursor:pointer;transition:border-color .15s,color .15s}
   #msg-send:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
   #msg-send:disabled{opacity:.4;cursor:default}
+
+  /* ── Scroll hints ── */
+  .scroll-hint {
+    position: fixed; bottom: 26px; font-size: 1.55rem;
+    opacity: .55; pointer-events: none; z-index: 200;
+    transition: opacity .5s ease;
+    animation: hint-bob 1.5s ease-in-out infinite;
+  }
+  .scroll-hint-l { left: 22px; }
+  .scroll-hint-r { right: 22px; }
+  .scroll-hint.hidden { opacity: 0; }
+  @keyframes hint-bob {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(9px); }
+  }
   </style>
   <script>
     /* Apply saved theme before first paint — prevents flash */
@@ -2664,7 +2679,23 @@ document.getElementById('msg-send').addEventListener('click', async () => {
     } else { throw new Error(); }
   } catch { btn.textContent = 'Error — try again'; btn.disabled = false; }
 });
+
+// ─── Scroll hints ─────────────────────────────────────────────────────────────
+(function () {
+  const hints = document.querySelectorAll('.scroll-hint');
+  function check() {
+    const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
+    const noScroll = document.documentElement.scrollHeight <= window.innerHeight + 10;
+    hints.forEach(h => h.classList.toggle('hidden', atBottom || noScroll));
+  }
+  window.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check);
+  check();
+})();
 </script>
+
+<div class="scroll-hint scroll-hint-l">👇</div>
+<div class="scroll-hint scroll-hint-r">👇</div>
 </div><!-- /.content-wrap -->
 
 </body>
