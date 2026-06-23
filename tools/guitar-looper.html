@@ -161,6 +161,7 @@ select{cursor:pointer}
 .s-rec{background:rgba(224,82,82,.2);color:var(--red)}
 .s-play{background:rgba(82,199,125,.15);color:var(--green)}
 .s-ovd{background:rgba(176,64,128,.2);color:#e07fba}
+.s-paused{background:rgba(120,120,120,.15);color:#999}
 .s-info{font-family:var(--mono);font-size:.75rem;color:var(--text-sub)}
 .s-pos{font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-left:auto}
 
@@ -315,7 +316,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap · P: preview · X: undo overdub · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· Space: rec/pause · ,: overdub · .: del overdub · T: tap · P: preview · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -374,6 +375,7 @@ let pedalCode = 'Space', midiObj = null;
 let previewMetro = false, metroVol = 0.7;
 let tapTimes = [], tapTimer = null;
 let history = []; // layers removed by undo — available for redo
+let _pauseOffset = 0;
 let mode = 'instant'; // 'instant' | 'metro'
 
 // Recording guard
@@ -776,8 +778,8 @@ function setVol(id, v) {
 }
 
 // ─── Phase helpers ────────────────────────────────────────────────────────────
-const PHASE_LABELS = {idle:'Idle', cd:'Countdown', rec:'Recording', play:'Playing', ovd:'Overdubbing'};
-const PHASE_CSS    = {idle:'s-idle', cd:'s-cd', rec:'s-rec', play:'s-play', ovd:'s-ovd'};
+const PHASE_LABELS = {idle:'Idle', cd:'Countdown', rec:'Recording', play:'Playing', paused:'Paused', ovd:'Overdubbing'};
+const PHASE_CSS    = {idle:'s-idle', cd:'s-cd', rec:'s-rec', play:'s-play', paused:'s-paused', ovd:'s-ovd'};
 
 function setPhase(p) {
   if ((p === 'cd' || p === 'rec') && previewMetro) {
@@ -790,15 +792,15 @@ function setPhase(p) {
   const rec = document.getElementById('btn-rec');
   rec.className = 'btn-rec' + (p === 'rec' ? ' on' : p === 'ovd' ? ' on ovd' : '');
   const labels = {
-    idle: '⏺ Record',
-    cd:   '⏺ Record',
-    rec:  mode === 'instant' ? '⏹ Stop & Loop' : '⏺ Recording…',
-    play: '⏺ Overdub',
-    ovd:  mode === 'instant' ? '⏹ Stop Overdub' : '⏺ Overdubbing…'
+    idle:   '⏺ Record',
+    cd:     '⏺ Record',
+    rec:    mode === 'instant' ? '⏹ Stop & Loop' : '⏺ Recording…',
+    play:   '⏺ Overdub',
+    paused: '⏺ Overdub',
+    ovd:    mode === 'instant' ? '⏹ Stop Overdub' : '⏺ Overdubbing…'
   };
   rec.textContent = labels[p] || '⏺';
-  // In metro mode, record is locked during rec/ovd (auto-stops); in instant mode it's the stop trigger
-  rec.disabled = (p === 'cd') || (mode === 'metro' && (p === 'rec' || p === 'ovd'));
+  rec.disabled = (p === 'cd') || (p === 'paused') || (mode === 'metro' && (p === 'rec' || p === 'ovd'));
   document.getElementById('btn-stop').disabled = (p === 'idle');
 }
 
@@ -881,6 +883,27 @@ async function handleRecMetro() {
   }
 }
 
+function pausePlayback() {
+  _pauseOffset = (actx.currentTime - loopT0) % loopDur;
+  stopPlayback();
+  setPhase('paused');
+}
+
+function resumePlayback() {
+  loopT0 = actx.currentTime - _pauseOffset;
+  layers.forEach(l => { if (!l.muted) playLayer(l, _pauseOffset); });
+  if (metroOn) {
+    const beatDur = 60 / bpm;
+    const nextBeatIdx = Math.ceil(_pauseOffset / beatDur);
+    nextBeatT = loopT0 + nextBeatIdx * beatDur;
+    beatIdx = nextBeatIdx;
+    scheduleTick();
+    schedId = setInterval(scheduleTick, SCHED_INT);
+  }
+  startPos();
+  setPhase('play');
+}
+
 function handleStop() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   stopPlayback();
@@ -898,7 +921,16 @@ async function handleClear() {
 }
 
 function handlePedal() {
-  handleRecord(); // handleRecord handles all phases for both modes
+  if (phase === 'idle') { handleRecord(); }
+  else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
+  else if (phase === 'play') { pausePlayback(); }
+  else if (phase === 'paused') { resumePlayback(); }
+  // cd, rec(metro), ovd → Space does nothing
+}
+
+function handleOverdub() {
+  if (phase === 'play') { handleRecord(); }
+  else if (phase === 'ovd' && mode === 'instant') { handleRecord(); }
 }
 
 // ─── Render layers ────────────────────────────────────────────────────────────
@@ -1039,7 +1071,9 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); toggleMetroPreview();
   }
   const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
-  if (e.code === 'KeyX' && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
+  if (e.code === 'KeyX'   && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
+  if (e.code === 'Comma'  && !e.repeat && noInput) { e.preventDefault(); handleOverdub(); }
+  if (e.code === 'Period' && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
   if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && noInput) { e.preventDefault(); doUndo(false); }
   if (e.ctrlKey && e.code === 'KeyY' && !e.repeat && noInput) { e.preventDefault(); doRedo(); }
 }, true);
