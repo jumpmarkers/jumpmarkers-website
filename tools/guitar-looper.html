@@ -287,6 +287,8 @@ select{cursor:pointer}
       <div class="setup-row">
         <span class="setup-label">Metronome</span>
         <div class="tog-wrap" id="tw-metro"><div class="tog on" id="tog-metro"></div><span class="tog-lbl">On</span></div>
+        <input type="range" id="in-metro-vol" min="0" max="100" value="70" style="width:90px;accent-color:var(--accent)">
+        <span class="dim" id="metro-vol-lbl" style="min-width:32px;text-align:right">70%</span>
       </div>
 
       <div class="setup-row" id="row-countdown" style="display:none">
@@ -313,7 +315,7 @@ select{cursor:pointer}
 
   <!-- Transport -->
   <div class="card">
-    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap · X: undo overdub · Ctrl+Z/Y: undo/redo</span></div>
+    <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span><span class="dim" style="text-transform:none;letter-spacing:0;margin-left:8px;opacity:.6">· T: tap · P: preview · X: undo overdub · Ctrl+Z/Y: undo/redo</span></div>
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
@@ -369,7 +371,7 @@ let metroOn = true, nextBeatT = 0, beatIdx = 0, schedId = null;
 // Settings
 let bpm = 120, bpMeasure = 4, numMeasures = 2, cdBeats = 4, cdOn = true;
 let pedalCode = 'Space', midiObj = null;
-let previewMetro = false;
+let previewMetro = false, metroVol = 0.7;
 let tapTimes = [], tapTimer = null;
 let history = []; // layers removed by undo — available for redo
 let mode = 'instant'; // 'instant' | 'metro'
@@ -520,8 +522,8 @@ function click(t, isFirst, isCD) {
   const o = actx.createOscillator(), g = actx.createGain();
   o.connect(g); g.connect(actx.destination);
   o.frequency.value = isCD ? (isFirst ? 1400 : 1000) : (isFirst ? 1100 : 800);
-  g.gain.setValueAtTime(isCD ? .18 : .28, t);
-  g.gain.exponentialRampToValueAtTime(.001, t + .04);
+  g.gain.setValueAtTime((isCD ? .18 : .28) * metroVol, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + .04);
   o.start(t); o.stop(t + .05);
 }
 
@@ -1033,6 +1035,9 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyT' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
     e.preventDefault(); doTap();
   }
+  if (e.code === 'KeyP' && !e.repeat && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault(); toggleMetroPreview();
+  }
   const noInput = !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
   if (e.code === 'KeyX' && !e.repeat && noInput) { e.preventDefault(); doUndo(true); }
   if (e.ctrlKey && e.code === 'KeyZ' && !e.repeat && noInput) { e.preventDefault(); doUndo(false); }
@@ -1086,6 +1091,10 @@ cdOn    = makeToggle('tw-cd',   'tog-cd',    true, v => { cdOn = v; document.get
 
 // ─── Transport listeners ──────────────────────────────────────────────────────
 document.getElementById('btn-metro-prev').addEventListener('click', toggleMetroPreview);
+document.getElementById('in-metro-vol').addEventListener('input', e => {
+  metroVol = e.target.value / 100;
+  document.getElementById('metro-vol-lbl').textContent = e.target.value + '%';
+});
 document.getElementById('btn-tap').addEventListener('click', doTap);
 document.getElementById('btn-rec').addEventListener('click', handleRecord);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
