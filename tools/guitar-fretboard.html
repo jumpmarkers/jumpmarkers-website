@@ -2617,15 +2617,14 @@ renderPresets();
 applyLayout();
 (function() {
   const el = document.getElementById('scroll-hint');
-  const scroller = document.querySelector('.content-wrap');
-  if (!scroller) return;
-  function check() {
-    if (scroller.scrollTop > 30) {
-      el.classList.add('hidden');
-      scroller.removeEventListener('scroll', check);
-    }
+  function hide() {
+    el.classList.add('hidden');
+    scroller && scroller.removeEventListener('scroll', onScroll);
   }
-  scroller.addEventListener('scroll', check, { passive: true });
+  const scroller = document.querySelector('.content-wrap');
+  function onScroll() { if (scroller.scrollTop > 30) hide(); }
+  if (scroller) scroller.addEventListener('scroll', onScroll, { passive: true });
+  setTimeout(hide, 5000);
 })();
 </script>
 </div><!-- /.content-wrap -->
