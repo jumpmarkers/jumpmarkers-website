@@ -1058,7 +1058,9 @@ function setPill(p, txt) {
 
 function updateInfo() {
   const nv = document.getElementById('in-nv').value;
-  if (mode === 'metro') loopDur = calcDur();
+  // Only recalculate loopDur from BPM settings when no layers exist.
+  // Once a loop is established (by recording or import), its duration is fixed.
+  if (mode === 'metro' && layers.length === 0) loopDur = calcDur();
   document.getElementById('s-info').textContent = mode === 'metro'
     ? `${numMeasures} × ${bpMeasure}/${nv} @ ${bpm} BPM · ${loopDur.toFixed(2)}s`
     : loopDur > 0 ? `${loopDur.toFixed(2)}s loop · ${bpm} BPM` : `Free length · ${bpm} BPM`;
@@ -1391,7 +1393,12 @@ async function exportAAC() {
     tmpCtx.close();
   };
   mr.start(); src.start();
-  src.onended = () => mr.stop();
+  src.onended = () => {
+    // outputLatency + baseLatency worth of audio is still in the output pipeline
+    // when onended fires — wait for it to drain before stopping the recorder.
+    const drainMs = Math.ceil(((tmpCtx.outputLatency || 0) + (tmpCtx.baseLatency || 0)) * 1000) + 180;
+    setTimeout(() => { try { mr.stop(); } catch(e){} }, drainMs);
+  };
 }
 
 function dl(blob, name) {
@@ -1413,6 +1420,7 @@ document.getElementById('in-import').addEventListener('change', async e => {
     numMeasures = Math.max(1, Math.round(loopDur / (bpMeasure * beatDur)));
     document.getElementById('in-measures').value = numMeasures;
     buildBeatRow(); updateInfo();
+    loopDur = buf.duration; // restore: updateInfo recalculates from BPM when layers is empty
   }
   addLayer(buf, false, true);
   if (layers.length === 1 && phase === 'idle') {
