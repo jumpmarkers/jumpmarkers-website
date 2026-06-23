@@ -446,6 +446,19 @@
       white-space: nowrap;
     }
     .support-banner-cta:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  /* ── Feedback widget ── */
+  .msg-card{background:var(--bg-card,#1e1e38);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:14px auto;max-width:800px}
+  .msg-card-title{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-sub,#888);margin-bottom:8px}
+  .msg-card>p{font-size:.78rem;color:var(--text-sub,#888);margin:0 0 10px}
+  #msg-wrap{position:relative}
+  #msg-text{width:100%;box-sizing:border-box;background:var(--bg,#0d0d1a);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;font-family:inherit;padding:9px 12px;resize:none;height:68px;outline:none;transition:border-color .15s}
+  #msg-text:focus{border-color:var(--accent)}
+  #msg-text::placeholder{color:var(--text-sub,#666)}
+  #msg-count{position:absolute;bottom:8px;right:10px;font-size:.68rem;color:var(--text-sub,#666);pointer-events:none;transition:color .15s}
+  #msg-count.warn{color:var(--accent2,#ff6b6b)}
+  #msg-send{padding:5px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem;cursor:pointer;transition:border-color .15s,color .15s}
+  #msg-send:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  #msg-send:disabled{opacity:.4;cursor:default}
   </style>
 </head>
 <body>
@@ -589,6 +602,18 @@
       <span class="setting-label" id="modalLangLabel">Idioma</span>
       <div class="btn-row" id="langBtns"></div>
     </div>
+  </div>
+</div>
+
+<div class="msg-card">
+  <div class="msg-card-title">💬 Say hi / suggest a feature</div>
+  <p>Say hi to the creator, suggest the next free tool, or request a feature you'd like to see.</p>
+  <div id="msg-wrap">
+    <textarea id="msg-text" maxlength="140" placeholder="Write here… (140 chars max)"></textarea>
+    <span id="msg-count">140</span>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:8px">
+    <button id="msg-send">Send →</button>
   </div>
 </div>
 
@@ -1914,6 +1939,34 @@ render();
     document.querySelector('.support-banner')?.scrollIntoView({ behavior: 'smooth' });
   });
 })();
+
+// ─── Feedback widget ──────────────────────────────────────────────────────────
+document.getElementById('msg-text').addEventListener('input', e => {
+  const rem = 140 - e.target.value.length;
+  const cnt = document.getElementById('msg-count');
+  cnt.textContent = rem; cnt.classList.toggle('warn', rem < 20);
+});
+document.getElementById('msg-send').addEventListener('click', async () => {
+  const text = document.getElementById('msg-text').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('msg-send');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('https://formsubmit.co/ajax/jumpmarkers@gmail.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ message: text, _subject: 'Harmonica Explorer — feedback', _captcha: 'false' })
+    });
+    const d = await r.json();
+    if (d.success === 'true' || d.success === true) {
+      document.getElementById('msg-text').value = '';
+      document.getElementById('msg-count').textContent = '140';
+      document.getElementById('msg-count').classList.remove('warn');
+      btn.textContent = '✓ Sent!';
+      setTimeout(() => { btn.textContent = 'Send →'; btn.disabled = false; }, 2500);
+    } else { throw new Error(); }
+  } catch { btn.textContent = 'Error — try again'; btn.disabled = false; }
+});
 </script>
 </body>
 </html>
