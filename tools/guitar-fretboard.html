@@ -2149,7 +2149,7 @@ function mkChordChart(opts = {}) {
 
 function chordSVG(cc) {
   const NS = 6, SG = 14, FG = 15;
-  const LP = cc.startFret > 1 ? 24 : 12;
+  const LP = 24; // always leave room for fret numbers
   const RP = 10, TP = 22, BP = 6;
   const W = LP + (NS - 1) * SG + RP;
   const H = TP + cc.numFrets * FG + BP;
@@ -2162,8 +2162,8 @@ function chordSVG(cc) {
     const cls = f === 0 && cc.startFret === 1 ? 'cs-nut' : 'cs-fret';
     o += `<line class="${cls}" x1="${sx(0)}" y1="${fy(f)}" x2="${sx(NS-1)}" y2="${fy(f)}"/>`;
   }
-  if (cc.startFret > 1)
-    o += `<text class="cs-fretnum" x="${LP-5}" y="${fy(0)+FG/2+3}" text-anchor="end">${cc.startFret}</text>`;
+  for (let f = 1; f <= cc.numFrets; f++)
+    o += `<text class="cs-fretnum" x="${LP-5}" y="${fy(f-1)+FG/2+3}" text-anchor="end">${cc.startFret + f - 1}</text>`;
   for (let i = 0; i < NS; i++) {
     const h = cc.headings[i];
     const lbl = h === 'x' ? '✕' : h === 'o' ? '○' : '·';
@@ -2216,7 +2216,7 @@ function buildChordChartsPanel(b) {
     const svgEl = tmp.firstElementChild;
     const NS = 6, SG = 14, FG = 15, TP = 22;
     svgEl.addEventListener('click', e => {
-      const LP = cc.startFret > 1 ? 24 : 12;
+      const LP = 24;
       const rect = svgEl.getBoundingClientRect();
       const px = (e.clientX - rect.left) * (svgEl.viewBox.baseVal.width / rect.width);
       const py = (e.clientY - rect.top)  * (svgEl.viewBox.baseVal.height / rect.height);
