@@ -118,7 +118,14 @@ select{cursor:pointer}
 
 /* ── Beat dots ── */
 .beat-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
-.m-group{display:flex;align-items:center;gap:7px}
+.m-group{display:flex;align-items:center;gap:7px;cursor:pointer;padding:4px 5px;border-radius:9px;border:2px solid transparent;transition:border-color .15s,background .15s}
+.m-group.selected{border-color:rgba(255,255,255,.35)}
+.m-group[data-color] .beat-dot.m1{border-color:var(--mc)}
+.m-group[data-color] .beat-dot.active.m1{background:var(--mc);border-color:var(--mc)}
+#mc-bar{display:none;align-items:center;gap:8px;margin:-4px 0 12px;font-size:.72rem;color:var(--text-sub)}
+.mc-swatch{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .12s,border-color .12s;flex-shrink:0}
+.mc-swatch:hover{transform:scale(1.2)}
+.mc-swatch.active-swatch{border-color:white}
 .beat-dot{
   width:42px;height:42px;border-radius:50%;
   background:var(--bg3);border:3px solid var(--border2);
@@ -400,6 +407,14 @@ select{cursor:pointer}
   <div class="card">
     <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span></div>
     <div class="beat-row" id="beat-row"></div>
+    <div id="mc-bar">
+      <span>Section:</span>
+      <button class="mc-swatch" data-c="blue"   style="background:#38bdf8" title="Blue"></button>
+      <button class="mc-swatch" data-c="green"  style="background:#4ade80" title="Green"></button>
+      <button class="mc-swatch" data-c="red"    style="background:#f87171" title="Red"></button>
+      <button class="mc-swatch" data-c="yellow" style="background:#fbbf24" title="Yellow"></button>
+      <button class="mc-swatch" data-c="" style="background:var(--bg3);border-color:var(--border2);font-size:11px;color:var(--text-sub);display:flex;align-items:center;justify-content:center" title="Clear">×</button>
+    </div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
       <button class="btn-tr" id="btn-play" disabled>▶ Play</button>
@@ -493,6 +508,8 @@ const SCHED_INT  = 50;   // ms — scheduler interval
 let actx = null, worklet = null, analyser = null, micSrc = null;
 let masterGain = null, monitorGain = null;
 let retimeRate = 1.0;
+const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
+let measureColors = {}, selMeasure = null;
 let layers = [], nextId = 1;
 let phase = 'idle'; // idle | cd | rec | play | ovd
 let loopDur = 0, loopT0 = 0; // loopT0 = actx time when loop cycle last started
@@ -682,8 +699,8 @@ async function initAudio() {
 async function openMic(deviceId) {
   if (!actx) return;
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: deviceId ? {deviceId:{exact:deviceId}, echoCancellation:false, noiseSuppression:false, autoGainControl:false}
-                    : {echoCancellation:false, noiseSuppression:false, autoGainControl:false}
+    audio: deviceId ? {deviceId:{exact:deviceId}, echoCancellation:false, noiseSuppression:false, autoGainControl:false, latency:0}
+                    : {echoCancellation:false, noiseSuppression:false, autoGainControl:false, latency:0}
   });
   micStream = stream;
   if (micSrc) micSrc.disconnect();
@@ -735,17 +752,45 @@ function startVU() {
 const sleep = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
 const calcDur = () => numMeasures * bpMeasure * (60 / bpm);
 
+// ─── Measure colors ───────────────────────────────────────────────────────────
+function applyMeasureColor(mIdx, c) {
+  const grp = document.querySelector(`.m-group[data-measure="${mIdx}"]`);
+  if (!grp) return;
+  if (c && MC_COLORS[c]) {
+    grp.dataset.color = c;
+    grp.style.setProperty('--mc', MC_COLORS[c]);
+    grp.style.background = MC_COLORS[c] + '22';
+    measureColors[mIdx] = c;
+  } else {
+    delete grp.dataset.color;
+    grp.style.removeProperty('--mc');
+    grp.style.background = '';
+    delete measureColors[mIdx];
+  }
+}
+
+function selectMeasure(idx) {
+  selMeasure = idx;
+  document.querySelectorAll('.m-group').forEach((g, i) => g.classList.toggle('selected', i === idx));
+  const bar = document.getElementById('mc-bar');
+  bar.style.display = idx !== null ? 'flex' : 'none';
+  document.querySelectorAll('.mc-swatch').forEach(s =>
+    s.classList.toggle('active-swatch', idx !== null && measureColors[idx] === s.dataset.c && s.dataset.c !== ''));
+}
+
 // ─── Beat row ─────────────────────────────────────────────────────────────────
 function buildBeatRow(isCD = false, totalBeats = null) {
   const row = document.getElementById('beat-row');
   row.innerHTML = '';
+  selectMeasure(null);
   const total = isCD ? cdBeats
     : (totalBeats ?? (mode === 'instant' ? bpMeasure : numMeasures * bpMeasure));
-  let beatIdx = 0;
+  let beatIdx = 0, mIdx = 0;
   while (beatIdx < total) {
-    const grpSize = isCD ? total : bpMeasure; // CD: one flat group; normal: one per measure
+    const grpSize = isCD ? total : bpMeasure;
     const grp = document.createElement('div');
     grp.className = 'm-group';
+    if (!isCD) grp.dataset.measure = mIdx;
     const end = Math.min(beatIdx + grpSize, total);
     for (let i = beatIdx; i < end; i++) {
       const d = document.createElement('div');
@@ -756,7 +801,9 @@ function buildBeatRow(isCD = false, totalBeats = null) {
       grp.appendChild(d);
     }
     row.appendChild(grp);
+    if (!isCD && measureColors[mIdx]) applyMeasureColor(mIdx, measureColors[mIdx]);
     beatIdx += isCD ? total : bpMeasure;
+    mIdx++;
   }
 }
 
@@ -1364,6 +1411,7 @@ function handleClear() {
   stopPlayback();
   [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
   layers = []; history = []; nextId = 1; loopDur = 0;
+  measureColors = {}; selectMeasure(null);
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
 
@@ -1747,6 +1795,24 @@ document.getElementById('btn-rec').addEventListener('click', handleRecord);
 document.getElementById('btn-play').addEventListener('click', handlePlay);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
+
+// Measure color selection
+document.getElementById('beat-row').addEventListener('click', e => {
+  const grp = e.target.closest('.m-group[data-measure]');
+  if (!grp) return;
+  const mIdx = +grp.dataset.measure;
+  selectMeasure(selMeasure === mIdx ? null : mIdx);
+});
+document.getElementById('mc-bar').addEventListener('click', e => {
+  const btn = e.target.closest('.mc-swatch');
+  if (!btn || selMeasure === null) return;
+  applyMeasureColor(selMeasure, btn.dataset.c);
+  selectMeasure(selMeasure); // refresh active-swatch highlight
+});
+document.addEventListener('click', e => {
+  if (selMeasure === null) return;
+  if (!e.target.closest('#beat-row') && !e.target.closest('#mc-bar')) selectMeasure(null);
+});
 document.getElementById('btn-midi').addEventListener('click', async () => {
   if (!navigator.requestMIDIAccess) { showToast('Web MIDI not supported. Use Chrome or Edge.', 'warn', 0); return; }
   try { wireMIDI(await navigator.requestMIDIAccess()); }
