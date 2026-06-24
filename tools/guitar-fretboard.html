@@ -253,7 +253,16 @@
     .chord-charts-hdr {
       font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
       letter-spacing: 0.8px; color: var(--muted); padding-bottom: 2px;
+      display: flex; align-items: center; justify-content: space-between;
     }
+    .chord-eye-btn { background: none; border: none; cursor: pointer; padding: 0 2px;
+      color: var(--muted); font-size: 13px; line-height: 1; opacity: .6; transition: opacity .15s; }
+    .chord-eye-btn:hover { opacity: 1; }
+    .chord-eye-btn.active { opacity: 1; color: var(--accent2); }
+    /* Hide controls when toggled off */
+    body.hide-chord-controls .chord-chart-name { display: none !important; }
+    body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
+    body.hide-chord-controls .chord-svg        { width: 130px; }
     .chord-charts-row { display: grid; grid-template-columns: repeat(4, max-content); gap: 8px; align-items: start; max-height: 483px; overflow-y: auto; padding-right: 4px; }
     .chord-charts-row::-webkit-scrollbar { width: 4px; }
     .chord-charts-row::-webkit-scrollbar-track { background: transparent; }
@@ -1100,7 +1109,7 @@ const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La',
 const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
 
 // ─── App settings ─────────────────────────────────────────────────────────────
-let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony', showChordCharts: false };
+let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony', showChordCharts: false, showChordControls: true };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
 function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
 function applyTheme(t) {
@@ -1188,6 +1197,12 @@ function applyChordChartsVisibility() {
   document.body.classList.toggle('hide-chord-charts', !show);
   const btn = document.getElementById('btn-chord-charts');
   if (btn) btn.classList.toggle('active', show);
+}
+
+function applyChordControlsVisibility() {
+  const show = appSettings.showChordControls !== false;
+  document.body.classList.toggle('hide-chord-controls', !show);
+  document.querySelectorAll('.chord-eye-btn').forEach(b => b.classList.toggle('active', !show));
 }
 
 function getNoteName(idx) {
@@ -2202,7 +2217,20 @@ function buildChordChartsPanel(b) {
 
   const hdr = document.createElement('div');
   hdr.className = 'chord-charts-hdr';
-  hdr.textContent = 'Chord Charts';
+  const hdrLbl = document.createElement('span');
+  hdrLbl.textContent = 'Chord Charts';
+  const eyeBtn = document.createElement('button');
+  eyeBtn.className = 'chord-eye-btn';
+  eyeBtn.title = 'Show/hide chord controls';
+  eyeBtn.textContent = '👁';
+  if (appSettings.showChordControls === false) eyeBtn.classList.add('active');
+  eyeBtn.addEventListener('click', () => {
+    appSettings.showChordControls = appSettings.showChordControls === false ? true : false;
+    saveAppSettings();
+    applyChordControlsVisibility();
+  });
+  hdr.appendChild(hdrLbl);
+  hdr.appendChild(eyeBtn);
   panel.appendChild(hdr);
 
   const row = document.createElement('div');
@@ -2956,6 +2984,7 @@ _history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
 applyLayout();
 applyChordChartsVisibility();
+applyChordControlsVisibility();
 
 // ─── Feedback widget ──────────────────────────────────────────────────────────
 document.getElementById('msg-text').addEventListener('input', e => {
