@@ -508,7 +508,7 @@ let masterGain = null, monitorGain = null;
 let retimeRate = 1.0;
 let _cdResolve = null;
 const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
-let measureColors = {}, selMeasure = null;
+let measureColors = {}, selMeasures = new Set();
 let layers = [], nextId = 1;
 let phase = 'idle'; // idle | cd | rec | play | ovd
 let loopDur = 0, loopT0 = 0; // loopT0 = actx time when loop cycle last started
@@ -767,13 +767,29 @@ function applyMeasureColor(mIdx, c) {
   }
 }
 
-function selectMeasure(idx) {
-  selMeasure = idx;
-  document.querySelectorAll('.m-group').forEach((g, i) => g.classList.toggle('selected', i === idx));
+function _refreshMcBar() {
+  document.querySelectorAll('.m-group').forEach((g, i) => g.classList.toggle('selected', selMeasures.has(i)));
   const bar = document.getElementById('mc-bar');
-  bar.style.display = idx !== null ? 'flex' : 'none';
+  bar.style.display = selMeasures.size > 0 ? 'flex' : 'none';
+  const lbl = bar.querySelector('span');
+  if (lbl) lbl.textContent = selMeasures.size > 1 ? `Section (${selMeasures.size}):` : 'Section:';
+  const colors = [...selMeasures].map(i => measureColors[i]);
+  const allSame = colors.length > 0 && colors.every(c => c === colors[0]) && colors[0];
   document.querySelectorAll('.mc-swatch').forEach(s =>
-    s.classList.toggle('active-swatch', idx !== null && measureColors[idx] === s.dataset.c && s.dataset.c !== ''));
+    s.classList.toggle('active-swatch', !!allSame && s.dataset.c === allSame));
+}
+
+function selectMeasure(idx, multi = false) {
+  if (idx === null) {
+    selMeasures.clear();
+  } else if (multi) {
+    if (selMeasures.has(idx)) selMeasures.delete(idx);
+    else selMeasures.add(idx);
+  } else {
+    if (selMeasures.size === 1 && selMeasures.has(idx)) selMeasures.clear();
+    else { selMeasures.clear(); selMeasures.add(idx); }
+  }
+  _refreshMcBar();
 }
 
 // ─── Beat row ─────────────────────────────────────────────────────────────────
@@ -1812,17 +1828,16 @@ document.getElementById('btn-clear').addEventListener('click', handleClear);
 document.getElementById('beat-row').addEventListener('click', e => {
   const grp = e.target.closest('.m-group[data-measure]');
   if (!grp) return;
-  const mIdx = +grp.dataset.measure;
-  selectMeasure(selMeasure === mIdx ? null : mIdx);
+  selectMeasure(+grp.dataset.measure, e.ctrlKey || e.metaKey);
 });
 document.getElementById('mc-bar').addEventListener('click', e => {
   const btn = e.target.closest('.mc-swatch');
-  if (!btn || selMeasure === null) return;
-  applyMeasureColor(selMeasure, btn.dataset.c);
-  selectMeasure(selMeasure); // refresh active-swatch highlight
+  if (!btn || selMeasures.size === 0) return;
+  selMeasures.forEach(mIdx => applyMeasureColor(mIdx, btn.dataset.c));
+  _refreshMcBar(); // update active-swatch without touching selection
 });
 document.addEventListener('click', e => {
-  if (selMeasure === null) return;
+  if (selMeasures.size === 0) return;
   if (!e.target.closest('#beat-row') && !e.target.closest('#mc-bar')) selectMeasure(null);
 });
 document.getElementById('btn-midi').addEventListener('click', async () => {
