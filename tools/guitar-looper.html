@@ -401,6 +401,7 @@ select{cursor:pointer}
     <div class="beat-row" id="beat-row"></div>
     <div class="transport">
       <button class="btn-rec" id="btn-rec">⏺ Record</button>
+      <button class="btn-tr" id="btn-play" disabled>▶ Play</button>
       <button class="btn-tr" id="btn-stop" disabled>⏹ Stop</button>
       <button class="btn-tr danger" id="btn-clear">🗑 Clear All</button>
       <div id="toast" class="toast"></div>
@@ -898,7 +899,8 @@ function startPlayback() {
   // When called from the import handler, loopT0 was just set to actx.currentTime
   // and schedId is null, so offset=0 and metro starts fresh.
   const offset = (actx.currentTime - loopT0) % loopDur;
-  layers.forEach(l => { if (!l.src) playLayer(l, offset); });
+  const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
+  layers.forEach(l => { if (!l.src && !l.mediaEl) _play(l, offset); });
   if (!schedId) startMetro(actx.currentTime);
   startPos();
 }
@@ -1209,6 +1211,9 @@ function setPhase(p) {
   rec.textContent = labels[p] || '⏺';
   rec.disabled = (p === 'cd') || (p === 'paused') || (mode === 'metro' && (p === 'rec' || p === 'ovd'));
   document.getElementById('btn-stop').disabled = (p === 'idle');
+  const playBtn = document.getElementById('btn-play');
+  playBtn.disabled = p === 'rec' || p === 'ovd' || p === 'cd' || (p === 'idle' && !layers.length);
+  playBtn.textContent = p === 'play' ? '⏸ Pause' : '▶ Play';
 }
 
 function setPill(p, txt) {
@@ -1312,7 +1317,8 @@ function pausePlayback() {
 
 function resumePlayback() {
   loopT0 = actx.currentTime - _pauseOffset;
-  layers.forEach(l => { if (!l.muted) playLayer(l, _pauseOffset); });
+  const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
+  layers.forEach(l => { if (!l.muted) _play(l, _pauseOffset); });
   if (metroOn) {
     const beatDur = 60 / bpm;
     const nextBeatIdx = Math.ceil(_pauseOffset / beatDur);
@@ -1322,6 +1328,16 @@ function resumePlayback() {
     schedId = setInterval(scheduleTick, SCHED_INT);
   }
   startPos();
+  setPhase('play');
+}
+
+function handlePlay() {
+  if (!layers.length) return;
+  if (phase === 'play')   { pausePlayback(); return; }
+  if (phase === 'paused') { resumePlayback(); return; }
+  if (phase !== 'idle') return;
+  loopT0 = actx.currentTime;
+  startPlayback();
   setPhase('play');
 }
 
@@ -1719,6 +1735,7 @@ document.getElementById('in-retime').addEventListener('input', e => {
 });
 document.getElementById('btn-tap').addEventListener('click', doTap);
 document.getElementById('btn-rec').addEventListener('click', handleRecord);
+document.getElementById('btn-play').addEventListener('click', handlePlay);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
 document.getElementById('btn-midi').addEventListener('click', async () => {
