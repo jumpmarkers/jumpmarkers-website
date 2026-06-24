@@ -240,22 +240,22 @@
     .preset-search-input::placeholder { color: var(--muted); }
 
     /* ── Chord Charts ── */
-    .board-card { display: flex; align-items: stretch; }
+    .board-card { display: flex; align-items: flex-start; }
     .board-main-col { flex: 1; min-width: 0; }
     #boards-container.cols-2 .board-card { display: inline-block; }
     .chord-charts-panel {
       display: flex; flex-direction: column; gap: 6px;
       padding: 6px 6px 8px 10px; border-left: 1px solid var(--border);
-      flex-shrink: 0; width: 504px; overflow-y: auto;
+      flex-shrink: 0; width: 504px;
     }
-    .chord-charts-panel::-webkit-scrollbar { width: 4px; }
-    .chord-charts-panel::-webkit-scrollbar-track { background: transparent; }
-    .chord-charts-panel::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; opacity: 0.6; }
     .chord-charts-hdr {
       font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
       letter-spacing: 0.8px; color: var(--muted); padding-bottom: 2px;
     }
-    .chord-charts-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+    .chord-charts-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; max-height: 483px; overflow-y: auto; padding-right: 4px; }
+    .chord-charts-row::-webkit-scrollbar { width: 4px; }
+    .chord-charts-row::-webkit-scrollbar-track { background: transparent; }
+    .chord-charts-row::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; }
     .chord-chart-wrap {
       display: flex; flex-direction: column; align-items: center; gap: 3px;
       background: var(--surface); border: 1px solid var(--border);
