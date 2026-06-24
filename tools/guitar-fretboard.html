@@ -2232,8 +2232,20 @@ function buildChordChartsPanel(b) {
       const si = Math.round((px - LP) / SG);
       const fi = Math.floor((py - TP) / FG) + 1;
       if (si < 0 || si >= NS || fi < 1 || fi > cc.numFrets) return;
+      if (e.ctrlKey || e.metaKey) {
+        if (!cc.dots.some(d => d.s === si && d.f === fi)) return;
+        const alreadyRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi;
+        cc.rootDot = alreadyRoot ? null : {s: si, f: fi};
+        pushHistory(); refreshChordChartsPanel(b.id);
+        return;
+      }
       const idx = cc.dots.findIndex(d => d.s === si && d.f === fi);
-      if (idx >= 0) cc.dots.splice(idx, 1); else cc.dots.push({s: si, f: fi});
+      if (idx >= 0) {
+        if (cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi) cc.rootDot = null;
+        cc.dots.splice(idx, 1);
+      } else {
+        cc.dots.push({s: si, f: fi});
+      }
       pushHistory(); refreshChordChartsPanel(b.id);
     });
     wrap.appendChild(svgEl);
