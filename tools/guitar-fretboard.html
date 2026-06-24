@@ -246,13 +246,13 @@
     .chord-charts-panel {
       display: flex; flex-direction: column; gap: 6px;
       padding: 6px 6px 8px 10px; border-left: 1px solid var(--border);
-      flex-shrink: 0; width: 504px;
+      flex: 1; min-width: 0;
     }
     .chord-charts-hdr {
       font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
       letter-spacing: 0.8px; color: var(--muted); padding-bottom: 2px;
     }
-    .chord-charts-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; max-height: 483px; overflow-y: auto; padding-right: 4px; }
+    .chord-charts-row { display: grid; grid-template-columns: repeat(4, max-content); gap: 8px; align-items: start; max-height: 483px; overflow-y: auto; padding-right: 4px; }
     .chord-charts-row::-webkit-scrollbar { width: 4px; }
     .chord-charts-row::-webkit-scrollbar-track { background: transparent; }
     .chord-charts-row::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; }
@@ -2316,8 +2316,8 @@ function buildChordChartsPanel(b) {
   addBtn.addEventListener('click', () => {
     b.chordCharts.push(mkChordChart()); pushHistory(); refreshChordChartsPanel(b.id);
   });
-  row.appendChild(addBtn);
   panel.appendChild(row);
+  panel.appendChild(addBtn);
   return panel;
 }
 
