@@ -176,7 +176,9 @@
     .btn-danger:hover { background: rgba(255,107,107,.1); border-color: var(--red); }
 
     /* ── Toolbar ── */
-    .toolbar { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+    .toolbar-top { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+    .toolbar-top-right { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
 
     /* ── Presets panel ── */
     .presets-wrap {
@@ -938,8 +940,17 @@
   </div>
 
   <div class="toolbar">
-    <button class="btn btn-outline" id="btn-export" style="flex-shrink:0">⬇ Export PDF</button>
-    <button class="btn btn-outline" id="btn-clear-all" style="flex-shrink:0;color:var(--red);border-color:var(--red)">✕ Clear All</button>
+    <div class="toolbar-top">
+      <button class="btn btn-outline" id="btn-export">⬇ Export PDF</button>
+      <button class="btn btn-outline" id="btn-clear-all" style="color:var(--red);border-color:var(--red)">✕ Clear All</button>
+      <div class="toolbar-top-right">
+        <button class="btn btn-outline" id="btn-metronome-split" title="Show metronome side by side">🥁 Metronome</button>
+        <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
+        <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
+        <button class="btn btn-outline" id="btn-fb-help">? Help</button>
+        <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
+      </div>
+    </div>
     <div class="presets-wrap">
       <div class="presets-top">
         <span class="presets-label">Presets</span>
@@ -956,13 +967,6 @@
         <input class="preset-search-input" id="preset-search" type="search" placeholder="🔍 Filter presets…" autocomplete="off" spellcheck="false">
       </div>
       <div class="preset-list" id="preset-list"></div>
-    </div>
-    <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
-      <button class="btn btn-outline" id="btn-metronome-split" title="Show metronome side by side">🥁 Metronome</button>
-      <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
-      <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
-      <button class="btn btn-outline" id="btn-fb-help">? Help</button>
-      <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
     </div>
   </div>
 
@@ -2184,7 +2188,8 @@ function chordSVG(cc) {
       fill = DEGREE_COL[DEG_MAP[(dp - rootPitch + 120) % 12]];
     }
     const isRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === f;
-    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}" fill="${fill}"${isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : ''}/>`
+    const fillAttr = rootPitch !== null ? ` style="fill:${fill}"` : '';
+    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}"${fillAttr}${isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : ''}/>`
   });
   return o + '</svg>';
 }
