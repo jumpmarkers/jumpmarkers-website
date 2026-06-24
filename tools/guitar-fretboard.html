@@ -239,6 +239,77 @@
     .preset-search-input:focus { border-color: var(--accent); }
     .preset-search-input::placeholder { color: var(--muted); }
 
+    /* ── Chord Charts ── */
+    .board-card { display: flex; align-items: flex-start; }
+    .board-main-col { flex: 1; min-width: 0; }
+    #boards-container.cols-2 .board-card { display: inline-block; }
+    .chord-charts-panel {
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 6px 6px 8px 10px; border-left: 1px solid var(--border);
+      flex-shrink: 0; min-width: 110px;
+    }
+    .chord-charts-hdr {
+      font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--muted); padding-bottom: 2px;
+    }
+    .chord-charts-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+    .chord-chart-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 5px 4px; position: relative;
+    }
+    .chord-chart-del {
+      position: absolute; top: 2px; right: 2px;
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      padding: 1px 4px; font-size: 0.65rem; border-radius: 3px;
+      opacity: 0; transition: opacity .15s; line-height: 1;
+    }
+    .chord-chart-wrap:hover .chord-chart-del { opacity: 1; }
+    .chord-chart-del:hover { color: var(--red); background: rgba(255,107,107,.1); }
+    .chord-chart-name {
+      background: none; border: none; border-bottom: 1px solid transparent;
+      color: var(--text); font-family: var(--mono); font-size: 0.68rem;
+      text-align: center; outline: none; width: 76px; padding: 1px 2px;
+      transition: border-color .15s;
+    }
+    .chord-chart-name:focus { border-bottom-color: var(--accent); }
+    .chord-chart-name::placeholder { color: var(--muted); opacity: .6; }
+    .chord-ctrl-row {
+      display: flex; align-items: center; gap: 3px; justify-content: center;
+    }
+    .chord-ctrl-btn {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      cursor: pointer; padding: 1px 5px; font-size: 0.68rem; border-radius: 4px;
+      font-family: var(--mono); line-height: 1.6; transition: background .1s;
+    }
+    .chord-ctrl-btn:hover { background: var(--bg2); }
+    .chord-fret-num {
+      background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--mono); font-size: 0.68rem; text-align: center;
+      border-radius: 4px; outline: none; width: 26px; padding: 1px 2px;
+    }
+    .chord-fret-num:focus { border-color: var(--accent); }
+    .chord-fret-lbl { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+    .add-chord-btn {
+      background: none; border: 1px dashed var(--border2); color: var(--muted);
+      cursor: pointer; padding: 3px 8px; font-size: 0.68rem; border-radius: 5px;
+      font-family: var(--mono); transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .add-chord-btn:hover { color: var(--accent); border-color: var(--accent); }
+    /* SVG */
+    .chord-svg { cursor: crosshair; display: block; user-select: none; }
+    .chord-svg .cs-string { stroke: var(--border2); stroke-width: 1; }
+    .chord-svg .cs-fret   { stroke: var(--border2); stroke-width: 0.8; }
+    .chord-svg .cs-nut    { stroke: var(--text); stroke-width: 3; }
+    .chord-svg .cs-dot    { fill: var(--accent2); }
+    .chord-svg .cs-head   { font-family: monospace; font-size: 9px; cursor: pointer; }
+    .chord-svg .cs-fretnum { font-family: monospace; font-size: 8px; fill: var(--muted); }
+    /* Hide in 2-col and when toggled off */
+    #boards-container.cols-2 .chord-charts-panel { display: none !important; }
+    body.hide-chord-charts .chord-charts-panel   { display: none !important; }
+    @media print { .chord-charts-panel { display: none !important; } }
+
     /* ── Two-column layout (column-first flow: 1,2,3 ↓ col1  then 4,5,6 ↓ col2) ── */
     #boards-container.cols-2 {
       column-count: 2;
@@ -881,6 +952,7 @@
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
       <button class="btn btn-outline" id="btn-metronome-split" title="Show metronome side by side">🥁 Metronome</button>
+      <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
       <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
       <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
       <button class="btn btn-outline" id="btn-fb-help">? Help</button>
@@ -1016,7 +1088,7 @@ const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La',
 const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
 
 // ─── App settings ─────────────────────────────────────────────────────────────
-let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony' };
+let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony', showChordCharts: false };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
 function saveAppSettings() { try { localStorage.setItem('gfv-settings', JSON.stringify(appSettings)); } catch(e){} }
 function applyTheme(t) {
@@ -1097,6 +1169,13 @@ function applyLayout() {
   if (!btn) return;
   btn.textContent = is2 ? '▬ 1 Col' : '⊞ 2 Col';
   btn.title       = is2 ? 'Switch to single column' : 'Switch to 2 columns';
+}
+
+function applyChordChartsVisibility() {
+  const show = !!appSettings.showChordCharts;
+  document.body.classList.toggle('hide-chord-charts', !show);
+  const btn = document.getElementById('btn-chord-charts');
+  if (btn) btn.classList.toggle('active', show);
 }
 
 function getNoteName(idx) {
@@ -1196,6 +1275,7 @@ function mkBoard(opts = {}) {
     selectedNotes: new Set(opts.selectedNotes || []),
     hiddenCells:   new Set(opts.hiddenCells || []),
     pinnedCells:   new Set(opts.pinnedCells || []),
+    chordCharts:   (opts.chordCharts || []).map(mkChordChart),
   };
 }
 
@@ -1534,6 +1614,10 @@ function buildPresetData(name) {
       tonic: b.tonic, colorShift: b.colorShift || 0, sticker: b.sticker, stickerStyle: b.stickerStyle,
       visibleNotes: [...b.visibleNotes], selectedNotes: [...b.selectedNotes],
       hiddenCells: [...b.hiddenCells], pinnedCells: [...b.pinnedCells],
+      chordCharts: b.chordCharts.map(cc => ({
+        id: cc.id, label: cc.label, startFret: cc.startFret,
+        numFrets: cc.numFrets, dots: cc.dots.slice(), headings: cc.headings.slice(),
+      })),
     })),
   };
 }
@@ -2045,6 +2129,173 @@ function liveUpdateFretboard(bid) {
   });
 }
 
+// ─── Chord Charts ─────────────────────────────────────────────────────────────
+let _ccId = 0;
+function mkChordChart(opts = {}) {
+  const id = opts.id != null ? +opts.id : ++_ccId;
+  _ccId = Math.max(_ccId, id);
+  return {
+    id, label: opts.label || '',
+    startFret: opts.startFret || 1,
+    numFrets:  opts.numFrets  || 4,
+    dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f})),
+    headings:  opts.headings  ? [...opts.headings] : ['','','','','',''],
+  };
+}
+
+function chordSVG(cc) {
+  const NS = 6, SG = 14, FG = 15;
+  const LP = cc.startFret > 1 ? 24 : 12;
+  const RP = 10, TP = 22, BP = 6;
+  const W = LP + (NS - 1) * SG + RP;
+  const H = TP + cc.numFrets * FG + BP;
+  const sx = i => LP + i * SG;
+  const fy = f => TP + f * FG;
+  let o = `<svg class="chord-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  for (let i = 0; i < NS; i++)
+    o += `<line class="cs-string" x1="${sx(i)}" y1="${TP}" x2="${sx(i)}" y2="${H-BP}"/>`;
+  for (let f = 0; f <= cc.numFrets; f++) {
+    const cls = f === 0 && cc.startFret === 1 ? 'cs-nut' : 'cs-fret';
+    o += `<line class="${cls}" x1="${sx(0)}" y1="${fy(f)}" x2="${sx(NS-1)}" y2="${fy(f)}"/>`;
+  }
+  if (cc.startFret > 1)
+    o += `<text class="cs-fretnum" x="${LP-5}" y="${fy(0)+FG/2+3}" text-anchor="end">${cc.startFret}</text>`;
+  for (let i = 0; i < NS; i++) {
+    const h = cc.headings[i];
+    const lbl = h === 'x' ? '✕' : h === 'o' ? '○' : '·';
+    const col = h ? 'var(--text)' : 'var(--muted)';
+    o += `<text class="cs-head" x="${sx(i)}" y="${TP-8}" text-anchor="middle" fill="${col}" opacity="${h?1:.4}">${lbl}</text>`;
+  }
+  cc.dots.forEach(({s: si, f}) =>
+    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}"/>`
+  );
+  return o + '</svg>';
+}
+
+function buildChordChartsPanel(b) {
+  const panel = document.createElement('div');
+  panel.className = 'chord-charts-panel';
+  panel.dataset.bid = b.id;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'chord-charts-hdr';
+  hdr.textContent = 'Chord Charts';
+  panel.appendChild(hdr);
+
+  const row = document.createElement('div');
+  row.className = 'chord-charts-row';
+
+  b.chordCharts.forEach(cc => {
+    const wrap = document.createElement('div');
+    wrap.className = 'chord-chart-wrap';
+
+    const del = document.createElement('button');
+    del.className = 'chord-chart-del'; del.title = 'Delete'; del.textContent = '✕';
+    del.addEventListener('click', () => {
+      b.chordCharts = b.chordCharts.filter(x => x.id !== cc.id);
+      pushHistory(); refreshChordChartsPanel(b.id);
+    });
+    wrap.appendChild(del);
+
+    // SVG
+    const tmp = document.createElement('div');
+    tmp.innerHTML = chordSVG(cc);
+    const svgEl = tmp.firstElementChild;
+    const NS = 6, SG = 14, FG = 15, TP = 22;
+    svgEl.addEventListener('click', e => {
+      const LP = cc.startFret > 1 ? 24 : 12;
+      const rect = svgEl.getBoundingClientRect();
+      const px = (e.clientX - rect.left) * (svgEl.viewBox.baseVal.width / rect.width);
+      const py = (e.clientY - rect.top)  * (svgEl.viewBox.baseVal.height / rect.height);
+      if (py < TP) {
+        const si = Math.round((px - LP) / SG);
+        if (si >= 0 && si < NS) {
+          const cur = cc.headings[si];
+          cc.headings[si] = cur === '' ? 'x' : cur === 'x' ? 'o' : '';
+          pushHistory(); refreshChordChartsPanel(b.id);
+        }
+        return;
+      }
+      const si = Math.round((px - LP) / SG);
+      const fi = Math.floor((py - TP) / FG) + 1;
+      if (si < 0 || si >= NS || fi < 1 || fi > cc.numFrets) return;
+      const idx = cc.dots.findIndex(d => d.s === si && d.f === fi);
+      if (idx >= 0) cc.dots.splice(idx, 1); else cc.dots.push({s: si, f: fi});
+      pushHistory(); refreshChordChartsPanel(b.id);
+    });
+    wrap.appendChild(svgEl);
+
+    // Name input
+    const nameIn = document.createElement('input');
+    nameIn.className = 'chord-chart-name'; nameIn.type = 'text';
+    nameIn.placeholder = 'Chord name…'; nameIn.maxLength = 16; nameIn.value = cc.label;
+    nameIn.addEventListener('input', () => { cc.label = nameIn.value; });
+    nameIn.addEventListener('blur', pushHistory);
+    wrap.appendChild(nameIn);
+
+    // Controls: − numFrets + | startFret fr
+    const ctrlRow = document.createElement('div');
+    ctrlRow.className = 'chord-ctrl-row';
+
+    const mkBtn = (txt, title, fn) => {
+      const b2 = document.createElement('button');
+      b2.className = 'chord-ctrl-btn'; b2.textContent = txt; b2.title = title;
+      b2.addEventListener('click', fn); return b2;
+    };
+    const fretLbl = document.createElement('span');
+    fretLbl.className = 'chord-fret-lbl'; fretLbl.textContent = `${cc.numFrets}fr`;
+
+    ctrlRow.appendChild(mkBtn('−', 'Remove fret', () => {
+      if (cc.numFrets <= 1) return;
+      cc.numFrets--; cc.dots = cc.dots.filter(d => d.f <= cc.numFrets);
+      pushHistory(); refreshChordChartsPanel(b.id);
+    }));
+    ctrlRow.appendChild(fretLbl);
+    ctrlRow.appendChild(mkBtn('+', 'Add fret', () => {
+      if (cc.numFrets >= 9) return;
+      cc.numFrets++; pushHistory(); refreshChordChartsPanel(b.id);
+    }));
+
+    const sep = document.createElement('span');
+    sep.style.cssText = 'color:var(--border2);margin:0 2px'; sep.textContent = '|';
+    ctrlRow.appendChild(sep);
+
+    const startIn = document.createElement('input');
+    startIn.className = 'chord-fret-num'; startIn.type = 'number';
+    startIn.min = 1; startIn.max = 22; startIn.value = cc.startFret; startIn.title = 'Start fret';
+    startIn.addEventListener('change', () => {
+      const v = Math.max(1, Math.min(22, parseInt(startIn.value) || 1));
+      cc.startFret = v; startIn.value = v;
+      pushHistory(); refreshChordChartsPanel(b.id);
+    });
+    const startLbl = document.createElement('span');
+    startLbl.className = 'chord-fret-lbl'; startLbl.textContent = 'fr';
+    ctrlRow.appendChild(startIn);
+    ctrlRow.appendChild(startLbl);
+    wrap.appendChild(ctrlRow);
+    row.appendChild(wrap);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-chord-btn'; addBtn.textContent = '+ Add chord';
+  addBtn.addEventListener('click', () => {
+    b.chordCharts.push(mkChordChart()); pushHistory(); refreshChordChartsPanel(b.id);
+  });
+  row.appendChild(addBtn);
+  panel.appendChild(row);
+  return panel;
+}
+
+function refreshChordChartsPanel(bid) {
+  const card = document.querySelector(`.board-card[data-id="${bid}"]`);
+  if (!card) return;
+  const b = boards.find(x => x.id === +bid);
+  if (!b) return;
+  const existing = card.querySelector('.chord-charts-panel');
+  const panel = buildChordChartsPanel(b);
+  if (existing) existing.replaceWith(panel); else card.appendChild(panel);
+}
+
 // ─── Build a board card DOM element ──────────────────────────────────────────
 function buildCard(b) {
   clampStart(b);
@@ -2405,6 +2656,13 @@ function buildCard(b) {
   syncSliderUI();
   card.appendChild(rangeWrap);
 
+  // Wrap existing content in main-col and append chord charts panel
+  const mainCol = document.createElement('div');
+  mainCol.className = 'board-main-col';
+  while (card.firstChild) mainCol.appendChild(card.firstChild);
+  card.appendChild(mainCol);
+  card.appendChild(buildChordChartsPanel(b));
+
   return card;
 }
 
@@ -2417,6 +2675,11 @@ document.getElementById('btn-export').addEventListener('click', () => {
 const _printLandscape = document.createElement('style');
 _printLandscape.textContent = '@page { size: landscape; }';
 document.head.appendChild(_printLandscape);
+document.getElementById('btn-chord-charts').addEventListener('click', () => {
+  appSettings.showChordCharts = !appSettings.showChordCharts;
+  saveAppSettings();
+  applyChordChartsVisibility();
+});
 document.getElementById('btn-layout-toggle').addEventListener('click', () => {
   layoutCols = layoutCols === 1 ? 2 : 1;
   try { localStorage.setItem('gfv-layout-cols', layoutCols); } catch(e){}
@@ -2651,6 +2914,7 @@ if (_lastPreset && presets.find(p => p.name === _lastPreset)) {
 _history = [_serializeBoards()]; _histIdx = 0;
 renderPresets();
 applyLayout();
+applyChordChartsVisibility();
 
 // ─── Feedback widget ──────────────────────────────────────────────────────────
 document.getElementById('msg-text').addEventListener('input', e => {
