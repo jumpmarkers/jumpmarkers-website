@@ -117,7 +117,8 @@ select{cursor:pointer}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
 
 /* ── Beat dots ── */
-.beat-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
+.beat-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
+.m-group{display:flex;align-items:center;gap:7px}
 .beat-dot{
   width:42px;height:42px;border-radius:50%;
   background:var(--bg3);border:3px solid var(--border2);
@@ -740,14 +741,22 @@ function buildBeatRow(isCD = false, totalBeats = null) {
   row.innerHTML = '';
   const total = isCD ? cdBeats
     : (totalBeats ?? (mode === 'instant' ? bpMeasure : numMeasures * bpMeasure));
-  for (let i = 0; i < total; i++) {
-    if (!isCD && i > 0 && i % bpMeasure === 0) {
-      const sep = document.createElement('div'); sep.className = 'm-sep'; row.appendChild(sep);
+  let beatIdx = 0;
+  while (beatIdx < total) {
+    const grpSize = isCD ? total : bpMeasure; // CD: one flat group; normal: one per measure
+    const grp = document.createElement('div');
+    grp.className = 'm-group';
+    const end = Math.min(beatIdx + grpSize, total);
+    for (let i = beatIdx; i < end; i++) {
+      const d = document.createElement('div');
+      d.className = 'beat-dot'
+        + (!isCD && i % bpMeasure === 0 ? ' m1' : '')
+        + (isCD ? ' cd' : '');
+      d.id = 'bd-' + i;
+      grp.appendChild(d);
     }
-    const d = document.createElement('div');
-    d.className = 'beat-dot' + (!isCD && i % bpMeasure === 0 ? ' m1' : '') + (isCD ? ' cd' : '');
-    d.id = 'bd-' + i;
-    row.appendChild(d);
+    row.appendChild(grp);
+    beatIdx += isCD ? total : bpMeasure;
   }
 }
 
