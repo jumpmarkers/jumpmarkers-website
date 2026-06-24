@@ -310,7 +310,7 @@
       background: none; border: 1px dashed var(--border2); color: var(--muted);
       cursor: pointer; padding: 3px 8px; font-size: 0.68rem; border-radius: 5px;
       font-family: var(--mono); transition: color .15s, border-color .15s;
-      white-space: nowrap;
+      white-space: nowrap; grid-column: 1 / -1; width: 100%;
     }
     .add-chord-btn:hover { color: var(--accent); border-color: var(--accent); }
     /* SVG */
@@ -2349,8 +2349,8 @@ function buildChordChartsPanel(b) {
   addBtn.addEventListener('click', () => {
     b.chordCharts.push(mkChordChart()); pushHistory(); refreshChordChartsPanel(b.id);
   });
+  row.appendChild(addBtn);
   panel.appendChild(row);
-  panel.appendChild(addBtn);
   return panel;
 }
 
