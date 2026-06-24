@@ -111,8 +111,6 @@ select{cursor:pointer}
 
 /* ── VU ── */
 .vu-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:100px;max-width:240px}
-#btn-monitor{padding:2px 7px;font-size:.8rem;flex-shrink:0}
-#btn-monitor.mon-on{color:var(--green)!important;border-color:var(--green)}
 .vu-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
 
@@ -328,7 +326,7 @@ select{cursor:pointer}
         <span class="setup-label">🎙 Input</span>
         <select id="sel-device" style="flex:1;max-width:240px"><option value="">Default microphone</option></select>
         <button class="btn-io" id="btn-detect" style="padding:5px 12px;font-size:.82rem;flex-shrink:0" title="Detect audio devices">🔄 Detect</button>
-        <div class="vu-wrap"><span class="dim">Level</span><div class="vu-bar"><div class="vu-fill" id="vu"></div></div><button class="btn-io" id="btn-monitor" title="Monitor mic input" disabled>👂</button></div>
+        <div class="vu-wrap"><span class="dim">Level</span><div class="vu-bar"><div class="vu-fill" id="vu"></div></div></div>
       </div>
 
       <div class="setup-row">
@@ -508,6 +506,7 @@ const SCHED_INT  = 50;   // ms — scheduler interval
 let actx = null, worklet = null, analyser = null, micSrc = null;
 let masterGain = null, monitorGain = null;
 let retimeRate = 1.0;
+let _cdResolve = null;
 const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
 let measureColors = {}, selMeasure = null;
 let layers = [], nextId = 1;
@@ -709,7 +708,6 @@ async function openMic(deviceId) {
   micSrc.connect(analyser);
   micSrc.connect(worklet);
   micSrc.connect(monitorGain);
-  document.getElementById('btn-monitor').disabled = false;
   await populateDevices(stream);
   const inputLat  = stream.getAudioTracks()[0]?.getSettings()?.latency || 0;
   const outputLat = actx.outputLatency || 0;
@@ -897,13 +895,26 @@ async function doCountdown() {
     click(t, i === 0, true);
     const ii = i, tt = t;
     setTimeout(() => {
+      if (phase !== 'cd') return;
       activateDot(ii);
       setPill('cd', `${cdBeats - ii}…`);
     }, Math.max(0, (tt - actx.currentTime) * 1000));
   }
   const loopStart = t0 + cdBeats * beatDur;
-  await sleep((loopStart - actx.currentTime) * 1000 - 15);
-  return loopStart;
+  const result = await new Promise(resolve => {
+    _cdResolve = resolve;
+    setTimeout(() => resolve(loopStart), Math.max(0, (loopStart - actx.currentTime) * 1000 - 15));
+  });
+  _cdResolve = null;
+  return result; // null if cancelled, loopStart if completed
+}
+
+function cancelCountdown() {
+  if (_cdResolve) { _cdResolve(null); _cdResolve = null; }
+  stopMetro();
+  setPhase('idle');
+  buildBeatRow();
+  updateInfo();
 }
 
 // ─── Recording ────────────────────────────────────────────────────────────────
@@ -1348,6 +1359,7 @@ async function handleRecMetro() {
   if (phase === 'idle') {
     setPhase('cd');
     const loopStart = await doCountdown();
+    if (loopStart === null) return; // cancelled during countdown
     setPhase('rec');
     buildBeatRow(false, numMeasures * bpMeasure);
     _dotTotal = numMeasures * bpMeasure;
@@ -1417,12 +1429,12 @@ function handleClear() {
 
 function handlePedal() {
   if (phase === 'idle') { handleRecord(); }
+  else if (phase === 'cd') { cancelCountdown(); }
   else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
   else if (phase === 'rec') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); stopMetro(); setPhase('idle'); buildBeatRow(); updateInfo(); } // cancel metro recording
   else if (phase === 'play') { pausePlayback(); }
   else if (phase === 'paused') { resumePlayback(); }
   else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); } // commit partial overdub
-  // cd, rec(metro) → Space does nothing
 }
 
 function handleOverdub() {
@@ -1817,14 +1829,6 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
   if (!navigator.requestMIDIAccess) { showToast('Web MIDI not supported. Use Chrome or Edge.', 'warn', 0); return; }
   try { wireMIDI(await navigator.requestMIDIAccess()); }
   catch(e) { showToast('MIDI access denied: ' + e.message, 'error'); }
-});
-document.getElementById('btn-monitor').addEventListener('click', () => {
-  if (!monitorGain) return;
-  const isOn = monitorGain.gain.value > 0;
-  monitorGain.gain.setTargetAtTime(isOn ? 0 : 1, actx.currentTime, 0.005);
-  const btn = document.getElementById('btn-monitor');
-  btn.classList.toggle('mon-on', !isOn);
-  btn.title = !isOn ? 'Monitor ON — click to mute' : 'Monitor mic input';
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-merge').addEventListener('click', doMerge);
