@@ -261,7 +261,7 @@
     .chord-eye-btn.active { opacity: 1; color: var(--accent2); }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
-    .chord-charts-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: start; max-height: 315px; overflow-y: auto; padding-right: 4px; }
+    .chord-charts-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: start; overflow-y: auto; padding-right: 4px; }
     .chord-charts-row::-webkit-scrollbar { width: 4px; }
     .chord-charts-row::-webkit-scrollbar-track { background: transparent; }
     .chord-charts-row::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; }
@@ -1913,6 +1913,7 @@ function renderAll() {
       </div>`;
   } else {
     boards.forEach(b => wrap.appendChild(buildCard(b)));
+    setTimeout(syncAllChordRowMaxHeights, 0);
   }
 
   const addWrap = document.createElement('div');
@@ -2353,6 +2354,17 @@ function buildChordChartsPanel(b) {
   return panel;
 }
 
+function syncChordRowMaxHeight(row) {
+  if (!row) return;
+  const firstWrap = row.querySelector('.chord-chart-wrap');
+  if (!firstWrap) return;
+  const wrapH = firstWrap.getBoundingClientRect().height;
+  if (wrapH > 0) row.style.maxHeight = (wrapH * 2 + 8) + 'px';
+}
+function syncAllChordRowMaxHeights() {
+  document.querySelectorAll('.chord-charts-row').forEach(row => syncChordRowMaxHeight(row));
+}
+
 function refreshChordChartsPanel(bid) {
   const card = document.querySelector(`.board-card[data-id="${bid}"]`);
   if (!card) return;
@@ -2361,6 +2373,7 @@ function refreshChordChartsPanel(bid) {
   const existing = card.querySelector('.chord-charts-panel');
   const panel = buildChordChartsPanel(b);
   if (existing) existing.replaceWith(panel); else card.appendChild(panel);
+  setTimeout(syncAllChordRowMaxHeights, 0);
 }
 
 // ─── Build a board card DOM element ──────────────────────────────────────────
@@ -2920,6 +2933,8 @@ document.addEventListener('keydown', e => {
 // ─── Print: build layout + note for reliable page-break in Chrome ──────────────
 const _PRINT_NOTE = 'This tool is free — and it always will be. If you had a good practice time using it, consider supporting the developer by trying JumpMarkers — a free browser extension that can be handy when you\'re trying to learn or transcribe music from YouTube videos.';
 const _NOTE_STYLE = 'text-align:center;padding-top:20px;font-size:0.8rem;font-weight:600;color:#e07820;letter-spacing:0.02em;border:none';
+
+window.addEventListener('resize', syncAllChordRowMaxHeights);
 
 window.addEventListener('beforeprint', () => {
   const container = document.getElementById('boards-container');
