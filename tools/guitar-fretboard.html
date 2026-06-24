@@ -262,15 +262,14 @@
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-chart-name { display: none !important; }
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
-    body.hide-chord-controls .chord-svg        { width: 130px; }
-    .chord-charts-row { display: grid; grid-template-columns: repeat(4, max-content); gap: 8px; align-items: start; max-height: 483px; overflow-y: auto; padding-right: 4px; }
+    .chord-charts-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; align-items: start; max-height: 1050px; overflow-y: auto; padding-right: 4px; }
     .chord-charts-row::-webkit-scrollbar { width: 4px; }
     .chord-charts-row::-webkit-scrollbar-track { background: transparent; }
     .chord-charts-row::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; }
     .chord-chart-wrap {
       display: flex; flex-direction: column; align-items: center; gap: 3px;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 6px; padding: 5px 5px 4px; position: relative;
+      border-radius: 6px; padding: 5px 5px 4px; position: relative; width: 100%;
     }
     .chord-chart-del {
       position: absolute; top: 2px; right: 2px;
@@ -283,7 +282,7 @@
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
       color: var(--text); font-family: var(--mono); font-size: 0.68rem;
-      text-align: center; outline: none; width: 76px; padding: 1px 2px;
+      text-align: center; outline: none; width: 80%; padding: 1px 2px;
       transition: border-color .15s;
     }
     .chord-chart-name:focus { border-bottom-color: var(--accent); }
@@ -316,7 +315,7 @@
     }
     .add-chord-btn:hover { color: var(--accent); border-color: var(--accent); }
     /* SVG */
-    .chord-svg { cursor: crosshair; display: block; user-select: none; }
+    .chord-svg { cursor: crosshair; display: block; user-select: none; width: 100%; height: auto; }
     .chord-svg .cs-string { stroke: var(--border2); stroke-width: 1; }
     .chord-svg .cs-fret   { stroke: var(--border2); stroke-width: 0.8; }
     .chord-svg .cs-nut    { stroke: var(--text); stroke-width: 3; }
