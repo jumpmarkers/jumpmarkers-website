@@ -1201,7 +1201,9 @@ const STR_C     = ['#c8b898','#b8a278','#b09a68','#a89260','#a08850','#9a8050'];
 const S_DOTS    = new Set([3,5,7,9,15,17,19,21]);
 const D_DOTS    = new Set([12,24]);
 // 7 degree colors: 1=root 2 3 4 5 6 7
-const DEGREE_COL = ['#D93232','#3B4ED4','#22CC55','#DDCC22','#6B7A9E','#B896D8','#F0956A'];
+const DEGREE_COL  = ['#D93232','#3B4ED4','#22CC55','#DDCC22','#6B7A9E','#B896D8','#F0956A'];
+const DEG_MAP     = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]; // chromatic interval → degree index
+const STD_PITCH   = [0, 5, 10, 15, 19, 24]; // standard tuning: E A D G B e open semitones
 
 const NOTE_COL  = [
   '#C85454', // C  — muted crimson
@@ -1246,9 +1248,6 @@ function getDegreeColor(board, noteIdx, isPinned = false) {
     // Shift the color assignment along with the notes
     return NOTE_COL[(noteIdx - (board.colorShift || 0) + 12) % 12];
   }
-  // Map semitone interval from tonic → scale degree index (0=root, 1=2nd, 2=3rd, 3=4th, 4=5th, 5=6th, 6=7th)
-  // Tritone (6) treated as b5 (degree 5 family)
-  const DEG_MAP = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
   const interval = (noteIdx - board.tonic + 12) % 12;
   return DEGREE_COL[DEG_MAP[interval]];
 }
@@ -1620,6 +1619,7 @@ function buildPresetData(name) {
       chordCharts: b.chordCharts.map(cc => ({
         id: cc.id, label: cc.label, startFret: cc.startFret,
         numFrets: cc.numFrets, dots: cc.dots.slice(), headings: cc.headings.slice(),
+        rootDot: cc.rootDot ? {s: cc.rootDot.s, f: cc.rootDot.f} : null,
       })),
     })),
   };
@@ -2143,6 +2143,7 @@ function mkChordChart(opts = {}) {
     numFrets:  opts.numFrets  || 4,
     dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f})),
     headings:  opts.headings  ? [...opts.headings] : ['','','','','',''],
+    rootDot:   opts.rootDot   ? {s: opts.rootDot.s, f: opts.rootDot.f} : null,
   };
 }
 
@@ -2169,9 +2170,18 @@ function chordSVG(cc) {
     const col = h ? 'var(--text)' : 'var(--muted)';
     o += `<text class="cs-head" x="${sx(i)}" y="${TP-8}" text-anchor="middle" fill="${col}" opacity="${h?1:.4}">${lbl}</text>`;
   }
-  cc.dots.forEach(({s: si, f}) =>
-    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}"/>`
-  );
+  const rootPitch = cc.rootDot
+    ? STD_PITCH[cc.rootDot.s] + (cc.startFret + cc.rootDot.f - 1)
+    : null;
+  cc.dots.forEach(({s: si, f}) => {
+    let fill = 'var(--accent2)';
+    if (rootPitch !== null) {
+      const dp = STD_PITCH[si] + (cc.startFret + f - 1);
+      fill = DEGREE_COL[DEG_MAP[(dp - rootPitch + 120) % 12]];
+    }
+    const isRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === f;
+    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}" fill="${fill}"${isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : ''}/>`
+  });
   return o + '</svg>';
 }
 
