@@ -240,14 +240,17 @@
     .preset-search-input::placeholder { color: var(--muted); }
 
     /* ── Chord Charts ── */
-    .board-card { display: flex; align-items: flex-start; }
+    .board-card { display: flex; align-items: stretch; }
     .board-main-col { flex: 1; min-width: 0; }
     #boards-container.cols-2 .board-card { display: inline-block; }
     .chord-charts-panel {
       display: flex; flex-direction: column; gap: 6px;
       padding: 6px 6px 8px 10px; border-left: 1px solid var(--border);
-      flex-shrink: 0; min-width: 110px;
+      flex-shrink: 0; width: 262px; overflow-y: auto;
     }
+    .chord-charts-panel::-webkit-scrollbar { width: 4px; }
+    .chord-charts-panel::-webkit-scrollbar-track { background: transparent; }
+    .chord-charts-panel::-webkit-scrollbar-thumb { background: var(--accent2); border-radius: 2px; opacity: 0.6; }
     .chord-charts-hdr {
       font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase;
       letter-spacing: 0.8px; color: var(--muted); padding-bottom: 2px;
