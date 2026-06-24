@@ -293,6 +293,10 @@
     }
     .chord-fret-num:focus { border-color: var(--accent); }
     .chord-fret-lbl { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); }
+    .chord-sf-spin { display: flex; flex-direction: column; align-items: center; gap: 0; }
+    .chord-sf-val  { font-family: var(--mono); font-size: 0.65rem; color: var(--text); min-width: 14px; text-align: center; line-height: 1.2; }
+    .chord-sf-btn  { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 7px; padding: 0 2px; line-height: 1; }
+    .chord-sf-btn:hover { color: var(--accent2); }
     .add-chord-btn {
       background: none; border: 1px dashed var(--border2); color: var(--muted);
       cursor: pointer; padding: 3px 8px; font-size: 0.68rem; border-radius: 5px;
@@ -2285,17 +2289,23 @@ function buildChordChartsPanel(b) {
     sep.style.cssText = 'color:var(--border2);margin:0 2px'; sep.textContent = '|';
     ctrlRow.appendChild(sep);
 
-    const startIn = document.createElement('input');
-    startIn.className = 'chord-fret-num'; startIn.type = 'number';
-    startIn.min = 1; startIn.max = 22; startIn.value = cc.startFret; startIn.title = 'Start fret';
-    startIn.addEventListener('change', () => {
-      const v = Math.max(1, Math.min(22, parseInt(startIn.value) || 1));
-      cc.startFret = v; startIn.value = v;
-      pushHistory(); refreshChordChartsPanel(b.id);
+    const sfSpin = document.createElement('div');
+    sfSpin.className = 'chord-sf-spin'; sfSpin.title = 'Start fret';
+    const sfUp  = document.createElement('button'); sfUp.className  = 'chord-sf-btn'; sfUp.textContent  = '▲';
+    const sfVal = document.createElement('span');   sfVal.className = 'chord-sf-val'; sfVal.textContent = cc.startFret;
+    const sfDn  = document.createElement('button'); sfDn.className  = 'chord-sf-btn'; sfDn.textContent  = '▼';
+    sfUp.addEventListener('click', () => {
+      if (cc.startFret <= 1) return;
+      cc.startFret--; pushHistory(); refreshChordChartsPanel(b.id);
     });
+    sfDn.addEventListener('click', () => {
+      if (cc.startFret >= 22) return;
+      cc.startFret++; pushHistory(); refreshChordChartsPanel(b.id);
+    });
+    sfSpin.appendChild(sfUp); sfSpin.appendChild(sfVal); sfSpin.appendChild(sfDn);
     const startLbl = document.createElement('span');
     startLbl.className = 'chord-fret-lbl'; startLbl.textContent = 'fr';
-    ctrlRow.appendChild(startIn);
+    ctrlRow.appendChild(sfSpin);
     ctrlRow.appendChild(startLbl);
     wrap.appendChild(ctrlRow);
     row.appendChild(wrap);
