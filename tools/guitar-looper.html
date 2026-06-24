@@ -917,38 +917,53 @@ function playLayer(l, offset) {
 
 function stopLayerSrc(l) {
   if (l.src) { try { l.src.stop(); } catch(e){} l.src.disconnect(); l.src = null; }
+  if (l.mediaEl) {
+    l.mediaEl.pause();
+    try { l.mediaSrc.disconnect(); } catch(e){}
+    l.mediaSrc = null;
+    URL.revokeObjectURL(l.mediaUrl || '');
+    l.mediaEl = null; l.mediaUrl = null;
+  }
 }
 
-// ─── OLA pitch-preserving time stretch ───────────────────────────────────────
-function olaStretch(origBuf, rate) {
-  const nCh   = origBuf.numberOfChannels;
-  const inLen = origBuf.length;
-  const outLen = Math.max(1, Math.round(inLen / rate));
-  const out   = actx.createBuffer(nCh, outLen, origBuf.sampleRate);
-  const W  = 2048, Hs = 512;
-  const Ha = Math.max(1, Math.round(Hs * rate));
+// ─── Native pitch-preserving time stretch via <audio> + preservesPitch ───────
+function audioBufferToWav(buf) {
+  const nCh = buf.numberOfChannels, sr = buf.sampleRate, n = buf.length;
+  const out = new Int16Array(n * nCh);
   for (let c = 0; c < nCh; c++) {
-    const inp  = origBuf.getChannelData(c);
-    const outp = new Float32Array(outLen);
-    const norm = new Float32Array(outLen);
-    let inPos = 0, outPos = 0;
-    while (outPos < outLen) {
-      const wLen = Math.min(W, outLen - outPos);
-      const base = Math.floor(inPos);
-      for (let i = 0; i < wLen; i++) {
-        const idx = (base + i + inLen) % inLen;
-        const w   = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (W - 1));
-        outp[outPos + i] += inp[idx] * w;
-        norm[outPos + i] += w;
-      }
-      inPos  = (inPos + Ha) % inLen;
-      outPos += Hs;
-    }
-    for (let i = 0; i < outLen; i++)
-      if (norm[i] > 1e-4) outp[i] /= norm[i];
-    out.copyToChannel(outp, c);
+    const ch = buf.getChannelData(c);
+    for (let i = 0; i < n; i++)
+      out[i * nCh + c] = Math.max(-32768, Math.min(32767, ch[i] * 32767 | 0));
   }
-  return out;
+  const hdr = new ArrayBuffer(44), v = new DataView(hdr);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  const bl = out.byteLength;
+  w(0,'RIFF'); v.setUint32(4,36+bl,true); w(8,'WAVE');
+  w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true);
+  v.setUint16(22,nCh,true); v.setUint32(24,sr,true);
+  v.setUint32(28,sr*nCh*2,true); v.setUint16(32,nCh*2,true);
+  v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,bl,true);
+  return new Blob([hdr, out.buffer], { type:'audio/wav' });
+}
+
+function playLayerMedia(l, offsetWC) {
+  stopLayerSrc(l);
+  if (l.muted) return;
+  const orig = l.origBuf || l.buf;
+  const url  = URL.createObjectURL(audioBufferToWav(orig));
+  const audio = new Audio(url);
+  audio.loop = true;
+  audio.playbackRate = retimeRate;
+  // preservesPitch: Chrome 86+, Firefox 99+, Safari 16.4+ — keeps pitch at 1×
+  if ('preservesPitch' in audio) audio.preservesPitch = true;
+  const mediaSrc = actx.createMediaElementSource(audio);
+  mediaSrc.connect(l.gain);
+  l.mediaEl  = audio;
+  l.mediaSrc = mediaSrc;
+  l.mediaUrl = url;
+  // offsetWC is wall-clock seconds → convert to media position
+  audio.currentTime = (offsetWC * retimeRate) % orig.duration;
+  actx.resume().then(() => audio.play().catch(() => {}));
 }
 
 function applyRetime(rate) {
@@ -960,18 +975,19 @@ function applyRetime(rate) {
     ? ((actx.currentTime - loopT0) % loopDur) / loopDur : 0;
 
   layers.forEach(stopLayerSrc);
+  layers.forEach(l => { if (l.origBuf) l.buf = l.origBuf; });
 
   const origDur = (layers[0].origBuf || layers[0].buf).duration;
-  layers.forEach(l => {
-    if (!l.origBuf) l.origBuf = l.buf;
-    l.buf = Math.abs(rate - 1) < 0.005 ? l.origBuf : olaStretch(l.origBuf, rate);
-  });
-
   loopDur = origDur / rate;
-  const newOffset = fraction * loopDur;
-  loopT0 = actx.currentTime - newOffset;
+  const newOffsetWC = fraction * loopDur;
+  loopT0 = actx.currentTime - newOffsetWC;
 
-  if (wasPlaying) layers.forEach(l => playLayer(l, newOffset));
+  if (wasPlaying) {
+    if (Math.abs(rate - 1) < 0.005)
+      layers.forEach(l => playLayer(l, newOffsetWC));
+    else
+      layers.forEach(l => playLayerMedia(l, newOffsetWC));
+  }
   updateInfo();
 }
 
@@ -1092,6 +1108,8 @@ function toggleMute(id) {
   l.muted = !l.muted;
   if (phase === 'play' || phase === 'ovd') {
     if (l.muted) stopLayerSrc(l);
+    else if (Math.abs(retimeRate - 1) > 0.005)
+      playLayerMedia(l, (actx.currentTime - loopT0) % loopDur);
     else playLayer(l, (actx.currentTime - loopT0) % loopDur);
   }
   renderLayers();
