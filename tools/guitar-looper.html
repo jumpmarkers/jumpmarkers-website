@@ -113,6 +113,11 @@ select{cursor:pointer}
 .vu-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:100px;max-width:240px}
 .vu-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
+#loop-progress{height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;margin-bottom:14px;display:none}
+#loop-fill{height:100%;width:0%;border-radius:5px;background:var(--green);transition:none}
+#loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
+#loop-progress.is-ovd #loop-fill{background:var(--accent)}
+@keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
 
 /* ── Beat dots ── */
 .beat-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
@@ -404,6 +409,7 @@ select{cursor:pointer}
   <!-- Transport -->
   <div class="card">
     <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span></div>
+    <div id="loop-progress"><div id="loop-fill"></div></div>
     <div class="beat-row" id="beat-row"></div>
     <div id="mc-bar">
       <span>Section:</span>
@@ -1088,14 +1094,22 @@ function stopPlayback() {
 let _posRaf = null;
 function startPos() {
   stopPos();
-  const el = document.getElementById('s-pos');
+  const el   = document.getElementById('s-pos');
+  const prog = document.getElementById('loop-progress');
+  const fill = document.getElementById('loop-fill');
   (function f() {
     if (actx && (phase === 'play' || phase === 'rec' || phase === 'ovd')) {
       if (phase === 'rec' && mode === 'instant') {
         el.textContent = `${(actx.currentTime - loopT0).toFixed(2)}s recording…`;
+        prog.className = 'is-rec';
+        fill.style.width = '100%';
       } else if (loopDur > 0) {
         const p = (actx.currentTime - loopT0) % loopDur;
         el.textContent = `${p.toFixed(2)}s / ${loopDur.toFixed(2)}s`;
+        if (mode === 'instant') {
+          prog.className = phase === 'ovd' ? 'is-ovd' : '';
+          fill.style.width = (p / loopDur * 100) + '%';
+        }
       }
     }
     _posRaf = requestAnimationFrame(f);
@@ -1104,6 +1118,8 @@ function startPos() {
 function stopPos() {
   if (_posRaf) { cancelAnimationFrame(_posRaf); _posRaf = null; }
   document.getElementById('s-pos').textContent = '';
+  document.getElementById('loop-progress').className = '';
+  document.getElementById('loop-fill').style.width = '0%';
 }
 
 // ─── Loop crossfade ───────────────────────────────────────────────────────────
@@ -1399,6 +1415,10 @@ function pausePlayback() {
   _pauseOffset = (actx.currentTime - loopT0) % loopDur;
   stopPlayback();
   setPhase('paused');
+  if (mode === 'instant' && loopDur > 0) {
+    document.getElementById('loop-progress').className = '';
+    document.getElementById('loop-fill').style.width = (_pauseOffset / loopDur * 100) + '%';
+  }
 }
 
 function resumePlayback() {
@@ -1925,6 +1945,8 @@ document.getElementById('mode-switch').addEventListener('click', e => {
   document.getElementById('row-measures').style.display  = isMetro ? '' : 'none';
   document.getElementById('row-countdown').style.display = isMetro ? '' : 'none';
   document.getElementById('row-quantize').style.display  = isMetro ? 'none' : '';
+  document.getElementById('beat-row').style.display      = isMetro ? '' : 'none';
+  document.getElementById('loop-progress').style.display = isMetro ? 'none' : '';
   if (isMetro) loopDur = calcDur();
   else { loopDur = 0; }
   buildBeatRow();
