@@ -1471,9 +1471,16 @@ function handlePedal() {
   else if (phase === 'cd') { cancelCountdown(); }
   else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
   else if (phase === 'rec') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); stopMetro(); setPhase('idle'); buildBeatRow(); updateInfo(); }
-  else if (phase === 'play') { pausePlayback(); }   // metro mode
+  else if (phase === 'play') { pausePlayback(); }    // metro mode
   else if (phase === 'paused') { resumePlayback(); } // metro mode
-  else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); }
+  else if (phase === 'ovd') {
+    if (mode === 'instant') {
+      // Cancel before cycle ends → discard; only the auto-stop at loopDur commits
+      _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); setPhase('play');
+    } else {
+      worklet?.port.postMessage({cmd:'stop'}); // metro: commit partial
+    }
+  }
 }
 
 function handleOverdub() {
