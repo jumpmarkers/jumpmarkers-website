@@ -1534,24 +1534,11 @@ function handleReRecord(id) {
   if (phase !== 'play' || !actx) return;
   _replaceTarget = id;
   renderLayers();
-  if (mode === 'metro') {
-    const elapsed = (actx.currentTime - loopT0) % loopDur;
-    const ovdStart = actx.currentTime + (loopDur - elapsed);
-    _ovdT0 = ovdStart;
-    setPhase('ovd');
-    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
-  } else {
-    let ovdStart = actx.currentTime;
-    if (autoQuantize) {
-      const beatDur = 60 / bpm;
-      const sinceLast = (actx.currentTime - loopT0) % beatDur;
-      const toNext = beatDur - sinceLast;
-      ovdStart = actx.currentTime + (toNext < 0.04 ? toNext + beatDur : toNext);
-    }
-    _ovdT0 = ovdStart;
-    setPhase('ovd');
-    worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
-  }
+  const elapsed = (actx.currentTime - loopT0) % loopDur;
+  const ovdStart = actx.currentTime + (loopDur - elapsed); // next loop boundary
+  _ovdT0 = ovdStart;
+  setPhase('ovd');
+  worklet.port.postMessage({cmd:'start', startAt: ovdStart, stopAt: ovdStart + loopDur});
 }
 
 async function doMerge() {
