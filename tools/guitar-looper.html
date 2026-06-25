@@ -507,7 +507,7 @@ let actx = null, worklet = null, analyser = null, micSrc = null;
 let masterGain = null, monitorGain = null;
 let retimeRate = 1.0;
 let _cdResolve = null;
-let _pedalLastT = 0;
+let _pedalTid = null;
 const PEDAL_DOUBLE_MS = 320;
 const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
 let measureColors = {}, selMeasures = new Set();
@@ -1446,31 +1446,34 @@ function handleClear() {
 }
 
 function handlePedal() {
-  // Instant mode: Flashback-style single/double-tap on play and ovd
-  if (mode === 'instant' && (phase === 'play' || phase === 'ovd')) {
-    const now = Date.now();
-    const isDouble = (now - _pedalLastT) < PEDAL_DOUBLE_MS;
-    _pedalLastT = now;
-    if (isDouble) {
-      // Double-tap → commit overdub if active, then pause
-      if (phase === 'ovd') worklet?.port.postMessage({cmd:'stop'});
-      // Wait briefly for onRecData to process the committed overdub before pausing
-      setTimeout(() => { if (phase === 'play') pausePlayback(); }, 40);
+  // Instant mode – play state uses deferred double-tap detection
+  if (mode === 'instant' && phase === 'play') {
+    if (_pedalTid !== null) {
+      // Second press arrived within window → double-tap → PAUSE
+      clearTimeout(_pedalTid); _pedalTid = null;
+      pausePlayback();
     } else {
-      // Single tap: toggle overdub
-      if (phase === 'play') handleRecord();              // enter overdub
-      else worklet?.port.postMessage({cmd:'stop'});      // exit overdub → play
+      // First press → wait to confirm it's not a double-tap
+      _pedalTid = setTimeout(() => {
+        _pedalTid = null;
+        if (phase === 'play') handleRecord(); // single press confirmed → overdub
+      }, PEDAL_DOUBLE_MS);
     }
     return;
+  }
+
+  // Instant mode – paused: always restart from the beginning
+  if (mode === 'instant' && phase === 'paused') {
+    _pauseOffset = 0; resumePlayback(); return;
   }
 
   if (phase === 'idle') { handleRecord(); }
   else if (phase === 'cd') { cancelCountdown(); }
   else if (phase === 'rec' && mode === 'instant') { handleRecord(); } // stop & loop
   else if (phase === 'rec') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); stopMetro(); setPhase('idle'); buildBeatRow(); updateInfo(); }
-  else if (phase === 'play') { pausePlayback(); }        // metro mode
-  else if (phase === 'paused') { resumePlayback(); }
-  else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); } // metro mode
+  else if (phase === 'play') { pausePlayback(); }   // metro mode
+  else if (phase === 'paused') { resumePlayback(); } // metro mode
+  else if (phase === 'ovd') { worklet?.port.postMessage({cmd:'stop'}); }
 }
 
 function handleOverdub() {
