@@ -114,6 +114,9 @@ select{cursor:pointer}
 .vu-bar{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
 .vu-fill{height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .05s}
 #loop-progress{height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;margin-bottom:14px;display:none}
+#pedal-hints{display:none;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:.7rem;color:var(--muted)}
+#pedal-hints .ph-item{display:flex;align-items:center;gap:4px}
+#pedal-hints kbd{background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:.68rem;color:var(--text-sub);line-height:1.4}
 #loop-fill{height:100%;width:0%;border-radius:5px;background:var(--green);transition:none}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
@@ -224,7 +227,7 @@ select{cursor:pointer}
 .btn-rr{color:var(--red)!important;opacity:.7}
 .btn-rr:hover{opacity:1;background:rgba(224,82,82,.12)!important}
 .btn-rr.rr-active{opacity:1;animation:blink .8s infinite}
-#btn-merge{padding:3px 10px;font-size:.75rem;margin-left:auto}
+#btn-merge{padding:3px 10px;font-size:.75rem}
 /* ── Feedback widget ── */
 #fb-wrap{position:relative}
 #fb-text{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;font-family:inherit;padding:9px 12px;resize:none;height:68px;outline:none;transition:border-color .15s}
@@ -364,11 +367,6 @@ select{cursor:pointer}
         <span class="dim" id="metro-vol-lbl" style="min-width:32px;text-align:right">70%</span>
       </div>
 
-      <div class="setup-row">
-        <span class="setup-label">Output</span>
-        <input type="range" id="in-master-vol" min="100" max="400" step="1" value="100" style="width:90px;accent-color:var(--blue)">
-        <span class="dim" id="master-vol-lbl" style="min-width:42px;text-align:right">100%</span>
-      </div>
 
       <div class="setup-row" id="row-quantize" style="display:none">
         <span class="setup-label">Quantize</span>
@@ -431,11 +429,25 @@ select{cursor:pointer}
       <span class="s-info" id="s-info">–</span>
       <span class="s-pos" id="s-pos"></span>
     </div>
+    <div id="pedal-hints">
+      <span class="ph-item"><kbd>Space</kbd> overdub</span>
+      <span class="ph-item" style="opacity:.45">·</span>
+      <span class="ph-item"><kbd>Space</kbd><kbd>Space</kbd> pause</span>
+      <span class="ph-item" style="opacity:.45">·</span>
+      <span class="ph-item"><kbd>Space</kbd> paused → play from start</span>
+    </div>
   </div>
 
   <!-- Layers -->
   <div class="card">
-    <div class="card-title" style="display:flex;align-items:center;gap:8px">Layers <button class="btn-io" id="btn-merge" disabled>⊕ Merge</button></div>
+    <div class="card-title" style="display:flex;align-items:center;gap:8px">Layers
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+        <span class="dim" style="font-size:.75rem">Volume boost</span>
+        <input type="range" id="in-master-vol" min="100" max="400" step="1" value="100" style="width:80px;accent-color:var(--blue)">
+        <span class="dim" id="master-vol-lbl" style="min-width:38px;font-size:.75rem;text-align:right">100%</span>
+        <button class="btn-io" id="btn-merge" disabled>⊕ Merge</button>
+      </div>
+    </div>
     <div id="layers-wrap">
       <div class="empty-layers">No layers yet — press Record to start</div>
     </div>
@@ -1789,6 +1801,13 @@ document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(false); }
     if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); doRedo(); }
   }
+  // Arrow keys → speed (blocked in any text-input context)
+  if (!blockKeys && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+    e.preventDefault();
+    const sl = document.getElementById('in-retime');
+    sl.value = Math.max(15, Math.min(150, parseInt(sl.value) + (e.code === 'ArrowRight' ? 5 : -5)));
+    sl.dispatchEvent(new Event('input'));
+  }
   // Number mute: works in all contexts except rename and fb-text
   if (!e.repeat && !e.ctrlKey && !inRename && ae?.id !== 'fb-text'
       && /^Digit[0-9]$/.test(e.code)) {
@@ -1957,6 +1976,7 @@ document.getElementById('mode-switch').addEventListener('click', e => {
   document.getElementById('row-quantize').style.display  = isMetro ? 'none' : '';
   document.getElementById('beat-row').style.display      = isMetro ? '' : 'none';
   document.getElementById('loop-progress').style.display = isMetro ? 'none' : 'block';
+  document.getElementById('pedal-hints').style.display   = isMetro ? 'none' : 'flex';
   document.getElementById('row-metro').style.display     = isMetro ? '' : 'none';
   document.getElementById('btn-metro-prev').style.display= isMetro ? '' : 'none';
   if (isMetro) loopDur = calcDur();
