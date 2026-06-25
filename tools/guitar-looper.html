@@ -357,7 +357,7 @@ select{cursor:pointer}
         <input type="number" id="in-measures" value="2" min="1" max="64">
       </div>
 
-      <div class="setup-row">
+      <div class="setup-row" id="row-metro">
         <span class="setup-label">Metronome</span>
         <div class="tog-wrap" id="tw-metro"><div class="tog on" id="tog-metro"></div><span class="tog-lbl">On</span></div>
         <input type="range" id="in-metro-vol" min="0" max="100" value="70" style="width:90px;accent-color:var(--accent)">
@@ -992,7 +992,7 @@ function startPlayback() {
   const offset = (actx.currentTime - loopT0) % loopDur;
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.src && !l.mediaEl) _play(l, offset); });
-  if (!schedId) startMetro(actx.currentTime);
+  if (!schedId && mode === 'metro') startMetro(actx.currentTime);
   startPos();
 }
 
@@ -1360,7 +1360,6 @@ async function handleRecInstant() {
     buildBeatRow(false, bpMeasure);
     _dotTotal = bpMeasure;
     worklet.port.postMessage({cmd:'start'}); // immediate, no stopAt → user stops manually
-    if (metroOn) startMetro(actx.currentTime);
     startPos();
   } else if (phase === 'rec') {
     if (autoQuantize) {
@@ -1425,7 +1424,7 @@ function resumePlayback() {
   loopT0 = actx.currentTime - _pauseOffset;
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.muted) _play(l, _pauseOffset); });
-  if (metroOn) {
+  if (metroOn && mode === 'metro') {
     const beatDur = 60 / bpm;
     const nextBeatIdx = Math.ceil(_pauseOffset / beatDur);
     nextBeatT = loopT0 + nextBeatIdx * beatDur;
@@ -1946,7 +1945,9 @@ document.getElementById('mode-switch').addEventListener('click', e => {
   document.getElementById('row-countdown').style.display = isMetro ? '' : 'none';
   document.getElementById('row-quantize').style.display  = isMetro ? 'none' : '';
   document.getElementById('beat-row').style.display      = isMetro ? '' : 'none';
-  document.getElementById('loop-progress').style.display = isMetro ? 'none' : '';
+  document.getElementById('loop-progress').style.display = isMetro ? 'none' : 'block';
+  document.getElementById('row-metro').style.display     = isMetro ? '' : 'none';
+  document.getElementById('btn-metro-prev').style.display= isMetro ? '' : 'none';
   if (isMetro) loopDur = calcDur();
   else { loopDur = 0; }
   buildBeatRow();
