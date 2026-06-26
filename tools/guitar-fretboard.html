@@ -264,6 +264,9 @@
     .slot-nav-btn:hover:not(:disabled) { color: var(--accent2); border-color: var(--accent2); }
     .slot-nav-btn:disabled { opacity: .3; cursor: default; }
     .slot-nav-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text); min-width: 28px; text-align: center; letter-spacing: 0.02em; }
+    .slot-sync { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); }
+    .slot-sync input[type="number"] { width: 38px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
+    .slot-sync input[type="number"]::-webkit-outer-spin-button, .slot-sync input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; padding: 0 4px; opacity: .7; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
@@ -1266,6 +1269,7 @@ const PRESET_COLORS = [
 let boards  = [];
 let presets = [];
 let nextId  = 1;
+const _slotMeasureCounts = {};
 
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
 
@@ -2601,6 +2605,38 @@ function buildCard(b) {
   slotNav.appendChild(slotNextBtn);
   settings.appendChild(slotNav);
 
+  // Auto-advance: "every N bars" (only visible when multiple slots exist)
+  if (totalSlots > 1) {
+    const syncGrp = document.createElement('div');
+    syncGrp.className = 'slot-sync';
+    syncGrp.title = 'Auto-advance slots every N measures synced with metronome (0 = off)';
+
+    const syncLbl = document.createElement('span');
+    syncLbl.textContent = 'every';
+
+    const syncInp = document.createElement('input');
+    syncInp.type  = 'number';
+    syncInp.min   = '0';
+    syncInp.max   = '99';
+    syncInp.step  = '1';
+    syncInp.value = String(b.slotMeasures);
+    syncInp.addEventListener('change', e => {
+      const v = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0));
+      e.target.value = String(v);
+      b.slotMeasures = v;
+      _slotMeasureCounts[b.id] = 0;
+    });
+    syncInp.addEventListener('click', e => e.stopPropagation());
+
+    const syncUnit = document.createElement('span');
+    syncUnit.textContent = 'bars';
+
+    syncGrp.appendChild(syncLbl);
+    syncGrp.appendChild(syncInp);
+    syncGrp.appendChild(syncUnit);
+    settings.appendChild(syncGrp);
+  }
+
   // Remove button
   const rmBtn = document.createElement('button');
   rmBtn.className = 'btn btn-outline btn-sm btn-danger';
@@ -3085,6 +3121,19 @@ const _PRINT_NOTE = 'This tool is free — and it always will be. If you had a g
 const _NOTE_STYLE = 'text-align:center;padding-top:20px;font-size:0.8rem;font-weight:600;color:#e07820;letter-spacing:0.02em;border:none';
 
 window.addEventListener('resize', syncAllChordRowMaxHeights);
+
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'metro-measure') return;
+  boards.forEach(b => {
+    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (totalSlots <= 1 || !b.slotMeasures) return;
+    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+    if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
+      b.activeSlot = (b.activeSlot + 1) % totalSlots;
+      refreshBoard(b.id);
+    }
+  });
+});
 
 window.addEventListener('beforeprint', () => {
   const container = document.getElementById('boards-container');

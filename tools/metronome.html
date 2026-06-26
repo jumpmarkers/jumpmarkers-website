@@ -961,6 +961,9 @@ function rafLoop(){
 }
 
 function onBeat(beat){
+  if (beat === 0 && window.parent !== window) {
+    window.parent.postMessage({ type: 'metro-measure' }, '*');
+  }
   const btype = beatPattern[beat] || 'normal';
   const beatActive = btype !== 'rest';
   // Circular SVG
