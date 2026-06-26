@@ -1731,6 +1731,15 @@ function buildPresetData(name) {
         numFrets: cc.numFrets, dots: cc.dots.slice(), headings: cc.headings.slice(),
         rootDot: cc.rootDot ? {s: cc.rootDot.s, f: cc.rootDot.f} : null,
       })),
+      extraSlots: b.extraSlots.map(s => ({
+        notes:        [...s.notes],
+        tonic:        s.tonic,
+        visibleNotes: s.visibleNotes ? [...s.visibleNotes] : null,
+      })),
+      activeSlot:        b.activeSlot,
+      slotMeasures:      b.slotMeasures,
+      slotPattern:       b.slotPattern,
+      crossfadeDuration: b.crossfadeDuration,
     })),
   };
 }
