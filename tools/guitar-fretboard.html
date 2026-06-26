@@ -2045,6 +2045,32 @@ function refreshBoard(boardId) {
   old.replaceWith(buildCard(b));
 }
 
+function _crossfadeBoard(boardId) {
+  const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!oldFb) { refreshBoard(boardId); return; }
+
+  const clone = oldFb.cloneNode(true);
+  refreshBoard(boardId); // card is rebuilt; new fretboard-outer is now in DOM
+
+  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!newFb) return;
+  const r = newFb.getBoundingClientRect();
+
+  Object.assign(clone.style, {
+    position: 'fixed', top: r.top + 'px', left: r.left + 'px',
+    width: r.width + 'px', height: r.height + 'px',
+    pointerEvents: 'none', zIndex: '9998',
+    overflow: 'hidden', opacity: '1',
+    transition: 'opacity 0.28s ease-out',
+  });
+  document.body.appendChild(clone);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    clone.style.opacity = '0';
+    setTimeout(() => clone.remove(), 350);
+  }));
+}
+
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
 function buildFbOuter(b) {
   const fretsToShow = [];
@@ -2580,7 +2606,7 @@ function buildCard(b) {
   slotPrevBtn.title = 'Previous highlight slot';
   slotPrevBtn.disabled = (b.activeSlot === 0);
   slotPrevBtn.addEventListener('click', () => {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
   });
 
   const slotLbl = document.createElement('span');
@@ -2601,7 +2627,7 @@ function buildCard(b) {
       b.activeSlot++;
     }
     pushHistory();
-    refreshBoard(b.id);
+    _crossfadeBoard(b.id);
   });
 
   slotNav.appendChild(slotPrevBtn);
@@ -2617,19 +2643,6 @@ function buildCard(b) {
   settings.appendChild(rmBtn);
 
   hdr.appendChild(settings);
-
-  const stickerEl = document.createElement('input');
-  stickerEl.type          = 'text';
-  stickerEl.className     = `fret-sticker sticker-${b.stickerStyle || 'parchment'}`;
-  stickerEl.value         = b.sticker || '';
-  stickerEl.placeholder   = 'Label…';
-  stickerEl.maxLength     = 24;
-  stickerEl.spellcheck    = false;
-  stickerEl.autocomplete  = 'off';
-  stickerEl.addEventListener('input', e => { b.sticker = e.target.value; });
-  stickerEl.addEventListener('click', e => e.stopPropagation());
-  hdr.appendChild(stickerEl);
-
 
   card.appendChild(hdr);
 
@@ -3142,7 +3155,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (e.key === 'ArrowLeft') {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
   } else {
     if (b.activeSlot < totalSlots - 1) {
       b.activeSlot++;
@@ -3151,7 +3164,7 @@ document.addEventListener('keydown', e => {
       b.activeSlot++;
     }
     pushHistory();
-    refreshBoard(b.id);
+    _crossfadeBoard(b.id);
   }
 });
 
@@ -3175,7 +3188,7 @@ function _onMetroMeasure() {
     _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
     if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
       b.activeSlot = (b.activeSlot + 1) % totalSlots;
-      refreshBoard(b.id);
+      _crossfadeBoard(b.id);
     }
   });
 }
