@@ -259,6 +259,12 @@
       color: var(--muted); font-size: 13px; line-height: 1; opacity: .6; transition: opacity .15s; }
     .chord-eye-btn:hover { opacity: 1; }
     .chord-eye-btn.active { opacity: 1; color: var(--accent2); }
+    .slot-nav { display: flex; align-items: center; gap: 3px; }
+    .slot-nav-btn { background: none; border: 1px solid var(--border2); color: var(--muted); cursor: pointer; padding: 1px 7px; font-size: 0.75rem; border-radius: 3px; line-height: 1.6; transition: color .15s, border-color .15s; }
+    .slot-nav-btn:hover:not(:disabled) { color: var(--accent2); border-color: var(--accent2); }
+    .slot-nav-btn:disabled { opacity: .3; cursor: default; }
+    .slot-nav-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text); min-width: 28px; text-align: center; letter-spacing: 0.02em; }
+    .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; padding: 0 4px; opacity: .7; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
     .chord-charts-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: start; overflow-y: auto; padding-right: 4px; }
@@ -1264,14 +1270,29 @@ let nextId  = 1;
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
 
 // Returns the display color for a note, factoring in tonic/degree coloring
-function getDegreeColor(board, noteIdx, isPinned = false) {
-  if (!board.selectedNotes.has(noteIdx) && !isPinned) return null;
-  if (board.tonic === null || board.tonic === undefined) {
+function getDegreeColor(board, noteIdx, isPinned = false, sd = null) {
+  const notes = sd ? sd.notes : board.selectedNotes;
+  const tonic = sd ? sd.tonic : board.tonic;
+  if (!notes.has(noteIdx) && !isPinned) return null;
+  if (tonic === null || tonic === undefined) {
     // Shift the color assignment along with the notes
     return NOTE_COL[(noteIdx - (board.colorShift || 0) + 12) % 12];
   }
-  const interval = (noteIdx - board.tonic + 12) % 12;
+  const interval = (noteIdx - tonic + 12) % 12;
   return DEGREE_COL[DEG_MAP[interval]];
+}
+
+function getActiveSlotData(b) {
+  if (!b.extraSlots || b.activeSlot === 0) {
+    return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes };
+  }
+  const s = b.extraSlots[b.activeSlot - 1];
+  if (!s) return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes };
+  return {
+    notes:        s.notes,
+    tonic:        s.tonic !== undefined ? s.tonic : b.tonic,
+    visibleNotes: s.visibleNotes !== null ? s.visibleNotes : b.visibleNotes,
+  };
 }
 
 // ─── Board helpers ────────────────────────────────────────────────────────────
@@ -1300,6 +1321,13 @@ function mkBoard(opts = {}) {
     hiddenCells:   new Set(opts.hiddenCells || []),
     pinnedCells:   new Set(opts.pinnedCells || []),
     chordCharts:   (opts.chordCharts || []).map(mkChordChart),
+    extraSlots:    (opts.extraSlots || []).map(s => ({
+      notes:        new Set(s.notes || []),
+      tonic:        s.tonic !== undefined ? s.tonic : undefined,
+      visibleNotes: (s.visibleNotes !== undefined && s.visibleNotes !== null) ? new Set(s.visibleNotes) : null,
+    })),
+    activeSlot:    opts.activeSlot  || 0,
+    slotMeasures:  opts.slotMeasures !== undefined ? opts.slotMeasures : 1,
   };
 }
 
@@ -1323,6 +1351,13 @@ function _serializeBoards() {
       visibleNotes:  [...b.visibleNotes],
       hiddenCells:   [...b.hiddenCells],
       pinnedCells:   [...b.pinnedCells],
+      extraSlots:    b.extraSlots.map(s => ({
+        notes:        [...s.notes],
+        tonic:        s.tonic,
+        visibleNotes: s.visibleNotes ? [...s.visibleNotes] : null,
+      })),
+      activeSlot:    b.activeSlot,
+      slotMeasures:  b.slotMeasures,
     })),
     presets,
     currentPresetName,
@@ -1529,11 +1564,20 @@ document.addEventListener('mouseup', () => {
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  b.selectedNotes = new Set([...b.selectedNotes].map(n => (n + delta + 12) % 12));
-  b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
-  if (b.tonic !== null && b.tonic !== undefined)
-    b.tonic = (b.tonic + delta + 12) % 12;
-  b.colorShift = ((b.colorShift || 0) + delta + 12) % 12;
+  if (!b.extraSlots || b.activeSlot === 0) {
+    b.selectedNotes = new Set([...b.selectedNotes].map(n => (n + delta + 12) % 12));
+    b.visibleNotes  = new Set([...b.visibleNotes].map(n => (n + delta + 12) % 12));
+    if (b.tonic !== null && b.tonic !== undefined)
+      b.tonic = (b.tonic + delta + 12) % 12;
+    b.colorShift = ((b.colorShift || 0) + delta + 12) % 12;
+  } else {
+    const s = b.extraSlots[b.activeSlot - 1];
+    if (s) {
+      s.notes = new Set([...s.notes].map(n => (n + delta + 12) % 12));
+      if (s.tonic !== undefined && s.tonic !== null) s.tonic = (s.tonic + delta + 12) % 12;
+      if (s.visibleNotes) s.visibleNotes = new Set([...s.visibleNotes].map(n => (n + delta + 12) % 12));
+    }
+  }
   pushHistory();
   refreshBoard(boardId);
 }
@@ -1569,12 +1613,23 @@ function removeBoard(id) {
 function toggleNote(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  if (b.selectedNotes.has(noteIdx)) {
-    b.selectedNotes.delete(noteIdx);
-    if (b.tonic === noteIdx) b.tonic = null;
+  if (!b.extraSlots || b.activeSlot === 0) {
+    if (b.selectedNotes.has(noteIdx)) {
+      b.selectedNotes.delete(noteIdx);
+      if (b.tonic === noteIdx) b.tonic = null;
+    } else {
+      b.selectedNotes.add(noteIdx);
+      b.visibleNotes.add(noteIdx);
+    }
   } else {
-    b.selectedNotes.add(noteIdx);
-    b.visibleNotes.add(noteIdx); // highlight forces visible
+    const s = b.extraSlots[b.activeSlot - 1];
+    if (!s) return;
+    if (s.notes.has(noteIdx)) {
+      s.notes.delete(noteIdx);
+      if (s.tonic === noteIdx) s.tonic = undefined;
+    } else {
+      s.notes.add(noteIdx);
+    }
   }
   pushHistory();
   refreshBoard(boardId);
@@ -1583,8 +1638,13 @@ function toggleNote(boardId, noteIdx) {
 function clearBoard(boardId) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  b.selectedNotes.clear();
-  b.tonic = null;
+  if (!b.extraSlots || b.activeSlot === 0) {
+    b.selectedNotes.clear();
+    b.tonic = null;
+  } else {
+    const s = b.extraSlots[b.activeSlot - 1];
+    if (s) { s.notes.clear(); s.tonic = undefined; }
+  }
   pushHistory();
   refreshBoard(boardId);
 }
@@ -1592,11 +1652,21 @@ function clearBoard(boardId) {
 function toggleVisible(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
-  if (b.visibleNotes.has(noteIdx)) {
-    if (b.selectedNotes.has(noteIdx)) return; // highlighted → can't hide
-    b.visibleNotes.delete(noteIdx);
+  let vis;
+  if (!b.extraSlots || b.activeSlot === 0) {
+    vis = b.visibleNotes;
   } else {
-    b.visibleNotes.add(noteIdx);
+    const s = b.extraSlots[b.activeSlot - 1];
+    if (!s) return;
+    if (!s.visibleNotes) s.visibleNotes = new Set(b.visibleNotes); // materialize inherited
+    vis = s.visibleNotes;
+  }
+  const sd = getActiveSlotData(b);
+  if (vis.has(noteIdx)) {
+    if (sd.notes.has(noteIdx)) return; // highlighted → can't hide
+    vis.delete(noteIdx);
+  } else {
+    vis.add(noteIdx);
   }
   pushHistory();
   refreshBoard(boardId);
@@ -2026,11 +2096,12 @@ function buildFbOuter(b) {
   });
 
   // string rows
+  const _sd = getActiveSlotData(b);
   OPEN.forEach((openNoteIdx, si) => {
     const lbl = document.createElement('div');
     lbl.className = 'fs-label';
     lbl.textContent = STR_NAMES[si];
-    const openColor = getDegreeColor(b, openNoteIdx);
+    const openColor = getDegreeColor(b, openNoteIdx, false, _sd);
     if (openColor) {
       lbl.style.color      = openColor;
       lbl.style.fontWeight = '700';
@@ -2043,9 +2114,9 @@ function buildFbOuter(b) {
       const cellKey  = `${si}-${f}`;
       const isPinned = b.pinnedCells.has(cellKey);
       const noteName = getDisplayName(noteIdx, b);
-      const color = getDegreeColor(b, noteIdx, isPinned);
+      const color = getDegreeColor(b, noteIdx, isPinned, _sd);
       const isOn  = color !== null;
-      const isVis = b.visibleNotes.has(noteIdx);
+      const isVis = _sd.visibleNotes.has(noteIdx);
       const isHidden = b.hiddenCells.has(cellKey);
 
       const cell = document.createElement('div');
@@ -2080,8 +2151,13 @@ function buildFbOuter(b) {
         cell.classList.add('fc-empty');
         cell.addEventListener('click', e => {
           if (e.altKey) return;
-          b.visibleNotes.add(noteIdx);
-          b.selectedNotes.add(noteIdx);
+          if (!b.extraSlots || b.activeSlot === 0) {
+            b.visibleNotes.add(noteIdx);
+            b.selectedNotes.add(noteIdx);
+          } else {
+            const _s = b.extraSlots[b.activeSlot - 1];
+            if (_s) _s.notes.add(noteIdx);
+          }
           pushHistory();
           refreshBoard(b.id);
         });
@@ -2093,11 +2169,11 @@ function buildFbOuter(b) {
         const nc = document.createElement('div');
         nc.className = 'nc' + (isOn ? ' on' : '');
         nc.textContent = noteName;
-        nc.title = `${getNoteName(noteIdx)}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${b.tonic === noteIdx ? '· ROOT' : ''}  (Shift+click to hear · Alt+click to hide)`;
+        nc.title = `${getNoteName(noteIdx)}  ·  String ${STR_NAMES[si]}  ·  Fret ${f === 0 ? 'Open' : f}  ${_sd.tonic === noteIdx ? '· ROOT' : ''}  (Shift+click to hear · Alt+click to hide)`;
         if (isOn) {
           nc.style.background = color;
         }
-        if (b.tonic === noteIdx) {
+        if (_sd.tonic === noteIdx) {
           nc.style.outline      = '2px solid rgba(255,255,255,0.7)';
           nc.style.outlineOffset = '2px';
         }
@@ -2109,13 +2185,18 @@ function buildFbOuter(b) {
             return;
           }
           if (e.ctrlKey || e.metaKey) {
-            b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
+            if (!b.extraSlots || b.activeSlot === 0) {
+              b.tonic = (b.tonic === noteIdx) ? null : noteIdx;
+            } else {
+              const _s = b.extraSlots[b.activeSlot - 1];
+              if (_s) _s.tonic = (_s.tonic === noteIdx) ? undefined : noteIdx;
+            }
             pushHistory();
             refreshBoard(b.id);
             return;
           }
           // Toggle highlight — note stays visible on neck regardless (no toggleVisible)
-          if (b.selectedNotes.has(noteIdx)) {
+          if (getActiveSlotData(b).notes.has(noteIdx)) {
             nc.classList.add('pop');
             nc.addEventListener('animationend', () => nc.classList.remove('pop'), { once: true });
           }
@@ -2479,6 +2560,47 @@ function buildCard(b) {
   fretGroup.appendChild(fretSel);
   settings.appendChild(fretGroup);
 
+  // Slot navigation
+  const slotNav = document.createElement('div');
+  slotNav.className = 'slot-nav';
+
+  const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+
+  const slotPrevBtn = document.createElement('button');
+  slotPrevBtn.className = 'slot-nav-btn';
+  slotPrevBtn.textContent = '←';
+  slotPrevBtn.title = 'Previous highlight slot';
+  slotPrevBtn.disabled = (b.activeSlot === 0);
+  slotPrevBtn.addEventListener('click', () => {
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
+  });
+
+  const slotLbl = document.createElement('span');
+  slotLbl.className = 'slot-nav-label';
+  slotLbl.textContent = `${b.activeSlot + 1}/${totalSlots}`;
+  slotLbl.title = 'Current highlight slot / total slots';
+
+  const slotNextBtn = document.createElement('button');
+  slotNextBtn.className = 'slot-nav-btn';
+  slotNextBtn.textContent = totalSlots < 10 && b.activeSlot === totalSlots - 1 ? '+' : '→';
+  slotNextBtn.title = b.activeSlot < totalSlots - 1 ? 'Next highlight slot' : (totalSlots < 10 ? 'Add new highlight slot' : 'Max 10 slots');
+  slotNextBtn.disabled = (b.activeSlot === totalSlots - 1 && totalSlots >= 10);
+  slotNextBtn.addEventListener('click', () => {
+    if (b.activeSlot < totalSlots - 1) {
+      b.activeSlot++;
+    } else if (totalSlots < 10) {
+      b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null });
+      b.activeSlot++;
+    }
+    pushHistory();
+    refreshBoard(b.id);
+  });
+
+  slotNav.appendChild(slotPrevBtn);
+  slotNav.appendChild(slotLbl);
+  slotNav.appendChild(slotNextBtn);
+  settings.appendChild(slotNav);
+
   // Remove button
   const rmBtn = document.createElement('button');
   rmBtn.className = 'btn btn-outline btn-sm btn-danger';
@@ -2516,16 +2638,25 @@ function buildCard(b) {
     [...b.pinnedCells].map(key => { const [si, f] = key.split('-').map(Number); return (OPEN[si] + f) % 12; })
   );
 
+  const _palSd = getActiveSlotData(b);
+
+  if (b.activeSlot > 0) {
+    const slotInd = document.createElement('span');
+    slotInd.className = 'slot-indicator';
+    slotInd.textContent = `slot ${b.activeSlot + 1}`;
+    palette.appendChild(slotInd);
+  }
+
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
-    pill.className = 'note-pill' + (b.selectedNotes.has(i) || pinnedNoteIndices.has(i) ? ' active' : '');
+    pill.className = 'note-pill' + (_palSd.notes.has(i) || pinnedNoteIndices.has(i) ? ' active' : '');
     pill.textContent = getNoteName(i);
-    const pc = getDegreeColor(b, i, pinnedNoteIndices.has(i));
+    const pc = getDegreeColor(b, i, pinnedNoteIndices.has(i), _palSd);
     if (pc) {
       pill.style.background  = pc;
       pill.style.borderColor = pc;
       pill.style.color       = 'rgba(255,255,255,0.92)';
-      if (b.tonic === i) {
+      if (_palSd.tonic === i) {
         pill.style.outline = '2px solid rgba(255,255,255,0.7)';
         pill.style.outlineOffset = '2px';
       }
@@ -2533,7 +2664,12 @@ function buildCard(b) {
     pill.addEventListener('click', e => {
       if (e.shiftKey) { _playMidi(60 + i); return; }
       if (e.ctrlKey || e.metaKey) {
-        b.tonic = (b.tonic === i) ? null : i;
+        if (!b.extraSlots || b.activeSlot === 0) {
+          b.tonic = (b.tonic === i) ? null : i;
+        } else {
+          const _s = b.extraSlots[b.activeSlot - 1];
+          if (_s) _s.tonic = (_s.tonic === i) ? undefined : i;
+        }
         pushHistory();
         refreshBoard(b.id);
         return;
@@ -2548,9 +2684,9 @@ function buildCard(b) {
   palette.appendChild(palSep);
 
   const tonicBadge = document.createElement('span');
-  if (b.tonic !== null && b.tonic !== undefined) {
+  if (_palSd.tonic !== null && _palSd.tonic !== undefined) {
     tonicBadge.className = 'tonic-badge active';
-    tonicBadge.textContent = `Root: ${getNoteName(b.tonic)}`;
+    tonicBadge.textContent = `Root: ${getNoteName(_palSd.tonic)}`;
   } else {
     tonicBadge.className = 'tonic-badge hint';
     tonicBadge.textContent = 'Ctrl+click = root';
@@ -2591,9 +2727,11 @@ function buildCard(b) {
   vLabel.textContent = 'Show';
   visRow.appendChild(vLabel);
 
+  const _visSd = getActiveSlotData(b);
+
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
-    const isVis = b.visibleNotes.has(i) || pinnedNoteIndices.has(i);
+    const isVis = _visSd.visibleNotes.has(i) || pinnedNoteIndices.has(i);
     pill.className = 'note-pill' + (isVis ? ' vis-on' : '');
     pill.textContent = getNoteName(i);
     pill.title = isVis ? 'Visible — click to hide' : 'Hidden — click to show';
@@ -2612,7 +2750,12 @@ function buildCard(b) {
   vAllBtn.className = 'btn btn-outline btn-sm';
   vAllBtn.textContent = 'All';
   vAllBtn.addEventListener('click', () => {
-    b.visibleNotes = new Set([0,1,2,3,4,5,6,7,8,9,10,11]);
+    if (!b.extraSlots || b.activeSlot === 0) {
+      b.visibleNotes = new Set([0,1,2,3,4,5,6,7,8,9,10,11]);
+    } else {
+      const _s = b.extraSlots[b.activeSlot - 1];
+      if (_s) _s.visibleNotes = new Set([0,1,2,3,4,5,6,7,8,9,10,11]);
+    }
     pushHistory();
     refreshBoard(b.id);
   });
@@ -2622,7 +2765,14 @@ function buildCard(b) {
   vNoneBtn.className = 'btn btn-outline btn-sm';
   vNoneBtn.textContent = 'None';
   vNoneBtn.addEventListener('click', () => {
-    b.visibleNotes = new Set([...b.visibleNotes].filter(n => b.selectedNotes.has(n)));
+    const _sd2 = getActiveSlotData(b);
+    const _filtered = new Set([..._sd2.visibleNotes].filter(n => _sd2.notes.has(n)));
+    if (!b.extraSlots || b.activeSlot === 0) {
+      b.visibleNotes = _filtered;
+    } else {
+      const _s = b.extraSlots[b.activeSlot - 1];
+      if (_s) _s.visibleNotes = _filtered;
+    }
     pushHistory();
     refreshBoard(b.id);
   });
