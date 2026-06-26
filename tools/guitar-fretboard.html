@@ -267,6 +267,7 @@
     .slot-sync { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); }
     .slot-sync input[type="number"] { width: 38px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
     .slot-sync input[type="number"]::-webkit-outer-spin-button, .slot-sync input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .slot-ctrl-zone { display: flex; align-items: center; gap: 8px; background: rgba(128,128,128,0.08); border: 1px solid var(--border2); border-radius: 8px; padding: 3px 10px; margin-left: auto; }
     .slot-pattern-grp { display: flex; align-items: center; gap: 5px; }
     .slot-pattern-lbl { font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
     .slot-pattern-inp { width: 96px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 4px; padding: 2px 6px; font-size: 0.72rem; font-family: var(--mono); }
@@ -2755,7 +2756,6 @@ function buildCard(b) {
   if (totalSlots > 1) {
     const patGrp = document.createElement('div');
     patGrp.className = 'slot-pattern-grp';
-    patGrp.style.marginLeft = 'auto';
 
     const patLbl = document.createElement('span');
     patLbl.className = 'slot-pattern-lbl';
@@ -2778,8 +2778,11 @@ function buildCard(b) {
 
     patGrp.appendChild(patLbl);
     patGrp.appendChild(patInp);
-    palette.appendChild(patGrp);
-    palette.appendChild(slotNav);
+    const _palCtrlZone = document.createElement('div');
+    _palCtrlZone.className = 'slot-ctrl-zone';
+    _palCtrlZone.appendChild(patGrp);
+    _palCtrlZone.appendChild(slotNav);
+    palette.appendChild(_palCtrlZone);
   } else {
     slotNav.style.marginLeft = 'auto';
     palette.appendChild(slotNav);
@@ -2851,7 +2854,6 @@ function buildCard(b) {
   if (totalSlots > 1) {
     const syncGrp = document.createElement('div');
     syncGrp.className = 'slot-sync';
-    syncGrp.style.marginLeft = 'auto';
     syncGrp.title = 'Auto-advance slots every N measures synced with metronome (0 = off)';
 
     const syncLbl = document.createElement('span');
@@ -2879,7 +2881,6 @@ function buildCard(b) {
     syncGrp.appendChild(syncLbl);
     syncGrp.appendChild(syncInp);
     syncGrp.appendChild(syncUnit);
-    visRow.appendChild(syncGrp);
 
     const fadeGrp = document.createElement('div');
     fadeGrp.className = 'slot-sync';
@@ -2906,7 +2907,12 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeInp);
     fadeGrp.appendChild(fadeUnit);
-    visRow.appendChild(fadeGrp);
+
+    const _visCtrlZone = document.createElement('div');
+    _visCtrlZone.className = 'slot-ctrl-zone';
+    _visCtrlZone.appendChild(syncGrp);
+    _visCtrlZone.appendChild(fadeGrp);
+    visRow.appendChild(_visCtrlZone);
   }
 
   card.appendChild(visRow);
@@ -3226,18 +3232,14 @@ document.addEventListener('keydown', e => {
   if (!b) return;
   e.preventDefault();
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+  if (totalSlots < 2) return;
   if (e.key === 'ArrowLeft') {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
+    b.activeSlot = (b.activeSlot - 1 + totalSlots) % totalSlots;
   } else {
-    if (b.activeSlot < totalSlots - 1) {
-      b.activeSlot++;
-    } else if (totalSlots < 10) {
-      b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null });
-      b.activeSlot++;
-    }
-    pushHistory();
-    _crossfadeBoard(b.id);
+    b.activeSlot = (b.activeSlot + 1) % totalSlots;
   }
+  pushHistory();
+  _crossfadeBoard(b.id);
 });
 
 let _lastMetroTs = 0;
@@ -3255,7 +3257,14 @@ function _onMetroStart() {
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
     _slotSkipNext[b.id] = true;
-    b.patternPos = -1;
+    const pattern = _parsePattern(b);
+    if (pattern) {
+      b.patternPos = 0;
+      b.activeSlot = pattern[0];
+      refreshBoard(b.id);
+    } else {
+      b.patternPos = -1;
+    }
   });
 }
 
