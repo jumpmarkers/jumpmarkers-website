@@ -273,6 +273,9 @@
     .slot-pattern-inp { width: 96px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 4px; padding: 2px 6px; font-size: 0.72rem; font-family: var(--mono); }
     .slot-pattern-inp:focus { border-color: var(--accent); outline: none; }
     .slot-pattern-inp.invalid { border-color: #c0392b; }
+    .knob-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; cursor: ns-resize; user-select: none; touch-action: none; }
+    .knob-wrap:hover .knob-body { stroke: var(--accent2); }
+    .knob-val { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); line-height: 1.2; }
     .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; padding: 0 4px; opacity: .7; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
@@ -2514,6 +2517,110 @@ function refreshChordChartsPanel(bid) {
   setTimeout(syncAllChordRowMaxHeights, 0);
 }
 
+// ─── Circular knob ────────────────────────────────────────────────────────────
+function buildKnob(initVal, min, max, step, onChange) {
+  const SZ = 34, CX = SZ / 2, CY = SZ / 2;
+  const TR = 13, KR = 8, DR = 2, DD = 5.5;
+  const A0 = 225, SW = 270;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  function polar(deg, r) {
+    const rad = (deg - 90) * Math.PI / 180;
+    return [CX + r * Math.cos(rad), CY + r * Math.sin(rad)];
+  }
+  function arcPath(a, sw, r) {
+    const [sx, sy] = polar(a, r), [ex, ey] = polar(a + sw, r);
+    return `M${sx.toFixed(2)} ${sy.toFixed(2)} A${r} ${r} 0 ${sw > 180 ? 1 : 0} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'knob-wrap';
+  wrap.title = 'Drag arriba/abajo · Scroll · Doble-clic = 0';
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${SZ} ${SZ}`);
+  svg.setAttribute('width', SZ);
+  svg.setAttribute('height', SZ);
+  svg.style.display = 'block';
+
+  const mk = t => document.createElementNS(ns, t);
+
+  const track = mk('path');
+  track.setAttribute('fill', 'none');
+  track.setAttribute('stroke', 'var(--border2)');
+  track.setAttribute('stroke-width', '2.5');
+  track.setAttribute('stroke-linecap', 'round');
+  track.setAttribute('d', arcPath(A0, SW, TR));
+  svg.appendChild(track);
+
+  const fill = mk('path');
+  fill.setAttribute('fill', 'none');
+  fill.setAttribute('stroke', 'var(--accent)');
+  fill.setAttribute('stroke-width', '2.5');
+  fill.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(fill);
+
+  const body = mk('circle');
+  body.setAttribute('cx', CX); body.setAttribute('cy', CY); body.setAttribute('r', KR);
+  body.setAttribute('fill', 'var(--bg2)');
+  body.setAttribute('stroke', 'var(--border2)'); body.setAttribute('stroke-width', '1.5');
+  body.setAttribute('class', 'knob-body');
+  svg.appendChild(body);
+
+  const dot = mk('circle');
+  dot.setAttribute('r', DR); dot.setAttribute('fill', 'var(--accent)');
+  svg.appendChild(dot);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'knob-val';
+
+  wrap.appendChild(svg);
+  wrap.appendChild(lbl);
+
+  let _v = initVal;
+
+  function paint(v) {
+    _v = Math.max(min, Math.min(max, Math.round(v / step) * step));
+    const sw = (max > min) ? ((_v - min) / (max - min)) * SW : 0;
+    fill.setAttribute('d', sw < 0.5 ? '' : arcPath(A0, sw, TR));
+    const [dx, dy] = polar(A0 + sw, DD);
+    dot.setAttribute('cx', dx.toFixed(2)); dot.setAttribute('cy', dy.toFixed(2));
+    lbl.textContent = _v + 'ms';
+  }
+
+  paint(initVal);
+
+  wrap.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const y0 = e.clientY, v0 = _v;
+    const onMove = e => { paint(v0 + (y0 - e.clientY) * (max - min) / 150); onChange(_v); };
+    const onUp   = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  wrap.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const y0 = e.touches[0].clientY, v0 = _v;
+    const onMove = e => { paint(v0 + (y0 - e.touches[0].clientY) * (max - min) / 150); onChange(_v); };
+    const onEnd  = () => { window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd); };
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+  }, { passive: false });
+
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    paint(_v + (e.deltaY < 0 ? step : -step));
+    onChange(_v);
+  }, { passive: false });
+
+  wrap.addEventListener('dblclick', () => { paint(0); onChange(_v); });
+
+  wrap.addEventListener('click', e => e.stopPropagation());
+
+  return { el: wrap, getValue: () => _v };
+}
+
 // ─── Build a board card DOM element ──────────────────────────────────────────
 function buildCard(b) {
   clampStart(b);
@@ -2893,29 +3000,16 @@ function buildCard(b) {
 
     const fadeGrp = document.createElement('div');
     fadeGrp.className = 'slot-sync';
-    fadeGrp.title = 'Crossfade duration when changing slots (0 = instant)';
 
     const fadeLbl = document.createElement('span');
     fadeLbl.textContent = 'fade';
 
-    const fadeInp = document.createElement('input');
-    fadeInp.type  = 'number';
-    fadeInp.min   = '0';
-    fadeInp.max   = '2000';
-    fadeInp.step  = '50';
-    fadeInp.value = String(b.crossfadeDuration);
-    fadeInp.addEventListener('change', e => {
-      b.crossfadeDuration = Math.max(0, Math.min(2000, parseInt(e.target.value, 10) || 0));
-      e.target.value = String(b.crossfadeDuration);
+    const fadeKnob = buildKnob(b.crossfadeDuration, 0, 2000, 50, v => {
+      b.crossfadeDuration = v;
     });
-    fadeInp.addEventListener('click', e => e.stopPropagation());
-
-    const fadeUnit = document.createElement('span');
-    fadeUnit.textContent = 'ms';
 
     fadeGrp.appendChild(fadeLbl);
-    fadeGrp.appendChild(fadeInp);
-    fadeGrp.appendChild(fadeUnit);
+    fadeGrp.appendChild(fadeKnob.el);
 
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
