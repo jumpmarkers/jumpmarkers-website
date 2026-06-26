@@ -833,6 +833,8 @@ function startMetronome(){
   if(ctx.state==='suspended') ctx.resume();
   currentNote  = 0;
   nextNoteTime = ctx.currentTime + 0.05;
+  if (_metroBc) _metroBc.postMessage({ type: 'metro-start' });
+  if (window.parent !== window) window.parent.postMessage({ type: 'metro-start' }, '*');
   schedLoop();
 }
 
@@ -851,6 +853,16 @@ function schedLoop(){
     const beat = Math.floor(currentNote / subdivision);
     const sub  = currentNote % subdivision;
     notesQueue.push({ beat, sub, time: nextNoteTime });
+
+    if (beat === 0 && sub === 0) {
+      const _fireAt = nextNoteTime;
+      const delayMs = (_fireAt - ctx.currentTime) * 1000 - 500;
+      setTimeout(() => {
+        if (!isPlaying) return;
+        if (_metroBc) _metroBc.postMessage({ type: 'metro-measure' });
+        if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure' }, '*');
+      }, Math.max(0, delayMs));
+    }
 
     if(!muted){
       if(sub === 0){
@@ -962,10 +974,6 @@ function rafLoop(){
 }
 
 function onBeat(beat){
-  if (beat === 0) {
-    if (_metroBc) _metroBc.postMessage({ type: 'metro-measure' });
-    if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure' }, '*');
-  }
   const btype = beatPattern[beat] || 'normal';
   const beatActive = btype !== 'rest';
   // Circular SVG

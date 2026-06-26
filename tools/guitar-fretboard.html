@@ -1271,6 +1271,8 @@ let boards  = [];
 let presets = [];
 let nextId  = 1;
 const _slotMeasureCounts = {};
+const _slotSkipNext     = {};
+let   _lastActiveBoardId = null;
 
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
 
@@ -2469,6 +2471,7 @@ function buildCard(b) {
   const card = document.createElement('div');
   card.className = 'board-card';
   card.dataset.id = b.id;
+  card.addEventListener('pointerdown', () => { _lastActiveBoardId = b.id; }, true);
 
   // ── Print label (visible only in PDF) ────────────────────────────────────
   const printLabel = document.createElement('div');
@@ -2604,7 +2607,7 @@ function buildCard(b) {
   slotNav.appendChild(slotPrevBtn);
   slotNav.appendChild(slotLbl);
   slotNav.appendChild(slotNextBtn);
-  settings.appendChild(slotNav);
+  // slotNav is appended to the palette (highlight row) below, not here
 
   // Remove button
   const rmBtn = document.createElement('button');
@@ -2721,6 +2724,10 @@ function buildCard(b) {
   clearBtn.addEventListener('click', () => clearBoard(b.id));
   palette.appendChild(clearBtn);
 
+  // Slot navigation — right side of highlight row
+  slotNav.style.marginLeft = 'auto';
+  palette.appendChild(slotNav);
+
   card.appendChild(palette);
 
   // ── Visibility row ────────────────────────────────────────────────────────
@@ -2804,6 +2811,7 @@ function buildCard(b) {
       e.target.value = String(v);
       b.slotMeasures = v;
       _slotMeasureCounts[b.id] = 0;
+      _slotSkipNext[b.id] = false;
     });
     syncInp.addEventListener('click', e => e.stopPropagation());
 
@@ -3124,7 +3132,38 @@ const _NOTE_STYLE = 'text-align:center;padding-top:20px;font-size:0.8rem;font-we
 
 window.addEventListener('resize', syncAllChordRowMaxHeights);
 
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (_lastActiveBoardId === null) return;
+  const b = boards.find(x => x.id === _lastActiveBoardId);
+  if (!b) return;
+  e.preventDefault();
+  const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+  if (e.key === 'ArrowLeft') {
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
+  } else {
+    if (b.activeSlot < totalSlots - 1) {
+      b.activeSlot++;
+    } else if (totalSlots < 10) {
+      b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null });
+      b.activeSlot++;
+    }
+    pushHistory();
+    refreshBoard(b.id);
+  }
+});
+
 let _lastMetroTs = 0;
+
+function _onMetroStart() {
+  boards.forEach(b => {
+    _slotMeasureCounts[b.id] = 0;
+    _slotSkipNext[b.id] = true; // skip the very first downbeat after play is pressed
+  });
+}
+
 function _onMetroMeasure() {
   const now = performance.now();
   if (now - _lastMetroTs < 100) return; // deduplicate iframe + BroadcastChannel double-fire
@@ -3132,6 +3171,7 @@ function _onMetroMeasure() {
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
+    if (_slotSkipNext[b.id]) { _slotSkipNext[b.id] = false; return; }
     _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
     if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
       b.activeSlot = (b.activeSlot + 1) % totalSlots;
@@ -3139,16 +3179,18 @@ function _onMetroMeasure() {
     }
   });
 }
+
+function _handleMetroMsg(data) {
+  if (!data) return;
+  if (data.type === 'metro-start')   _onMetroStart();
+  if (data.type === 'metro-measure') _onMetroMeasure();
+}
 // Receive from embedded iframe
-window.addEventListener('message', e => {
-  if (e.data && e.data.type === 'metro-measure') _onMetroMeasure();
-});
+window.addEventListener('message', e => _handleMetroMsg(e.data));
 // Receive from standalone metronome tab (same origin)
 if (typeof BroadcastChannel !== 'undefined') {
   const _metroBC = new BroadcastChannel('guitar-tools');
-  _metroBC.addEventListener('message', e => {
-    if (e.data && e.data.type === 'metro-measure') _onMetroMeasure();
-  });
+  _metroBC.addEventListener('message', e => _handleMetroMsg(e.data));
 }
 
 window.addEventListener('beforeprint', () => {
