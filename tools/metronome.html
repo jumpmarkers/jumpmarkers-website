@@ -749,6 +749,7 @@ let subdivision = 1;
 let muted       = false;
 let isPlaying   = false;
 let vizMode     = 'circle';
+const _metroBc  = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('guitar-tools') : null;
 
 // Beat pattern: 'accent' | 'normal' | 'rest' for each beat position
 let beatPattern   = ['accent','normal','normal','normal']; // matches 4/4 default
@@ -961,8 +962,9 @@ function rafLoop(){
 }
 
 function onBeat(beat){
-  if (beat === 0 && window.parent !== window) {
-    window.parent.postMessage({ type: 'metro-measure' }, '*');
+  if (beat === 0) {
+    if (_metroBc) _metroBc.postMessage({ type: 'metro-measure' });
+    if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure' }, '*');
   }
   const btype = beatPattern[beat] || 'normal';
   const beatActive = btype !== 'rest';

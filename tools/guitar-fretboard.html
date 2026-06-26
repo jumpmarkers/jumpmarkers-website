@@ -1217,10 +1217,11 @@ function getNoteName(idx) {
     return appSettings.accidentals === 'sharps' ? NOTES_LAT_SH[idx] : NOTES_LAT_FLAT[idx];
   return appSettings.accidentals === 'sharps' ? NOTES_SHARP[idx] : NOTES_FLAT[idx];
 }
-function getDisplayName(noteIdx, board) {
+function getDisplayName(noteIdx, board, tonic) {
+  const t = tonic !== undefined ? tonic : board.tonic;
   if (appSettings.noteDisplay === 'intervals' && board &&
-      board.tonic !== null && board.tonic !== undefined)
-    return INTERVAL_NAMES[(noteIdx - board.tonic + 12) % 12];
+      t !== null && t !== undefined)
+    return INTERVAL_NAMES[(noteIdx - t + 12) % 12];
   return getNoteName(noteIdx);
 }
 
@@ -2117,7 +2118,7 @@ function buildFbOuter(b) {
       const noteIdx  = (openNoteIdx + f) % 12;
       const cellKey  = `${si}-${f}`;
       const isPinned = b.pinnedCells.has(cellKey);
-      const noteName = getDisplayName(noteIdx, b);
+      const noteName = getDisplayName(noteIdx, b, _sd.tonic);
       const color = getDegreeColor(b, noteIdx, isPinned, _sd);
       const isOn  = color !== null;
       const isVis = _sd.visibleNotes.has(noteIdx);
@@ -2605,38 +2606,6 @@ function buildCard(b) {
   slotNav.appendChild(slotNextBtn);
   settings.appendChild(slotNav);
 
-  // Auto-advance: "every N bars" (only visible when multiple slots exist)
-  if (totalSlots > 1) {
-    const syncGrp = document.createElement('div');
-    syncGrp.className = 'slot-sync';
-    syncGrp.title = 'Auto-advance slots every N measures synced with metronome (0 = off)';
-
-    const syncLbl = document.createElement('span');
-    syncLbl.textContent = 'every';
-
-    const syncInp = document.createElement('input');
-    syncInp.type  = 'number';
-    syncInp.min   = '0';
-    syncInp.max   = '99';
-    syncInp.step  = '1';
-    syncInp.value = String(b.slotMeasures);
-    syncInp.addEventListener('change', e => {
-      const v = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0));
-      e.target.value = String(v);
-      b.slotMeasures = v;
-      _slotMeasureCounts[b.id] = 0;
-    });
-    syncInp.addEventListener('click', e => e.stopPropagation());
-
-    const syncUnit = document.createElement('span');
-    syncUnit.textContent = 'bars';
-
-    syncGrp.appendChild(syncLbl);
-    syncGrp.appendChild(syncInp);
-    syncGrp.appendChild(syncUnit);
-    settings.appendChild(syncGrp);
-  }
-
   // Remove button
   const rmBtn = document.createElement('button');
   rmBtn.className = 'btn btn-outline btn-sm btn-danger';
@@ -2813,6 +2782,39 @@ function buildCard(b) {
     refreshBoard(b.id);
   });
   visRow.appendChild(vNoneBtn);
+
+  // Auto-advance: "every N bars" — right side of SHOW row, only when multiple slots
+  if (totalSlots > 1) {
+    const syncGrp = document.createElement('div');
+    syncGrp.className = 'slot-sync';
+    syncGrp.style.marginLeft = 'auto';
+    syncGrp.title = 'Auto-advance slots every N measures synced with metronome (0 = off)';
+
+    const syncLbl = document.createElement('span');
+    syncLbl.textContent = 'every';
+
+    const syncInp = document.createElement('input');
+    syncInp.type  = 'number';
+    syncInp.min   = '0';
+    syncInp.max   = '99';
+    syncInp.step  = '1';
+    syncInp.value = String(b.slotMeasures);
+    syncInp.addEventListener('change', e => {
+      const v = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0));
+      e.target.value = String(v);
+      b.slotMeasures = v;
+      _slotMeasureCounts[b.id] = 0;
+    });
+    syncInp.addEventListener('click', e => e.stopPropagation());
+
+    const syncUnit = document.createElement('span');
+    syncUnit.textContent = 'bars';
+
+    syncGrp.appendChild(syncLbl);
+    syncGrp.appendChild(syncInp);
+    syncGrp.appendChild(syncUnit);
+    visRow.appendChild(syncGrp);
+  }
 
   card.appendChild(visRow);
 
@@ -3122,8 +3124,11 @@ const _NOTE_STYLE = 'text-align:center;padding-top:20px;font-size:0.8rem;font-we
 
 window.addEventListener('resize', syncAllChordRowMaxHeights);
 
-window.addEventListener('message', e => {
-  if (!e.data || e.data.type !== 'metro-measure') return;
+let _lastMetroTs = 0;
+function _onMetroMeasure() {
+  const now = performance.now();
+  if (now - _lastMetroTs < 100) return; // deduplicate iframe + BroadcastChannel double-fire
+  _lastMetroTs = now;
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
@@ -3133,7 +3138,18 @@ window.addEventListener('message', e => {
       refreshBoard(b.id);
     }
   });
+}
+// Receive from embedded iframe
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'metro-measure') _onMetroMeasure();
 });
+// Receive from standalone metronome tab (same origin)
+if (typeof BroadcastChannel !== 'undefined') {
+  const _metroBC = new BroadcastChannel('guitar-tools');
+  _metroBC.addEventListener('message', e => {
+    if (e.data && e.data.type === 'metro-measure') _onMetroMeasure();
+  });
+}
 
 window.addEventListener('beforeprint', () => {
   const container = document.getElementById('boards-container');
