@@ -267,6 +267,11 @@
     .slot-sync { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); }
     .slot-sync input[type="number"] { width: 38px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
     .slot-sync input[type="number"]::-webkit-outer-spin-button, .slot-sync input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .slot-pattern-grp { display: flex; align-items: center; gap: 5px; }
+    .slot-pattern-lbl { font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
+    .slot-pattern-inp { width: 96px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 4px; padding: 2px 6px; font-size: 0.72rem; font-family: var(--mono); }
+    .slot-pattern-inp:focus { border-color: var(--accent); outline: none; }
+    .slot-pattern-inp.invalid { border-color: #c0392b; }
     .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; padding: 0 4px; opacity: .7; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
@@ -1335,6 +1340,8 @@ function mkBoard(opts = {}) {
     })),
     activeSlot:    opts.activeSlot  || 0,
     slotMeasures:  opts.slotMeasures !== undefined ? opts.slotMeasures : 1,
+    slotPattern:   opts.slotPattern  || '',
+    patternPos:    -1,
   };
 }
 
@@ -1365,6 +1372,7 @@ function _serializeBoards() {
       })),
       activeSlot:    b.activeSlot,
       slotMeasures:  b.slotMeasures,
+      slotPattern:   b.slotPattern,
     })),
     presets,
     currentPresetName,
@@ -2606,7 +2614,7 @@ function buildCard(b) {
   slotPrevBtn.title = 'Previous highlight slot';
   slotPrevBtn.disabled = (b.activeSlot === 0);
   slotPrevBtn.addEventListener('click', () => {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
   });
 
   const slotLbl = document.createElement('span');
@@ -2627,7 +2635,7 @@ function buildCard(b) {
       b.activeSlot++;
     }
     pushHistory();
-    _crossfadeBoard(b.id);
+    refreshBoard(b.id);
   });
 
   slotNav.appendChild(slotPrevBtn);
@@ -2737,9 +2745,39 @@ function buildCard(b) {
   clearBtn.addEventListener('click', () => clearBoard(b.id));
   palette.appendChild(clearBtn);
 
-  // Slot navigation — right side of highlight row
-  slotNav.style.marginLeft = 'auto';
-  palette.appendChild(slotNav);
+  // Pattern input + slot nav — right side of highlight row
+  if (totalSlots > 1) {
+    const patGrp = document.createElement('div');
+    patGrp.className = 'slot-pattern-grp';
+    patGrp.style.marginLeft = 'auto';
+
+    const patLbl = document.createElement('span');
+    patLbl.className = 'slot-pattern-lbl';
+    patLbl.textContent = 'Pat:';
+
+    const patInp = document.createElement('input');
+    patInp.type = 'text';
+    patInp.className = 'slot-pattern-inp';
+    patInp.value = b.slotPattern || '';
+    patInp.placeholder = '1,2,3…';
+    patInp.title = 'Slot order pattern (e.g. 1,3,2,1). Repeats. Leave empty for sequential.';
+    patInp.spellcheck = false;
+    patInp.addEventListener('input', e => {
+      b.slotPattern = e.target.value;
+      b.patternPos  = -1;
+      const ok = !e.target.value.trim() || _parsePattern(b) !== null;
+      patInp.classList.toggle('invalid', !ok);
+    });
+    patInp.addEventListener('click', e => e.stopPropagation());
+
+    patGrp.appendChild(patLbl);
+    patGrp.appendChild(patInp);
+    palette.appendChild(patGrp);
+    palette.appendChild(slotNav);
+  } else {
+    slotNav.style.marginLeft = 'auto';
+    palette.appendChild(slotNav);
+  }
 
   card.appendChild(palette);
 
@@ -2825,6 +2863,7 @@ function buildCard(b) {
       b.slotMeasures = v;
       _slotMeasureCounts[b.id] = 0;
       _slotSkipNext[b.id] = false;
+      b.patternPos = -1;
     });
     syncInp.addEventListener('click', e => e.stopPropagation());
 
@@ -3155,7 +3194,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (e.key === 'ArrowLeft') {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); refreshBoard(b.id); }
   } else {
     if (b.activeSlot < totalSlots - 1) {
       b.activeSlot++;
@@ -3164,22 +3203,32 @@ document.addEventListener('keydown', e => {
       b.activeSlot++;
     }
     pushHistory();
-    _crossfadeBoard(b.id);
+    refreshBoard(b.id);
   }
 });
 
 let _lastMetroTs = 0;
 
+function _parsePattern(b) {
+  const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+  if (!b.slotPattern || !b.slotPattern.trim()) return null;
+  const parts = b.slotPattern.split(',')
+    .map(s => parseInt(s.trim(), 10) - 1)
+    .filter(n => !isNaN(n) && n >= 0 && n < totalSlots);
+  return parts.length > 0 ? parts : null;
+}
+
 function _onMetroStart() {
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
-    _slotSkipNext[b.id] = true; // skip the very first downbeat after play is pressed
+    _slotSkipNext[b.id] = true;
+    b.patternPos = -1;
   });
 }
 
 function _onMetroMeasure() {
   const now = performance.now();
-  if (now - _lastMetroTs < 100) return; // deduplicate iframe + BroadcastChannel double-fire
+  if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
@@ -3187,8 +3236,14 @@ function _onMetroMeasure() {
     if (_slotSkipNext[b.id]) { _slotSkipNext[b.id] = false; return; }
     _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
     if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
-      b.activeSlot = (b.activeSlot + 1) % totalSlots;
-      _crossfadeBoard(b.id);
+      const pattern = _parsePattern(b);
+      if (pattern) {
+        b.patternPos = (b.patternPos + 1) % pattern.length;
+        b.activeSlot = pattern[b.patternPos];
+      } else {
+        b.activeSlot = (b.activeSlot + 1) % totalSlots;
+      }
+      refreshBoard(b.id);
     }
   });
 }

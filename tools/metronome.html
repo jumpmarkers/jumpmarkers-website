@@ -856,7 +856,7 @@ function schedLoop(){
 
     if (beat === 0 && sub === 0) {
       const _fireAt = nextNoteTime;
-      const delayMs = (_fireAt - ctx.currentTime) * 1000 - 500;
+      const delayMs = (_fireAt - ctx.currentTime) * 1000 - 800;
       setTimeout(() => {
         if (!isPlaying) return;
         if (_metroBc) _metroBc.postMessage({ type: 'metro-measure' });
