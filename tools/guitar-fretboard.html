@@ -1122,33 +1122,24 @@
 
       <div class="help-section-title">🥁 Metronome Sync — Auto-advance pages in musical time</div>
       <p class="help-p">When the metronome plays, pages advance automatically every N bars. The controls below appear on the right side of the SHOW row once a fretboard has 2 or more pages.</p>
-      <svg viewBox="0 0 370 110" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+      <svg viewBox="0 0 370 65" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
         <!-- change every N bars section -->
-        <text x="10" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">change every</text>
-        <rect x="90" y="42" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
-        <text x="104" y="56" style="font-size:10px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
-        <text x="123" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">bars</text>
+        <text x="10" y="36" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">change every</text>
+        <rect x="90" y="24" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="104" y="38" style="font-size:10px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
+        <text x="123" y="36" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">bars</text>
         <!-- vertical separator -->
-        <line x1="154" y1="6" x2="154" y2="104" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
-        <!-- ── out knob (top row) ── -->
-        <text x="163" y="22" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">out</text>
-        <circle cx="208" cy="32" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
-        <path d="M198.8 41.2 A13 13 0 1 1 217.2 41.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
-        <circle cx="198.8" cy="41.2" r="2.3" style="fill:var(--muted)"/>
-        <text x="208" y="53" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
-        <!-- row divider -->
-        <line x1="154" y1="59" x2="370" y2="59" style="stroke:var(--border2);stroke-width:.4"/>
-        <!-- ── in knob (bottom row) ── -->
-        <text x="163" y="72" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">in</text>
-        <circle cx="208" cy="82" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
-        <path d="M198.8 91.2 A13 13 0 1 1 217.2 91.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
-        <circle cx="198.8" cy="91.2" r="2.3" style="fill:var(--muted)"/>
-        <text x="208" y="103" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
+        <line x1="154" y1="6" x2="154" y2="59" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
+        <!-- ── fade knob ── -->
+        <text x="163" y="20" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">fade</text>
+        <circle cx="208" cy="33" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
+        <path d="M198.8 42.2 A13 13 0 1 1 217.2 42.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
+        <circle cx="198.8" cy="42.2" r="2.3" style="fill:var(--muted)"/>
+        <text x="208" y="55" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
       </svg>
       <table class="help-table">
         <tr><td>change every N</td><td>Advance to the next page (or next in PAT pattern) every N measures while the metronome is running</td></tr>
-        <tr><td>in knob</td><td>How many ms <em>before</em> beat 1 the next page's notes start appearing as a ghost. The fade-in ends exactly at beat 1. <strong>0ms</strong> = no preview.</td></tr>
-        <tr><td>out knob</td><td>How long the current page's notes take to dissolve <em>after</em> beat 1. <strong>0ms</strong> = instant cut.</td></tr>
+        <tr><td>fade knob</td><td>Crossfade duration when switching pages. <strong>0ms</strong> = instant snap. Drag up or scroll to increase up to 2000ms. Double-click to reset.</td></tr>
       </table>
 
       <div class="help-section-title">💡 Quick start with pages &amp; metronome</div>
@@ -1413,7 +1404,6 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
-    fadeInDuration:    opts.fadeInDuration    !== undefined ? opts.fadeInDuration    : 0,
     patternPos:        -1,
   };
 }
@@ -1447,7 +1437,6 @@ function _serializeBoards() {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
-      fadeInDuration:    b.fadeInDuration,
     })),
     presets,
     currentPresetName,
@@ -1812,7 +1801,6 @@ function buildPresetData(name) {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
-      fadeInDuration:    b.fadeInDuration,
     })),
   };
 }
@@ -2140,117 +2128,32 @@ function refreshBoard(boardId) {
 
 function _crossfadeBoard(boardId) {
   const b = boards.find(x => x.id === boardId);
-  const durOut = b ? (b.crossfadeDuration || 0) : 0;
-  const durIn  = b ? (b.fadeInDuration    || 0) : 0;
-  if (!durOut && !durIn) { refreshBoard(boardId); return; }
+  const dur = b ? (b.crossfadeDuration || 0) : 0;
+  if (!dur) { refreshBoard(boardId); return; }
 
   const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
   if (!oldFb) { refreshBoard(boardId); return; }
 
-  const clone = durOut > 0 ? oldFb.cloneNode(true) : null;
+  const clone = oldFb.cloneNode(true);
   refreshBoard(boardId);
 
   const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
   if (!newFb) return;
   const r = newFb.getBoundingClientRect();
 
-  if (clone) {
-    Object.assign(clone.style, {
-      position: 'fixed', top: r.top + 'px', left: r.left + 'px',
-      width: r.width + 'px', height: r.height + 'px',
-      pointerEvents: 'none', zIndex: '9998',
-      overflow: 'hidden', opacity: '1',
-      transition: `opacity ${durOut}ms ease-out`,
-    });
-    document.body.appendChild(clone);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      clone.style.opacity = '0';
-      setTimeout(() => clone.remove(), durOut + 60);
-    }));
-  }
-
-  if (durIn > 0) {
-    newFb.style.opacity = '0';
-    newFb.style.transition = `opacity ${durIn}ms ease-in`;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      newFb.style.opacity = '1';
-      setTimeout(() => { newFb.style.transition = ''; newFb.style.opacity = ''; }, durIn + 60);
-    }));
-  }
-}
-
-// Preview: show next page fading in durIn ms before beat 1. b.activeSlot already updated.
-function _startPagePreview(boardId, durIn) {
-  const b = boards.find(x => x.id === boardId);
-  if (!b) return;
-  if (b._pageClone) { b._pageClone.remove(); b._pageClone = null; }
-
-  const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-  if (!oldFb) { refreshBoard(boardId); return; }
-
-  const r = oldFb.getBoundingClientRect();
-  const clone = oldFb.cloneNode(true);
   Object.assign(clone.style, {
     position: 'fixed', top: r.top + 'px', left: r.left + 'px',
     width: r.width + 'px', height: r.height + 'px',
-    pointerEvents: 'none', zIndex: '9998', overflow: 'hidden', opacity: '1',
+    pointerEvents: 'none', zIndex: '9998',
+    overflow: 'hidden', opacity: '1',
+    transition: `opacity ${dur}ms ease-out`,
   });
   document.body.appendChild(clone);
-  b._pageClone = clone;
 
-  refreshBoard(boardId);
-  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-  if (!newFb) return;
-  newFb.style.opacity = '0';
-  newFb.style.transition = `opacity ${durIn}ms linear`;
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    newFb.style.opacity = '1';
-    setTimeout(() => { newFb.style.transition = ''; newFb.style.opacity = ''; }, durIn + 100);
+    clone.style.opacity = '0';
+    setTimeout(() => clone.remove(), dur + 60);
   }));
-}
-
-// Beat 1: start fading out the old clone (hadPreview) or do a standard instant swap + fade-out.
-function _commitPageChange(boardId, durOut, hadPreview) {
-  const b = boards.find(x => x.id === boardId);
-  if (!b) return;
-
-  if (hadPreview) {
-    const clone = b._pageClone;
-    b._pageClone = null;
-    if (!clone) return;
-    if (durOut > 0) {
-      clone.style.transition = `opacity ${durOut}ms ease-out`;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        clone.style.opacity = '0';
-        setTimeout(() => clone.remove(), durOut + 60);
-      }));
-    } else {
-      clone.remove();
-    }
-  } else {
-    // durIn = 0: instant swap, optional fade-out of old page
-    const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-    if (!oldFb) { refreshBoard(boardId); return; }
-    const clone = durOut > 0 ? oldFb.cloneNode(true) : null;
-    refreshBoard(boardId);
-    if (clone) {
-      const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-      if (!newFb) { clone.remove(); return; }
-      const r = newFb.getBoundingClientRect();
-      Object.assign(clone.style, {
-        position: 'fixed', top: r.top + 'px', left: r.left + 'px',
-        width: r.width + 'px', height: r.height + 'px',
-        pointerEvents: 'none', zIndex: '9998',
-        overflow: 'hidden', opacity: '1',
-        transition: `opacity ${durOut}ms ease-out`,
-      });
-      document.body.appendChild(clone);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        clone.style.opacity = '0';
-        setTimeout(() => clone.remove(), durOut + 60);
-      }));
-    }
-  }
 }
 
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
@@ -3155,31 +3058,18 @@ function buildCard(b) {
     syncGrp.appendChild(syncInp);
     syncGrp.appendChild(syncUnit);
 
-    const fadeOutGrp = document.createElement('div');
-    fadeOutGrp.className = 'slot-sync';
-    const fadeOutLbl = document.createElement('span');
-    fadeOutLbl.textContent = 'out';
-    const fadeOutKnob = buildKnob(b.crossfadeDuration, 0, 2000, 50, v => { b.crossfadeDuration = v; });
-    fadeOutGrp.appendChild(fadeOutLbl);
-    fadeOutGrp.appendChild(fadeOutKnob.el);
-
-    const fadeInGrp = document.createElement('div');
-    fadeInGrp.className = 'slot-sync';
-    const fadeInLbl = document.createElement('span');
-    fadeInLbl.textContent = 'in';
-    const fadeInKnob = buildKnob(b.fadeInDuration, 0, 2000, 50, v => { b.fadeInDuration = v; });
-    fadeInGrp.appendChild(fadeInLbl);
-    fadeInGrp.appendChild(fadeInKnob.el);
-
-    const _knobbsCol = document.createElement('div');
-    _knobbsCol.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    _knobbsCol.appendChild(fadeOutGrp);
-    _knobbsCol.appendChild(fadeInGrp);
+    const fadeGrp = document.createElement('div');
+    fadeGrp.className = 'slot-sync';
+    const fadeLbl = document.createElement('span');
+    fadeLbl.textContent = 'fade';
+    const fadeKnob = buildKnob(b.crossfadeDuration, 0, 2000, 50, v => { b.crossfadeDuration = v; });
+    fadeGrp.appendChild(fadeLbl);
+    fadeGrp.appendChild(fadeKnob.el);
 
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
-    _visCtrlZone.appendChild(_knobbsCol);
+    _visCtrlZone.appendChild(fadeGrp);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -3539,41 +3429,24 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
-  const ms = msUntilBeat1 > 0 ? msUntilBeat1 : 60000 / (bpm || 120);
+  const delayMs = msUntilBeat1 > 0 ? msUntilBeat1 : 60000 / (bpm || 120);
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
-
-    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-    if (_slotMeasureCounts[b.id] % b.slotMeasures !== 0) return;
-
-    const pattern  = _parsePattern(b);
-    const nextPos  = pattern ? (b.patternPos + 1) % pattern.length : null;
-    const nextSlot = pattern ? pattern[nextPos] : (b.activeSlot + 1) % totalSlots;
-
-    const durIn  = b.fadeInDuration    || 0;
-    const durOut = b.crossfadeDuration || 0;
-    const hasPreview  = durIn > 0;
-    const previewDelay = Math.max(0, ms - durIn);
-
-    if (hasPreview) {
-      // Start preview durIn ms before beat 1: new page fades in from 0→1
-      setTimeout(() => {
-        if (pattern && nextPos !== null) b.patternPos = nextPos;
-        b.activeSlot = nextSlot;
-        _startPagePreview(b.id, durIn);
-      }, previewDelay);
-    }
-
-    // At beat 1: old page starts fading out
     setTimeout(() => {
-      if (!hasPreview) {
-        if (pattern && nextPos !== null) b.patternPos = nextPos;
-        b.activeSlot = nextSlot;
+      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
+        const pattern = _parsePattern(b);
+        if (pattern) {
+          b.patternPos = (b.patternPos + 1) % pattern.length;
+          b.activeSlot = pattern[b.patternPos];
+        } else {
+          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+        }
+        _crossfadeBoard(b.id);
       }
-      _commitPageChange(b.id, durOut, hasPreview);
-    }, ms);
+    }, delayMs);
   });
 }
 
