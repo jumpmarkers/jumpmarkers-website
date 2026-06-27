@@ -1370,6 +1370,7 @@ let nextId  = 1;
 const _slotMeasureCounts = {};
 const _slotBeatCounts    = {};
 const _ringState         = {}; // boardId → { svg, rect }
+const _ringCycleDurMs    = {}; // boardId → full-cycle animation duration in ms
 let   _metroActive       = false;
 let   _lastActiveBoardId = null;
 
@@ -2201,7 +2202,18 @@ function _ringAfterRefresh(boardId) {
   if (!b) return;
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots <= 1 || !b.slotMeasures) return;
-  _attachRing(boardId); // starts at dashoffset:1 (empty); next beat/measure will animate it
+  _attachRing(boardId); // new ring starts at dashoffset:1 (empty)
+  const cycleDurMs = _ringCycleDurMs[boardId] || 0;
+  if (cycleDurMs > 0) {
+    const s = _ringState[boardId];
+    if (s) {
+      const r = s.rect;
+      r.style.transition = 'none';
+      void r.getBoundingClientRect();
+      r.style.transition = `stroke-dashoffset ${cycleDurMs}ms linear`;
+      r.style.strokeDashoffset = '0'; // fill 0%→100% over one full cycle
+    }
+  }
 }
 
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
@@ -3562,6 +3574,7 @@ function _onMetroStart() {
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
     _slotBeatCounts[b.id]    = 0;
+    _ringCycleDurMs[b.id]    = 0;
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
@@ -3577,8 +3590,6 @@ function _onMetroStart() {
 }
 
 function _onMetroMeasure(bpm, msUntilBeat1) {
-  // Page changes always come through here (both standalone metro and looper).
-  // _onMetroBeat handles ring animation only — it no longer triggers page changes.
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
@@ -3594,22 +3605,24 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
     const count      = _slotMeasureCounts[b.id];
     const posInCycle = (count - 1) % cycleLen;
 
-    // Ring animation only when looper is not providing per-beat updates
-    if (!_beatModeActive) {
-      const curProg  = posInCycle / cycleLen;
-      const nextProg = Math.min(1, (posInCycle + 1) / cycleLen);
+    // At the start of each cycle, kick off a single long CSS transition that fills
+    // the ring from 0% to 100% over the entire cycle duration. This avoids all the
+    // per-beat race conditions. Only starts if the ring hasn't already been animated
+    // by _ringAfterRefresh (which also fires at the same moment after a page change).
+    if (posInCycle === 0) {
+      const cycleDurMs = cycleLen * delayMs;
+      _ringCycleDurMs[b.id] = cycleDurMs;
       const s = _ringState[b.id];
-      if (s) {
+      if (s && s.rect.style.strokeDashoffset !== '0') {
         const r = s.rect;
         r.style.transition = 'none';
-        r.style.strokeDashoffset = String(1 - curProg);
         void r.getBoundingClientRect();
-        r.style.transition = `stroke-dashoffset ${delayMs}ms linear`;
-        r.style.strokeDashoffset = String(1 - nextProg);
+        r.style.transition = `stroke-dashoffset ${cycleDurMs}ms linear`;
+        r.style.strokeDashoffset = '0';
       }
     }
 
-    // Page change fires at beat 1 of the next measure — correct sync for both metro and looper
+    // Page change fires at beat 1 of next measure — correct sync for both metro and looper
     setTimeout(() => {
       if (count % sm === 0) {
         const pattern = _parsePattern(b);
@@ -3627,36 +3640,8 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 
 function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
   _beatModeActive = true;
-  const now = performance.now();
-  if (now - _lastMetroBeatTs < 30) return;
-  _lastMetroBeatTs = now;
-  const beatDurMs = 60000 / (bpm || 120);
-
-  boards.forEach(b => {
-    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
-    if (totalSlots <= 1 || !b.slotMeasures) return;
-    const totalBeats = Math.max(1, Math.round(b.slotMeasures * (beatsPerMeasure || 4)));
-
-    setTimeout(() => {
-      _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
-      const count = _slotBeatCounts[b.id];
-      const N     = count % totalBeats;  // 0 = last beat of the cycle
-      // When N=0 (last beat): animate from (T-1)/T to 1.0 so ring reaches 100%
-      // before the page change fires (which comes from _onMetroMeasure one beat later)
-      const prev  = N === 0 ? totalBeats - 1 : N - 1;
-      const cur   = prev / totalBeats;
-      const nxt   = N === 0 ? 1.0 : N / totalBeats;
-      const s     = _ringState[b.id];
-      if (s) {
-        const r = s.rect;
-        r.style.transition = 'none';
-        r.style.strokeDashoffset = String(1 - cur);
-        void r.getBoundingClientRect();
-        r.style.transition = `stroke-dashoffset ${beatDurMs}ms linear`;
-        r.style.strokeDashoffset = String(1 - nxt);
-      }
-    }, msUntilBeat);
-  });
+  // Ring animation is a single long CSS transition driven by _onMetroMeasure;
+  // no per-beat ring updates needed here.
 }
 
 function _handleMetroMsg(data) {
