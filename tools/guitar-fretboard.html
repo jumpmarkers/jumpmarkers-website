@@ -2795,7 +2795,7 @@ function buildCard(b) {
   if (b.activeSlot > 0) {
     const slotInd = document.createElement('span');
     slotInd.className = 'slot-indicator';
-    slotInd.textContent = `slot ${b.activeSlot + 1}`;
+    slotInd.textContent = `page ${b.activeSlot + 1}`;
     palette.appendChild(slotInd);
   }
 
@@ -2973,7 +2973,7 @@ function buildCard(b) {
     syncGrp.title = 'Auto-advance slots every N measures synced with metronome (0 = off)';
 
     const syncLbl = document.createElement('span');
-    syncLbl.textContent = 'every';
+    syncLbl.textContent = 'change every';
 
     const syncInp = document.createElement('input');
     syncInp.type  = 'number';
