@@ -863,23 +863,25 @@ function click(t, isFirst, isCD) {
 }
 
 function scheduleTick() {
+  const effectiveBpm = bpm * retimeRate;
+  const beatDur = 60 / effectiveBpm;
   while (nextBeatT < actx.currentTime + LOOK_AHEAD) {
     const local = (_dotTotal > 0 ? beatIdx % _dotTotal : beatIdx % bpMeasure);
     click(nextBeatT, local % bpMeasure === 0, false);
     const t = nextBeatT, li = local;
     // Broadcast metro-measure at beat 1 of each measure (skip countdown)
     if (local % bpMeasure === 0 && phase !== 'cd') {
-      const _t = nextBeatT, _msDur = bpMeasure * (60 / bpm) * 1000;
+      const _t = nextBeatT, _msDur = bpMeasure * beatDur * 1000;
       setTimeout(() => {
         const msUntilBeat1 = Math.max(0, (_t - actx.currentTime) * 1000) + _msDur;
-        const msg = { type: 'metro-measure', bpm, msUntilBeat1 };
+        const msg = { type: 'metro-measure', bpm: effectiveBpm, msUntilBeat1 };
         if (_bc) _bc.postMessage(msg);
         if (window.parent !== window) window.parent.postMessage(msg, '*');
       }, 0);
     }
     setTimeout(() => activateDot(li), Math.max(0, (t - actx.currentTime) * 1000));
     beatIdx++;
-    nextBeatT += 60 / bpm;
+    nextBeatT += beatDur;
   }
 }
 
@@ -1113,6 +1115,17 @@ function applyRetime(rate) {
       layers.forEach(l => playLayer(l, newOffsetWC));
     else
       layers.forEach(l => playLayerMedia(l, newOffsetWC));
+
+    // Restart metronome at new effective BPM, aligned to current position
+    if (schedId) {
+      clearInterval(schedId); schedId = null;
+      const beatDur = 60 / (bpm * rate);
+      const nextBeatIdx = Math.ceil(newOffsetWC / beatDur);
+      nextBeatT = loopT0 + nextBeatIdx * beatDur;
+      beatIdx   = nextBeatIdx;
+      scheduleTick();
+      schedId = setInterval(scheduleTick, SCHED_INT);
+    }
   }
   updateInfo();
 }
