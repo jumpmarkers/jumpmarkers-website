@@ -1362,7 +1362,6 @@ let boards  = [];
 let presets = [];
 let nextId  = 1;
 const _slotMeasureCounts = {};
-const _slotSkipNext     = {};
 let   _lastActiveBoardId = null;
 
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
@@ -3073,7 +3072,6 @@ function buildCard(b) {
       e.target.value = String(v);
       b.slotMeasures = v;
       _slotMeasureCounts[b.id] = 0;
-      _slotSkipNext[b.id] = false;
       b.patternPos = -1;
     });
     syncInp.addEventListener('click', e => e.stopPropagation());
@@ -3465,7 +3463,6 @@ function _parsePattern(b) {
 function _onMetroStart() {
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
-    _slotSkipNext[b.id] = true;
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
@@ -3477,7 +3474,7 @@ function _onMetroStart() {
   });
 }
 
-function _onMetroMeasure(bpm) {
+function _onMetroMeasure(bpm, msUntilBeat1) {
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
@@ -3485,11 +3482,10 @@ function _onMetroMeasure(bpm) {
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
-    if (_slotSkipNext[b.id]) { _slotSkipNext[b.id] = false; return; }
-    // earlyChange is in beats (0 = at beat, 1 = 1 full beat early)
-    // metro-measure fires 800ms before beat 1; compute delay from that window
+    // earlyChange in beats: 0b = fires at beat 1, -1b = fires 1 beat before beat 1
+    // msUntilBeat1 is the exact time until the next measure's beat 1 (sent by the metronome)
     const earlyMs = -(b.earlyChange || 0) * beatMs;
-    const delayMs = Math.max(0, 800 - earlyMs);
+    const delayMs = Math.max(0, (msUntilBeat1 > 0 ? msUntilBeat1 : beatMs) - earlyMs);
     setTimeout(() => {
       _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
       if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
@@ -3509,7 +3505,7 @@ function _onMetroMeasure(bpm) {
 function _handleMetroMsg(data) {
   if (!data) return;
   if (data.type === 'metro-start')   _onMetroStart();
-  if (data.type === 'metro-measure') _onMetroMeasure(data.bpm || 120);
+  if (data.type === 'metro-measure') _onMetroMeasure(data.bpm || 120, data.msUntilBeat1 || 0);
 }
 // Receive from embedded iframe
 window.addEventListener('message', e => _handleMetroMsg(e.data));
