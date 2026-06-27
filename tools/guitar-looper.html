@@ -879,6 +879,16 @@ function scheduleTick() {
         if (window.parent !== window) window.parent.postMessage(msg, '*');
       }, 0);
     }
+    // Broadcast metro-beat at every beat (skip countdown) — enables sub-bar page changes
+    if (phase !== 'cd') {
+      const _t = nextBeatT;
+      setTimeout(() => {
+        const msUntilBeat = Math.max(0, (_t - actx.currentTime) * 1000);
+        const msg = { type: 'metro-beat', bpm: effectiveBpm, beatsPerMeasure: bpMeasure, msUntilBeat };
+        if (_bc) _bc.postMessage(msg);
+        if (window.parent !== window) window.parent.postMessage(msg, '*');
+      }, 0);
+    }
     setTimeout(() => activateDot(li), Math.max(0, (t - actx.currentTime) * 1000));
     beatIdx++;
     nextBeatT += beatDur;

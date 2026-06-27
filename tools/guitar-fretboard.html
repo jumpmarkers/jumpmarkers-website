@@ -266,7 +266,7 @@
     .slot-nav-btn:disabled { opacity: .3; cursor: default; }
     .slot-nav-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text); min-width: 28px; text-align: center; letter-spacing: 0.02em; }
     .slot-sync { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); }
-    .slot-sync input[type="number"] { width: 38px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
+    .slot-sync input[type="number"] { width: 52px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
     .slot-sync input[type="number"]::-webkit-outer-spin-button, .slot-sync input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     .slot-ctrl-zone { display: flex; align-items: center; gap: 8px; background: rgba(128,128,128,0.08); border: 1px solid var(--border2); border-radius: 8px; padding: 3px 10px; margin-left: auto; }
     .slot-pattern-grp { display: flex; align-items: center; gap: 5px; }
@@ -1143,7 +1143,7 @@
         <text x="216" y="60" style="font-size:10px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
       </svg>
       <table class="help-table">
-        <tr><td>change every N</td><td>Advance to the next page (or next in PAT pattern) every N measures while the metronome is running</td></tr>
+        <tr><td>change every N</td><td>Advance to the next page every N bars. Accepts decimals when using the Looper — <strong>0.25</strong> = 1 beat, <strong>0.5</strong> = half bar, <strong>1.25</strong> = 1 bar + 1 beat (in 4/4). Integer values work with both the Looper and the standalone Metronome.</td></tr>
         <tr><td>fade knob</td><td>Crossfade duration when switching pages. <strong>0ms</strong> = instant snap. Drag up or scroll to increase up to 2000ms. Double-click to reset.</td></tr>
       </table>
 
@@ -1363,6 +1363,7 @@ let boards  = [];
 let presets = [];
 let nextId  = 1;
 const _slotMeasureCounts = {};
+const _slotBeatCounts    = {};
 let   _lastActiveBoardId = null;
 
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
@@ -3064,13 +3065,14 @@ function buildCard(b) {
     syncInp.type  = 'number';
     syncInp.min   = '0';
     syncInp.max   = '99';
-    syncInp.step  = '1';
+    syncInp.step  = 'any';
     syncInp.value = String(b.slotMeasures);
     syncInp.addEventListener('change', e => {
-      const v = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0));
+      const v = Math.max(0, Math.min(99, parseFloat(e.target.value) || 0));
       e.target.value = String(v);
       b.slotMeasures = v;
       _slotMeasureCounts[b.id] = 0;
+      _slotBeatCounts[b.id]    = 0;
       b.patternPos = -1;
     });
     syncInp.addEventListener('click', e => e.stopPropagation());
@@ -3446,7 +3448,9 @@ document.addEventListener('keydown', e => {
   _crossfadeBoard(b.id);
 });
 
-let _lastMetroTs = 0;
+let _lastMetroTs     = 0;
+let _lastMetroBeatTs = 0;
+let _beatModeActive  = false;
 
 function _parsePattern(b) {
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
@@ -3458,8 +3462,10 @@ function _parsePattern(b) {
 }
 
 function _onMetroStart() {
+  _beatModeActive = false;
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
+    _slotBeatCounts[b.id]    = 0;
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
@@ -3472,6 +3478,7 @@ function _onMetroStart() {
 }
 
 function _onMetroMeasure(bpm, msUntilBeat1) {
+  if (_beatModeActive) return; // looper sends per-beat; skip measure counting
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
@@ -3496,10 +3503,37 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   });
 }
 
+function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
+  _beatModeActive = true;
+  const now = performance.now();
+  if (now - _lastMetroBeatTs < 30) return;
+  _lastMetroBeatTs = now;
+
+  boards.forEach(b => {
+    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (totalSlots <= 1 || !b.slotMeasures) return;
+    const beatThreshold = Math.max(1, Math.round(b.slotMeasures * (beatsPerMeasure || 4)));
+    setTimeout(() => {
+      _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
+      if (_slotBeatCounts[b.id] % beatThreshold === 0) {
+        const pattern = _parsePattern(b);
+        if (pattern) {
+          b.patternPos = (b.patternPos + 1) % pattern.length;
+          b.activeSlot = pattern[b.patternPos];
+        } else {
+          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+        }
+        _crossfadeBoard(b.id);
+      }
+    }, msUntilBeat);
+  });
+}
+
 function _handleMetroMsg(data) {
   if (!data) return;
   if (data.type === 'metro-start')   _onMetroStart();
   if (data.type === 'metro-measure') _onMetroMeasure(data.bpm || 120, data.msUntilBeat1 || 0);
+  if (data.type === 'metro-beat')    _onMetroBeat(data.bpm || 120, data.beatsPerMeasure || 4, data.msUntilBeat || 0);
 }
 // Receive from embedded iframe
 window.addEventListener('message', e => _handleMetroMsg(e.data));
