@@ -276,7 +276,8 @@
     .knob-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; cursor: ns-resize; user-select: none; touch-action: none; }
     .knob-wrap:hover .knob-body { stroke: var(--accent2); }
     .knob-val { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); line-height: 1.2; }
-    .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; padding: 0 4px; opacity: .7; }
+    .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; opacity: .7; }
+    .page-badge-row { padding: 1px 18px; display: flex; align-items: center; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
     .chord-charts-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: start; overflow-y: auto; padding-right: 4px; }
@@ -2875,13 +2876,6 @@ function buildCard(b) {
 
   const _palSd = getActiveSlotData(b);
 
-  if (b.activeSlot > 0) {
-    const slotInd = document.createElement('span');
-    slotInd.className = 'slot-indicator';
-    slotInd.textContent = `page ${b.activeSlot + 1}`;
-    palette.appendChild(slotInd);
-  }
-
   NOTES.forEach((name, i) => {
     const pill = document.createElement('button');
     pill.className = 'note-pill' + (_palSd.notes.has(i) || pinnedNoteIndices.has(i) ? ' active' : '');
@@ -2988,6 +2982,16 @@ function buildCard(b) {
   }
 
   card.appendChild(palette);
+
+  if (totalSlots > 1) {
+    const pageBadgeRow = document.createElement('div');
+    pageBadgeRow.className = 'page-badge-row';
+    const slotInd = document.createElement('span');
+    slotInd.className = 'slot-indicator';
+    slotInd.textContent = `page ${b.activeSlot + 1}`;
+    pageBadgeRow.appendChild(slotInd);
+    card.appendChild(pageBadgeRow);
+  }
 
   // ── Visibility row ────────────────────────────────────────────────────────
   const visRow = document.createElement('div');
