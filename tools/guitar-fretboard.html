@@ -1346,7 +1346,7 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
-    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : 800,
+    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : -800,
     patternPos:        -1,
   };
 }
@@ -3020,7 +3020,7 @@ function buildCard(b) {
     const earlyLbl = document.createElement('span');
     earlyLbl.textContent = 'early';
 
-    const earlyKnob = buildKnob(b.earlyChange, 0, 800, 50, v => {
+    const earlyKnob = buildKnob(b.earlyChange, -800, 0, 50, v => {
       b.earlyChange = v;
     });
 
@@ -3403,7 +3403,7 @@ function _onMetroMeasure() {
     // metro-measure fires 800ms before the beat; earlyChange controls how many ms
     // before the beat the visual change happens (0 = at the beat, 800 = immediately)
     const earlyMs = b.earlyChange !== undefined ? b.earlyChange : 800;
-    const delayMs = Math.max(0, 800 - earlyMs);
+    const delayMs = Math.max(0, 800 + earlyMs);
     setTimeout(() => {
       _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
       if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
