@@ -1346,6 +1346,7 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
+    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : 800,
     patternPos:        -1,
   };
 }
@@ -1743,6 +1744,7 @@ function buildPresetData(name) {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
+      earlyChange:       b.earlyChange,
     })),
   };
 }
@@ -3011,10 +3013,29 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeKnob.el);
 
+    const earlyGrp = document.createElement('div');
+    earlyGrp.className = 'slot-sync';
+    earlyGrp.title = 'How many ms before beat 1 the page changes (0 = at the beat, 800 = maximum early)';
+
+    const earlyLbl = document.createElement('span');
+    earlyLbl.textContent = 'early';
+
+    const earlyKnob = buildKnob(b.earlyChange, 0, 800, 50, v => {
+      b.earlyChange = v;
+    });
+
+    earlyGrp.appendChild(earlyLbl);
+    earlyGrp.appendChild(earlyKnob.el);
+
+    const _knobbsCol = document.createElement('div');
+    _knobbsCol.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    _knobbsCol.appendChild(fadeGrp);
+    _knobbsCol.appendChild(earlyGrp);
+
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
-    _visCtrlZone.appendChild(fadeGrp);
+    _visCtrlZone.appendChild(_knobbsCol);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -3379,17 +3400,23 @@ function _onMetroMeasure() {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
     if (_slotSkipNext[b.id]) { _slotSkipNext[b.id] = false; return; }
-    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-    if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
-      const pattern = _parsePattern(b);
-      if (pattern) {
-        b.patternPos = (b.patternPos + 1) % pattern.length;
-        b.activeSlot = pattern[b.patternPos];
-      } else {
-        b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    // metro-measure fires 800ms before the beat; earlyChange controls how many ms
+    // before the beat the visual change happens (0 = at the beat, 800 = immediately)
+    const earlyMs = b.earlyChange !== undefined ? b.earlyChange : 800;
+    const delayMs = Math.max(0, 800 - earlyMs);
+    setTimeout(() => {
+      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
+        const pattern = _parsePattern(b);
+        if (pattern) {
+          b.patternPos = (b.patternPos + 1) % pattern.length;
+          b.activeSlot = pattern[b.patternPos];
+        } else {
+          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+        }
+        _crossfadeBoard(b.id);
       }
-      _crossfadeBoard(b.id);
-    }
+    }, delayMs);
   });
 }
 
