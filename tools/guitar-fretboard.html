@@ -3537,17 +3537,15 @@ function _flashRing(boardId) {
   const r = s.rect;
   r.style.transition = 'none';
   r.style.strokeDashoffset = '0';
-  r.style.stroke = '#ffe566';
-  r.style.opacity = '1';
-  r.style.strokeWidth = '2.5px';
+  r.style.opacity = '0.8';
+  r.style.strokeWidth = '2px';
   setTimeout(() => {
     if (_ringState[boardId]?.rect !== r) return;
-    r.style.transition = 'stroke 180ms ease-out, opacity 180ms ease-out, stroke-width 180ms ease-out';
-    r.style.stroke = 'var(--accent2)';
+    r.style.transition = 'opacity 250ms ease-out, stroke-width 250ms ease-out';
     r.style.opacity = '0.45';
     r.style.strokeWidth = '1.5px';
-    r.style.strokeDashoffset = '1'; // reset to empty instantly
-  }, 65);
+    r.style.strokeDashoffset = '1';
+  }, 40);
 }
 
 function _parsePattern(b) {
@@ -3565,17 +3563,17 @@ function _onMetroStart() {
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
     _slotBeatCounts[b.id]    = 0;
-    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
-    if (totalSlots > 1 && b.slotMeasures > 0) _attachRing(b.id);
-    else _detachRing(b.id);
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
       b.activeSlot = pattern[0];
-      refreshBoard(b.id);
+      refreshBoard(b.id); // must run before _attachRing — refreshBoard replaces the DOM
     } else {
       b.patternPos = -1;
     }
+    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (totalSlots > 1 && b.slotMeasures > 0) _attachRing(b.id);
+    else _detachRing(b.id);
   });
 }
 
@@ -3589,9 +3587,28 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
+    const sm        = b.slotMeasures;
+    const cycleLen  = Math.max(1, Math.round(sm));
+    const prevCount = _slotMeasureCounts[b.id] || 0;
+    const posInCycle = prevCount % cycleLen;
+    const curProg    = posInCycle / cycleLen;
+    const nextProg   = Math.min(1, (posInCycle + 1) / cycleLen);
+
+    // Animate ring from current position to next position over this measure's duration
+    const s = _ringState[b.id];
+    if (s) {
+      const r = s.rect;
+      r.style.transition = 'none';
+      r.style.strokeDashoffset = String(1 - curProg);
+      void r.getBoundingClientRect();
+      r.style.transition = `stroke-dashoffset ${delayMs}ms linear`;
+      r.style.strokeDashoffset = String(1 - nextProg);
+    }
+
     setTimeout(() => {
-      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
+      if (_beatModeActive) return; // looper activated mid-measure; let _onMetroBeat handle it
+      _slotMeasureCounts[b.id] = prevCount + 1;
+      if (_slotMeasureCounts[b.id] % sm === 0) {
         const pattern = _parsePattern(b);
         if (pattern) {
           b.patternPos = (b.patternPos + 1) % pattern.length;
