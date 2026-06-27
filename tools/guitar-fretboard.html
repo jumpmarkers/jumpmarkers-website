@@ -1147,8 +1147,8 @@
       </svg>
       <table class="help-table">
         <tr><td>change every N</td><td>Advance to the next page (or next in PAT pattern) every N measures while the metronome is running</td></tr>
-        <tr><td>out knob</td><td>Fade-out duration for the <strong>outgoing</strong> page. The old notes dissolve over this time. <strong>0ms</strong> = instant cut.</td></tr>
-        <tr><td>in knob</td><td>Fade-in duration for the <strong>incoming</strong> page. The new notes materialize over this time. <strong>0ms</strong> = instant appear.</td></tr>
+        <tr><td>in knob</td><td>How many ms <em>before</em> beat 1 the next page's notes start appearing as a ghost. The fade-in ends exactly at beat 1. <strong>0ms</strong> = no preview.</td></tr>
+        <tr><td>out knob</td><td>How long the current page's notes take to dissolve <em>after</em> beat 1. <strong>0ms</strong> = instant cut.</td></tr>
       </table>
 
       <div class="help-section-title">💡 Quick start with pages &amp; metronome</div>
@@ -2176,6 +2176,80 @@ function _crossfadeBoard(boardId) {
       newFb.style.opacity = '1';
       setTimeout(() => { newFb.style.transition = ''; newFb.style.opacity = ''; }, durIn + 60);
     }));
+  }
+}
+
+// Preview: show next page fading in durIn ms before beat 1. b.activeSlot already updated.
+function _startPagePreview(boardId, durIn) {
+  const b = boards.find(x => x.id === boardId);
+  if (!b) return;
+  if (b._pageClone) { b._pageClone.remove(); b._pageClone = null; }
+
+  const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!oldFb) { refreshBoard(boardId); return; }
+
+  const r = oldFb.getBoundingClientRect();
+  const clone = oldFb.cloneNode(true);
+  Object.assign(clone.style, {
+    position: 'fixed', top: r.top + 'px', left: r.left + 'px',
+    width: r.width + 'px', height: r.height + 'px',
+    pointerEvents: 'none', zIndex: '9998', overflow: 'hidden', opacity: '1',
+  });
+  document.body.appendChild(clone);
+  b._pageClone = clone;
+
+  refreshBoard(boardId);
+  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!newFb) return;
+  newFb.style.opacity = '0';
+  newFb.style.transition = `opacity ${durIn}ms linear`;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    newFb.style.opacity = '1';
+    setTimeout(() => { newFb.style.transition = ''; newFb.style.opacity = ''; }, durIn + 100);
+  }));
+}
+
+// Beat 1: start fading out the old clone (hadPreview) or do a standard instant swap + fade-out.
+function _commitPageChange(boardId, durOut, hadPreview) {
+  const b = boards.find(x => x.id === boardId);
+  if (!b) return;
+
+  if (hadPreview) {
+    const clone = b._pageClone;
+    b._pageClone = null;
+    if (!clone) return;
+    if (durOut > 0) {
+      clone.style.transition = `opacity ${durOut}ms ease-out`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        clone.style.opacity = '0';
+        setTimeout(() => clone.remove(), durOut + 60);
+      }));
+    } else {
+      clone.remove();
+    }
+  } else {
+    // durIn = 0: instant swap, optional fade-out of old page
+    const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+    if (!oldFb) { refreshBoard(boardId); return; }
+    const clone = durOut > 0 ? oldFb.cloneNode(true) : null;
+    refreshBoard(boardId);
+    if (clone) {
+      const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+      if (!newFb) { clone.remove(); return; }
+      const r = newFb.getBoundingClientRect();
+      Object.assign(clone.style, {
+        position: 'fixed', top: r.top + 'px', left: r.left + 'px',
+        width: r.width + 'px', height: r.height + 'px',
+        pointerEvents: 'none', zIndex: '9998',
+        overflow: 'hidden', opacity: '1',
+        transition: `opacity ${durOut}ms ease-out`,
+      });
+      document.body.appendChild(clone);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        clone.style.opacity = '0';
+        setTimeout(() => clone.remove(), durOut + 60);
+      }));
+    }
   }
 }
 
@@ -3465,25 +3539,41 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
-  const beatMs = 60000 / (bpm || 120);
-  const delayMs = msUntilBeat1 > 0 ? msUntilBeat1 : beatMs;
+  const ms = msUntilBeat1 > 0 ? msUntilBeat1 : 60000 / (bpm || 120);
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
+
+    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+    if (_slotMeasureCounts[b.id] % b.slotMeasures !== 0) return;
+
+    const pattern  = _parsePattern(b);
+    const nextPos  = pattern ? (b.patternPos + 1) % pattern.length : null;
+    const nextSlot = pattern ? pattern[nextPos] : (b.activeSlot + 1) % totalSlots;
+
+    const durIn  = b.fadeInDuration    || 0;
+    const durOut = b.crossfadeDuration || 0;
+    const hasPreview  = durIn > 0;
+    const previewDelay = Math.max(0, ms - durIn);
+
+    if (hasPreview) {
+      // Start preview durIn ms before beat 1: new page fades in from 0→1
+      setTimeout(() => {
+        if (pattern && nextPos !== null) b.patternPos = nextPos;
+        b.activeSlot = nextSlot;
+        _startPagePreview(b.id, durIn);
+      }, previewDelay);
+    }
+
+    // At beat 1: old page starts fading out
     setTimeout(() => {
-      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
-        const pattern = _parsePattern(b);
-        if (pattern) {
-          b.patternPos = (b.patternPos + 1) % pattern.length;
-          b.activeSlot = pattern[b.patternPos];
-        } else {
-          b.activeSlot = (b.activeSlot + 1) % totalSlots;
-        }
-        _crossfadeBoard(b.id);
+      if (!hasPreview) {
+        if (pattern && nextPos !== null) b.patternPos = nextPos;
+        b.activeSlot = nextSlot;
       }
-    }, delayMs);
+      _commitPageChange(b.id, durOut, hasPreview);
+    }, ms);
   });
 }
 
