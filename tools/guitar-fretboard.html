@@ -1346,7 +1346,7 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
-    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : -800,
+    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : -1,
     patternPos:        -1,
   };
 }
@@ -2520,7 +2520,7 @@ function refreshChordChartsPanel(bid) {
 }
 
 // ─── Circular knob ────────────────────────────────────────────────────────────
-function buildKnob(initVal, min, max, step, onChange) {
+function buildKnob(initVal, min, max, step, onChange, format) {
   const SZ = 34, CX = SZ / 2, CY = SZ / 2;
   const TR = 13, KR = 8, DR = 2, DD = 5.5;
   const A0 = 225, SW = 270;
@@ -2587,7 +2587,7 @@ function buildKnob(initVal, min, max, step, onChange) {
     fill.setAttribute('d', sw < 0.5 ? '' : arcPath(A0, sw, TR));
     const [dx, dy] = polar(A0 + sw, DD);
     dot.setAttribute('cx', dx.toFixed(2)); dot.setAttribute('cy', dy.toFixed(2));
-    lbl.textContent = _v + 'ms';
+    lbl.textContent = format ? format(_v) : _v + 'ms';
   }
 
   paint(initVal);
@@ -3020,9 +3020,9 @@ function buildCard(b) {
     const earlyLbl = document.createElement('span');
     earlyLbl.textContent = 'early';
 
-    const earlyKnob = buildKnob(b.earlyChange, -800, 0, 50, v => {
+    const earlyKnob = buildKnob(b.earlyChange, -1, 0, 0.25, v => {
       b.earlyChange = v;
-    });
+    }, v => parseFloat(v.toFixed(2)) + 'b');
 
     earlyGrp.appendChild(earlyLbl);
     earlyGrp.appendChild(earlyKnob.el);
@@ -3392,18 +3392,19 @@ function _onMetroStart() {
   });
 }
 
-function _onMetroMeasure() {
+function _onMetroMeasure(bpm) {
   const now = performance.now();
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
+  const beatMs = 60000 / (bpm || 120);
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
     if (_slotSkipNext[b.id]) { _slotSkipNext[b.id] = false; return; }
-    // metro-measure fires 800ms before the beat; earlyChange controls how many ms
-    // before the beat the visual change happens (0 = at the beat, 800 = immediately)
-    const earlyMs = b.earlyChange !== undefined ? b.earlyChange : 800;
-    const delayMs = Math.max(0, 800 + earlyMs);
+    // earlyChange is in beats (0 = at beat, 1 = 1 full beat early)
+    // metro-measure fires 800ms before beat 1; compute delay from that window
+    const earlyMs = -(b.earlyChange || 0) * beatMs;
+    const delayMs = Math.max(0, 800 - earlyMs);
     setTimeout(() => {
       _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
       if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
@@ -3423,7 +3424,7 @@ function _onMetroMeasure() {
 function _handleMetroMsg(data) {
   if (!data) return;
   if (data.type === 'metro-start')   _onMetroStart();
-  if (data.type === 'metro-measure') _onMetroMeasure();
+  if (data.type === 'metro-measure') _onMetroMeasure(data.bpm || 120);
 }
 // Receive from embedded iframe
 window.addEventListener('message', e => _handleMetroMsg(e.data));

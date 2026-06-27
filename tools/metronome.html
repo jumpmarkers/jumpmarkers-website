@@ -859,8 +859,8 @@ function schedLoop(){
       const delayMs = (_fireAt - ctx.currentTime) * 1000 - 800;
       setTimeout(() => {
         if (!isPlaying) return;
-        if (_metroBc) _metroBc.postMessage({ type: 'metro-measure' });
-        if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure' }, '*');
+        if (_metroBc) _metroBc.postMessage({ type: 'metro-measure', bpm });
+        if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure', bpm }, '*');
       }, Math.max(0, delayMs));
     }
 
