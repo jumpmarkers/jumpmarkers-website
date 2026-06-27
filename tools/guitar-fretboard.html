@@ -871,7 +871,7 @@
     .fb-modal-overlay.open { display: flex; }
     .fb-modal {
       background: var(--bg2); border: 1px solid var(--border2);
-      border-radius: 14px; width: 420px; max-width: 95vw; max-height: 85vh;
+      border-radius: 14px; width: 500px; max-width: 95vw; max-height: 85vh;
       overflow-y: auto; box-shadow: 0 24px 48px rgba(0,0,0,.6);
     }
     .fb-modal-head {
@@ -900,6 +900,7 @@
     .help-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
     .help-table td:first-child { white-space: nowrap; font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); font-weight: 600; width: 38%; }
     .help-section-title { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 0 4px; }
+    .help-p { font-size: 0.8rem; line-height: 1.5; color: var(--text); margin: 0 0 8px; }
   /* ── Feedback widget ── */
   .msg-card{background:var(--surface,#131a3d);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:48px auto 14px;max-width:800px}
   .msg-card-title{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted,#888);margin-bottom:8px}
@@ -1090,6 +1091,86 @@
         <tr><td>Save (empty name)</td><td>Overwrites the currently loaded preset</td></tr>
         <tr><td>Export / Import</td><td>Save presets to a .json file and restore them anytime</td></tr>
       </table>
+
+      <div class="help-section-title">📄 Pages — Multiple configurations per fretboard</div>
+      <p class="help-p">Each fretboard can hold up to <strong>10 independent pages</strong>, each with its own highlighted notes, root and visibility. Great for alternating between chord inversions, positions along the neck, or scale patterns.</p>
+      <svg viewBox="0 0 370 66" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+        <text x="10" y="27" style="font-size:8.5px;font-family:monospace;fill:var(--muted);letter-spacing:.5px">PAT:</text>
+        <rect x="36" y="13" width="66" height="20" rx="4" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="69" y="27" style="font-size:9.5px;font-family:monospace;fill:var(--text)" text-anchor="middle">7, 1</text>
+        <rect x="112" y="13" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="124" y="28" style="font-size:12px;font-family:monospace;fill:var(--text)" text-anchor="middle">←</text>
+        <text x="151" y="27" style="font-size:9.5px;font-family:monospace;fill:var(--text)" text-anchor="middle">7/7</text>
+        <rect x="166" y="13" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--accent2);stroke-width:1"/>
+        <text x="178" y="28.5" style="font-size:14px;font-family:monospace;fill:var(--accent2)" text-anchor="middle">+</text>
+        <line x1="69"  y1="34" x2="69"  y2="48" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="124" y1="34" x2="124" y2="48" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="151" y1="34" x2="151" y2="48" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="178" y1="34" x2="178" y2="48" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <text x="69"  y="58" style="font-size:7.5px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page pattern</text>
+        <text x="124" y="58" style="font-size:7.5px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">prev page</text>
+        <text x="151" y="58" style="font-size:7.5px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page / total</text>
+        <text x="178" y="58" style="font-size:7.5px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">add page</text>
+      </svg>
+      <table class="help-table">
+        <tr><td>← N/M →</td><td>Navigate between existing pages. The + button replaces → when you're on the last page.</td></tr>
+        <tr><td>Arrow keys ← →</td><td>Same as above — keyboard shortcut (only when no text input is focused)</td></tr>
+        <tr><td>+ button</td><td>Create a new empty page. Each page stores its own note selection and root independently.</td></tr>
+        <tr><td>PAT: 1,3,2,1</td><td>Custom page order for auto-advance. Numbers are 1-based page numbers, duplicates allowed. Leave empty for sequential (1→2→3→…).</td></tr>
+      </table>
+
+      <div class="help-section-title">🥁 Metronome Sync — Auto-advance pages in musical time</div>
+      <p class="help-p">When the metronome plays, pages advance automatically every N bars. The controls below appear on the right side of the SHOW row once a fretboard has 2 or more pages.</p>
+      <svg viewBox="0 0 370 110" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+        <!-- change every N bars section -->
+        <text x="10" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">change every</text>
+        <rect x="90" y="42" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="104" y="56" style="font-size:10px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
+        <text x="123" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">bars</text>
+        <!-- vertical separator between "change every" and knobs -->
+        <line x1="154" y1="6" x2="154" y2="104" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
+        <!-- ── fade knob (top row) ── -->
+        <text x="163" y="28" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">fade</text>
+        <!-- knob body -->
+        <circle cx="208" cy="30" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
+        <!-- track arc: 225° → 495° (270° sweep, clockwise) = M(cx-9.2, cy+9.2) A ... (cx+9.2, cy+9.2) -->
+        <path d="M198.8 39.2 A13 13 0 1 1 217.2 39.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
+        <!-- dot at min (0ms → 7-o'clock position) -->
+        <circle cx="198.8" cy="39.2" r="2.3" style="fill:var(--muted)"/>
+        <text x="208" y="51" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
+        <!-- row divider between fade and early -->
+        <line x1="154" y1="62" x2="370" y2="62" style="stroke:var(--border2);stroke-width:.4"/>
+        <!-- ── early knob (bottom row) ── -->
+        <text x="163" y="76" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">early</text>
+        <!-- knob body -->
+        <circle cx="208" cy="78" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
+        <!-- track arc -->
+        <path d="M198.8 87.2 A13 13 0 1 1 217.2 87.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
+        <!-- fill arc at -0.5b: 135° sweep from 7-o'clock to 12-o'clock -->
+        <path d="M198.8 87.2 A13 13 0 0 1 208 65" style="fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round"/>
+        <!-- dot at 12-o'clock (−0.5b) -->
+        <circle cx="208" cy="65" r="2.3" style="fill:var(--accent)"/>
+        <text x="208" y="99" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">−0.5b</text>
+        <!-- side labels explaining the knob range -->
+        <text x="234" y="72" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">← counterclockwise</text>
+        <text x="234" y="82" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">= earlier change</text>
+        <text x="234" y="95" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">−1b = max early</text>
+        <text x="234" y="105" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">0b = at beat 1</text>
+      </svg>
+      <table class="help-table">
+        <tr><td>change every N</td><td>Advance to the next page (or next in PAT pattern) every N measures while the metronome is running</td></tr>
+        <tr><td>fade knob</td><td>Crossfade duration when switching pages. <strong>0ms</strong> = instant snap. Drag up or scroll to increase up to 2000ms. Double-click to reset.</td></tr>
+        <tr><td>early knob</td><td>How many beats <em>before</em> beat 1 the page changes. <strong>−1b</strong> = 1 full beat early. <strong>0b</strong> = exactly on beat 1. Scales with BPM automatically. Drag up (counterclockwise) for more advance.</td></tr>
+      </table>
+
+      <div class="help-section-title">💡 Quick start with pages &amp; metronome</div>
+      <ol style="font-size:0.8rem;line-height:1.9;color:var(--text);margin:0;padding-left:18px">
+        <li>Add 2+ pages to a fretboard using <strong>+</strong>. Highlight different notes on each page.</li>
+        <li>Optionally type a pattern in <strong>PAT:</strong> — e.g. <code style="font-family:var(--mono);font-size:.77rem;background:var(--surface);padding:1px 4px;border-radius:3px">2,1,3,1</code> — to define the page order.</li>
+        <li>Set <strong>change every</strong> to how many bars between switches.</li>
+        <li>Open the Metronome, set your tempo, and press <strong>▶ Play</strong>. Pages advance in sync.</li>
+        <li>Drag the <strong>early</strong> knob up/counterclockwise to see the next page slightly before beat 1 — so your hands are ready.</li>
+      </ol>
     </div>
   </div>
 </div>
