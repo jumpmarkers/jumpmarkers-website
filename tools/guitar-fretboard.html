@@ -2151,34 +2151,63 @@ function refreshBoard(boardId) {
   old.replaceWith(buildCard(b));
 }
 
-function _crossfadeBoard(boardId) {
+// Start showing the incoming page as a fade-in overlay while old page stays visible on top.
+// Called earlyMs before beat 1. b.activeSlot must already be set to the next page.
+function _startPagePreview(boardId, fadeDur) {
   const b = boards.find(x => x.id === boardId);
-  const dur = b ? b.crossfadeDuration : 0;
-  if (!dur) { refreshBoard(boardId); return; }
+  if (!b) return;
+  if (b._pageClone) { b._pageClone.remove(); b._pageClone = null; }
 
   const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
   if (!oldFb) { refreshBoard(boardId); return; }
 
+  // Freeze old page as a fixed overlay on top
+  const r = oldFb.getBoundingClientRect();
   const clone = oldFb.cloneNode(true);
-  refreshBoard(boardId);
-
-  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-  if (!newFb) return;
-  const r = newFb.getBoundingClientRect();
-
   Object.assign(clone.style, {
     position: 'fixed', top: r.top + 'px', left: r.left + 'px',
     width: r.width + 'px', height: r.height + 'px',
-    pointerEvents: 'none', zIndex: '9998',
-    overflow: 'hidden', opacity: '1',
-    transition: `opacity ${dur}ms ease-out`,
+    pointerEvents: 'none', zIndex: '9998', overflow: 'hidden', opacity: '1',
   });
   document.body.appendChild(clone);
+  b._pageClone = clone;
 
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    clone.style.opacity = '0';
-    setTimeout(() => clone.remove(), dur + 60);
-  }));
+  // Render new page underneath and fade it in
+  refreshBoard(boardId);
+  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!newFb) return;
+  newFb.style.opacity = '0';
+  newFb.style.transition = `opacity ${fadeDur}ms linear`;
+  requestAnimationFrame(() => requestAnimationFrame(() => { newFb.style.opacity = '1'; }));
+}
+
+// Called exactly at beat 1: snap off the old page overlay, let new page finish fading.
+// If no preview was started, applies the page change now (with optional fade-in).
+function _commitPageChange(boardId, fadeDur, hadPreview) {
+  const b = boards.find(x => x.id === boardId);
+  if (!b) return;
+
+  if (hadPreview && b._pageClone) {
+    // Old page snaps off — new page is still fading in, let it finish
+    b._pageClone.remove();
+    b._pageClone = null;
+    const fb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+    if (fb) setTimeout(() => { fb.style.transition = ''; fb.style.opacity = ''; }, fadeDur + 100);
+  } else {
+    // No preview: refresh board now
+    refreshBoard(boardId);
+    if (fadeDur > 0) {
+      const fb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+      if (fb) {
+        fb.style.opacity = '0';
+        fb.style.transition = `opacity ${fadeDur}ms linear`;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          fb.style.opacity = '1';
+          setTimeout(() => { fb.style.transition = ''; fb.style.opacity = ''; }, fadeDur + 100);
+        }));
+      }
+    }
+  }
 }
 
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
@@ -2820,7 +2849,7 @@ function buildCard(b) {
   slotPrevBtn.title = 'Previous highlight slot';
   slotPrevBtn.disabled = (b.activeSlot === 0);
   slotPrevBtn.addEventListener('click', () => {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _commitPageChange(b.id, b.crossfadeDuration || 0, false); }
   });
 
   const slotLbl = document.createElement('span');
@@ -2841,7 +2870,7 @@ function buildCard(b) {
       b.activeSlot++;
     }
     pushHistory();
-    _crossfadeBoard(b.id);
+    _commitPageChange(b.id, b.crossfadeDuration || 0, false);
   });
 
   slotNav.appendChild(slotPrevBtn);
@@ -3446,7 +3475,7 @@ document.addEventListener('keydown', e => {
     b.activeSlot = (b.activeSlot + 1) % totalSlots;
   }
   pushHistory();
-  _crossfadeBoard(b.id);
+  _commitPageChange(b.id, b.crossfadeDuration || 0, false);
 });
 
 let _lastMetroTs = 0;
@@ -3479,26 +3508,44 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
   const beatMs = 60000 / (bpm || 120);
+  const ms = msUntilBeat1 > 0 ? msUntilBeat1 : beatMs;
+
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
-    // earlyChange in beats: 0b = fires at beat 1, -1b = fires 1 beat before beat 1
-    // msUntilBeat1 is the exact time until the next measure's beat 1 (sent by the metronome)
+
+    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+    if (_slotMeasureCounts[b.id] % b.slotMeasures !== 0) return;
+
+    // Determine which slot comes next
+    const pattern = _parsePattern(b);
+    const nextPos = pattern ? (b.patternPos + 1) % pattern.length : null;
+    const nextSlot = pattern ? pattern[nextPos] : (b.activeSlot + 1) % totalSlots;
+
+    // earlyMs: how many ms before beat 1 the fade-in should START (0 = at beat 1)
     const earlyMs = -(b.earlyChange || 0) * beatMs;
-    const delayMs = Math.max(0, (msUntilBeat1 > 0 ? msUntilBeat1 : beatMs) - earlyMs);
+    const fadeDur = b.crossfadeDuration || 0;
+    const commitDelay = ms;                          // fires exactly at beat 1
+    const previewDelay = Math.max(0, ms - earlyMs);  // fires earlyMs before beat 1
+    const hasPreview = earlyMs > 0 && fadeDur > 0 && previewDelay < commitDelay;
+
+    if (hasPreview) {
+      // Start fade-in of incoming page earlyMs before beat 1
+      setTimeout(() => {
+        if (pattern && nextPos !== null) b.patternPos = nextPos;
+        b.activeSlot = nextSlot;
+        _startPagePreview(b.id, fadeDur);
+      }, previewDelay);
+    }
+
+    // At beat 1: snap off old page, commit new page
     setTimeout(() => {
-      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
-        const pattern = _parsePattern(b);
-        if (pattern) {
-          b.patternPos = (b.patternPos + 1) % pattern.length;
-          b.activeSlot = pattern[b.patternPos];
-        } else {
-          b.activeSlot = (b.activeSlot + 1) % totalSlots;
-        }
-        _crossfadeBoard(b.id);
+      if (!hasPreview) {
+        if (pattern && nextPos !== null) b.patternPos = nextPos;
+        b.activeSlot = nextSlot;
       }
-    }, delayMs);
+      _commitPageChange(b.id, fadeDur, hasPreview);
+    }, commitDelay);
   });
 }
 
