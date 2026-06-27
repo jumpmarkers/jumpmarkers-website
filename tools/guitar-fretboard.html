@@ -473,7 +473,12 @@
     .tonic-badge.hint   { color: var(--muted); opacity: .55; }
 
     /* ── Fretboard ── */
-    .fretboard-outer { padding: 14px 18px 2px; overflow-x: auto; }
+    .fretboard-outer { padding: 14px 18px 2px; overflow-x: auto; position: relative; }
+    /* Progress ring */
+    .fb-ring-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 5; overflow: visible;
+    }
     .fretboard {
       display: grid;
       /* columns set via JS */
@@ -1364,6 +1369,8 @@ let presets = [];
 let nextId  = 1;
 const _slotMeasureCounts = {};
 const _slotBeatCounts    = {};
+const _ringState         = {}; // boardId → { svg, rect }
+let   _metroActive       = false;
 let   _lastActiveBoardId = null;
 
 try { presets = JSON.parse(localStorage.getItem('gfv-presets') || '[]'); } catch(e){}
@@ -2154,13 +2161,20 @@ function refreshBoard(boardId) {
 function _crossfadeBoard(boardId) {
   const b = boards.find(x => x.id === boardId);
   const dur = b ? (b.crossfadeDuration || 0) : 0;
-  if (!dur) { refreshBoard(boardId); return; }
+
+  if (!dur) {
+    refreshBoard(boardId);
+    _ringAfterRefresh(boardId);
+    return;
+  }
 
   const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-  if (!oldFb) { refreshBoard(boardId); return; }
+  if (!oldFb) { refreshBoard(boardId); _ringAfterRefresh(boardId); return; }
 
   const clone = oldFb.cloneNode(true);
+  clone.querySelector('.fb-ring-svg')?.remove(); // don't fade old ring with content
   refreshBoard(boardId);
+  _ringAfterRefresh(boardId);
 
   const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
   if (!newFb) return;
@@ -2179,6 +2193,16 @@ function _crossfadeBoard(boardId) {
     clone.style.opacity = '0';
     setTimeout(() => clone.remove(), dur + 60);
   }));
+}
+
+function _ringAfterRefresh(boardId) {
+  if (!_metroActive) return;
+  const b = boards.find(x => x.id === boardId);
+  if (!b) return;
+  const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+  if (totalSlots <= 1 || !b.slotMeasures) return;
+  _attachRing(boardId);
+  _flashRing(boardId);
 }
 
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
@@ -3452,6 +3476,80 @@ let _lastMetroTs     = 0;
 let _lastMetroBeatTs = 0;
 let _beatModeActive  = false;
 
+// ─── Progress ring helpers ────────────────────────────────────────────────────
+const _ringResizeObs = typeof ResizeObserver !== 'undefined'
+  ? new ResizeObserver(entries => entries.forEach(e => {
+      const bid = e.target.dataset.bid;
+      if (bid && _ringState[bid]) _sizeRing(bid);
+    }))
+  : null;
+
+function _sizeRing(boardId) {
+  const s = _ringState[boardId];
+  if (!s) return;
+  const outer = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!outer) return;
+  const p = 3, w = outer.offsetWidth, h = outer.offsetHeight;
+  s.rect.setAttribute('x', p);
+  s.rect.setAttribute('y', p);
+  s.rect.setAttribute('width',  Math.max(0, w - p * 2));
+  s.rect.setAttribute('height', Math.max(0, h - p * 2));
+}
+
+function _attachRing(boardId) {
+  _detachRing(boardId);
+  const outer = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!outer) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg  = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'fb-ring-svg');
+  const rect = document.createElementNS(ns, 'rect');
+  rect.setAttribute('pathLength', '1');
+  rect.setAttribute('rx', '8'); rect.setAttribute('ry', '8');
+  rect.style.cssText = [
+    'fill:none',
+    'stroke:var(--accent2)',
+    'stroke-width:1.5px',
+    'opacity:0.45',
+    'stroke-dasharray:1 1',
+    'stroke-dashoffset:1',
+    'transition:none',
+    'stroke-linecap:round',
+  ].join(';');
+  svg.appendChild(rect);
+  outer.appendChild(svg);
+  _ringState[boardId] = { svg, rect };
+  _sizeRing(boardId);
+  if (_ringResizeObs) _ringResizeObs.observe(outer);
+}
+
+function _detachRing(boardId) {
+  const s = _ringState[boardId];
+  if (!s) return;
+  if (_ringResizeObs && s.svg.parentElement) _ringResizeObs.unobserve(s.svg.parentElement);
+  s.svg.remove();
+  delete _ringState[boardId];
+}
+
+function _flashRing(boardId) {
+  const s = _ringState[boardId];
+  if (!s) return;
+  const r = s.rect;
+  r.style.transition = 'none';
+  r.style.strokeDashoffset = '0';
+  r.style.stroke = '#ffe566';
+  r.style.opacity = '1';
+  r.style.strokeWidth = '2.5px';
+  setTimeout(() => {
+    if (_ringState[boardId]?.rect !== r) return;
+    r.style.transition = 'stroke 180ms ease-out, opacity 180ms ease-out, stroke-width 180ms ease-out';
+    r.style.stroke = 'var(--accent2)';
+    r.style.opacity = '0.45';
+    r.style.strokeWidth = '1.5px';
+    r.style.strokeDashoffset = '1'; // reset to empty instantly
+  }, 65);
+}
+
 function _parsePattern(b) {
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (!b.slotPattern || !b.slotPattern.trim()) return null;
@@ -3463,9 +3561,13 @@ function _parsePattern(b) {
 
 function _onMetroStart() {
   _beatModeActive = false;
+  _metroActive    = true;
   boards.forEach(b => {
     _slotMeasureCounts[b.id] = 0;
     _slotBeatCounts[b.id]    = 0;
+    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (totalSlots > 1 && b.slotMeasures > 0) _attachRing(b.id);
+    else _detachRing(b.id);
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
@@ -3508,6 +3610,7 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
   const now = performance.now();
   if (now - _lastMetroBeatTs < 30) return;
   _lastMetroBeatTs = now;
+  const beatDurMs = 60000 / (bpm || 120);
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
@@ -3515,7 +3618,10 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     const beatThreshold = Math.max(1, Math.round(b.slotMeasures * (beatsPerMeasure || 4)));
     setTimeout(() => {
       _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
-      if (_slotBeatCounts[b.id] % beatThreshold === 0) {
+      const count = _slotBeatCounts[b.id];
+
+      if (count % beatThreshold === 0) {
+        // Cycle complete — page change; ring re-attach + flash happens inside _crossfadeBoard
         const pattern = _parsePattern(b);
         if (pattern) {
           b.patternPos = (b.patternPos + 1) % pattern.length;
@@ -3524,6 +3630,20 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
           b.activeSlot = (b.activeSlot + 1) % totalSlots;
         }
         _crossfadeBoard(b.id);
+      } else {
+        // Mid-cycle — animate ring one segment forward
+        const N   = count % beatThreshold;          // beats done in this cycle (1-indexed)
+        const cur = (N - 1) / beatThreshold;        // dashoffset before this beat
+        const nxt = N       / beatThreshold;        // dashoffset after this beat
+        const s   = _ringState[b.id];
+        if (s) {
+          const r = s.rect;
+          r.style.transition = 'none';
+          r.style.strokeDashoffset = String(1 - cur);
+          void r.getBoundingClientRect();           // flush so snap takes effect
+          r.style.transition = `stroke-dashoffset ${beatDurMs}ms linear`;
+          r.style.strokeDashoffset = String(1 - nxt);
+        }
       }
     }, msUntilBeat);
   });
