@@ -1089,9 +1089,12 @@ function playLayerMedia(l, offsetWC) {
   l.mediaEl  = audio;
   l.mediaSrc = mediaSrc;
   l.mediaUrl = url;
-  // offsetWC is wall-clock seconds → convert to media position
-  audio.currentTime = (offsetWC * retimeRate) % orig.duration;
-  actx.resume().then(() => audio.play().catch(() => {}));
+  // Compute position inside the Promise so WAV-conversion delay is absorbed
+  actx.resume().then(() => {
+    const elapsed = actx.currentTime - loopT0;
+    audio.currentTime = (Math.max(0, elapsed) * retimeRate) % orig.duration;
+    return audio.play();
+  }).catch(() => {});
 }
 
 function applyRetime(rate) {
