@@ -1122,46 +1122,24 @@
 
       <div class="help-section-title">🥁 Metronome Sync — Auto-advance pages in musical time</div>
       <p class="help-p">When the metronome plays, pages advance automatically every N bars. The controls below appear on the right side of the SHOW row once a fretboard has 2 or more pages.</p>
-      <svg viewBox="0 0 370 110" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+      <svg viewBox="0 0 370 65" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
         <!-- change every N bars section -->
-        <text x="10" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">change every</text>
-        <rect x="90" y="42" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
-        <text x="104" y="56" style="font-size:10px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
-        <text x="123" y="53" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">bars</text>
-        <!-- vertical separator between "change every" and knobs -->
-        <line x1="154" y1="6" x2="154" y2="104" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
-        <!-- ── fade knob (top row) ── -->
-        <text x="163" y="28" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">fade</text>
-        <!-- knob body -->
-        <circle cx="208" cy="30" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
-        <!-- track arc: 225° → 495° (270° sweep, clockwise) = M(cx-9.2, cy+9.2) A ... (cx+9.2, cy+9.2) -->
-        <path d="M198.8 39.2 A13 13 0 1 1 217.2 39.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
-        <!-- dot at min (0ms → 7-o'clock position) -->
-        <circle cx="198.8" cy="39.2" r="2.3" style="fill:var(--muted)"/>
-        <text x="208" y="51" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
-        <!-- row divider between fade and early -->
-        <line x1="154" y1="62" x2="370" y2="62" style="stroke:var(--border2);stroke-width:.4"/>
-        <!-- ── early knob (bottom row) ── -->
-        <text x="163" y="76" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">early</text>
-        <!-- knob body -->
-        <circle cx="208" cy="78" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
-        <!-- track arc -->
-        <path d="M198.8 87.2 A13 13 0 1 1 217.2 87.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
-        <!-- fill arc at -0.5b: 135° sweep from 7-o'clock to 12-o'clock -->
-        <path d="M198.8 87.2 A13 13 0 0 1 208 65" style="fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round"/>
-        <!-- dot at 12-o'clock (−0.5b) -->
-        <circle cx="208" cy="65" r="2.3" style="fill:var(--accent)"/>
-        <text x="208" y="99" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">−0.5b</text>
-        <!-- side labels explaining the knob range -->
-        <text x="234" y="72" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">← counterclockwise</text>
-        <text x="234" y="82" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">= earlier change</text>
-        <text x="234" y="95" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">−1b = max early</text>
-        <text x="234" y="105" style="font-size:7px;font-family:sans-serif;fill:var(--muted)">0b = at beat 1</text>
+        <text x="10" y="36" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">change every</text>
+        <rect x="90" y="24" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="104" y="38" style="font-size:10px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
+        <text x="123" y="36" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)">bars</text>
+        <!-- vertical separator -->
+        <line x1="154" y1="6" x2="154" y2="59" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
+        <!-- ── fade knob ── -->
+        <text x="163" y="20" style="font-size:8px;font-family:sans-serif;fill:var(--muted)">fade</text>
+        <circle cx="208" cy="33" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
+        <path d="M198.8 42.2 A13 13 0 1 1 217.2 42.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
+        <circle cx="198.8" cy="42.2" r="2.3" style="fill:var(--muted)"/>
+        <text x="208" y="55" style="font-size:8px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
       </svg>
       <table class="help-table">
         <tr><td>change every N</td><td>Advance to the next page (or next in PAT pattern) every N measures while the metronome is running</td></tr>
         <tr><td>fade knob</td><td>Crossfade duration when switching pages. <strong>0ms</strong> = instant snap. Drag up or scroll to increase up to 2000ms. Double-click to reset.</td></tr>
-        <tr><td>early knob</td><td>How many beats <em>before</em> beat 1 the page changes. <strong>−1b</strong> = 1 full beat early. <strong>0b</strong> = exactly on beat 1. Scales with BPM automatically. Drag up (counterclockwise) for more advance.</td></tr>
       </table>
 
       <div class="help-section-title">💡 Quick start with pages &amp; metronome</div>
@@ -1170,7 +1148,6 @@
         <li>Optionally type a pattern in <strong>PAT:</strong> — e.g. <code style="font-family:var(--mono);font-size:.77rem;background:var(--surface);padding:1px 4px;border-radius:3px">2,1,3,1</code> — to define the page order.</li>
         <li>Set <strong>change every</strong> to how many bars between switches.</li>
         <li>Open the Metronome, set your tempo, and press <strong>▶ Play</strong>. Pages advance in sync.</li>
-        <li>Drag the <strong>early</strong> knob up/counterclockwise to see the next page slightly before beat 1 — so your hands are ready.</li>
       </ol>
     </div>
   </div>
@@ -1427,7 +1404,6 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
-    earlyChange:       opts.earlyChange       !== undefined ? opts.earlyChange       : -1,
     patternPos:        -1,
   };
 }
@@ -1825,7 +1801,6 @@ function buildPresetData(name) {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
-      earlyChange:       b.earlyChange,
     })),
   };
 }
@@ -2151,63 +2126,34 @@ function refreshBoard(boardId) {
   old.replaceWith(buildCard(b));
 }
 
-// Start showing the incoming page as a fade-in overlay while old page stays visible on top.
-// Called earlyMs before beat 1. b.activeSlot must already be set to the next page.
-function _startPagePreview(boardId, fadeDur) {
+function _crossfadeBoard(boardId) {
   const b = boards.find(x => x.id === boardId);
-  if (!b) return;
-  if (b._pageClone) { b._pageClone.remove(); b._pageClone = null; }
+  const dur = b ? b.crossfadeDuration : 0;
+  if (!dur) { refreshBoard(boardId); return; }
 
   const oldFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
   if (!oldFb) { refreshBoard(boardId); return; }
 
-  // Freeze old page as a fixed overlay on top
-  const r = oldFb.getBoundingClientRect();
   const clone = oldFb.cloneNode(true);
+  refreshBoard(boardId);
+
+  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
+  if (!newFb) return;
+  const r = newFb.getBoundingClientRect();
+
   Object.assign(clone.style, {
     position: 'fixed', top: r.top + 'px', left: r.left + 'px',
     width: r.width + 'px', height: r.height + 'px',
-    pointerEvents: 'none', zIndex: '9998', overflow: 'hidden', opacity: '1',
+    pointerEvents: 'none', zIndex: '9998',
+    overflow: 'hidden', opacity: '1',
+    transition: `opacity ${dur}ms ease-out`,
   });
   document.body.appendChild(clone);
-  b._pageClone = clone;
 
-  // Render new page underneath and fade it in
-  refreshBoard(boardId);
-  const newFb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-  if (!newFb) return;
-  newFb.style.opacity = '0';
-  newFb.style.transition = `opacity ${fadeDur}ms linear`;
-  requestAnimationFrame(() => requestAnimationFrame(() => { newFb.style.opacity = '1'; }));
-}
-
-// Called exactly at beat 1: snap off the old page overlay, let new page finish fading.
-// If no preview was started, applies the page change now (with optional fade-in).
-function _commitPageChange(boardId, fadeDur, hadPreview) {
-  const b = boards.find(x => x.id === boardId);
-  if (!b) return;
-
-  if (hadPreview && b._pageClone) {
-    // Old page snaps off — new page is still fading in, let it finish
-    b._pageClone.remove();
-    b._pageClone = null;
-    const fb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-    if (fb) setTimeout(() => { fb.style.transition = ''; fb.style.opacity = ''; }, fadeDur + 100);
-  } else {
-    // No preview: refresh board now
-    refreshBoard(boardId);
-    if (fadeDur > 0) {
-      const fb = document.querySelector(`.fretboard-outer[data-bid="${boardId}"]`);
-      if (fb) {
-        fb.style.opacity = '0';
-        fb.style.transition = `opacity ${fadeDur}ms linear`;
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          fb.style.opacity = '1';
-          setTimeout(() => { fb.style.transition = ''; fb.style.opacity = ''; }, fadeDur + 100);
-        }));
-      }
-    }
-  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    clone.style.opacity = '0';
+    setTimeout(() => clone.remove(), dur + 60);
+  }));
 }
 
 // ─── Fretboard outer builder (shared by buildCard and live updates) ───────────
@@ -2849,7 +2795,7 @@ function buildCard(b) {
   slotPrevBtn.title = 'Previous highlight slot';
   slotPrevBtn.disabled = (b.activeSlot === 0);
   slotPrevBtn.addEventListener('click', () => {
-    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _commitPageChange(b.id, b.crossfadeDuration || 0, false); }
+    if (b.activeSlot > 0) { b.activeSlot--; pushHistory(); _crossfadeBoard(b.id); }
   });
 
   const slotLbl = document.createElement('span');
@@ -2870,7 +2816,7 @@ function buildCard(b) {
       b.activeSlot++;
     }
     pushHistory();
-    _commitPageChange(b.id, b.crossfadeDuration || 0, false);
+    _crossfadeBoard(b.id);
   });
 
   slotNav.appendChild(slotPrevBtn);
@@ -3125,29 +3071,10 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeKnob.el);
 
-    const earlyGrp = document.createElement('div');
-    earlyGrp.className = 'slot-sync';
-    earlyGrp.title = 'How many ms before beat 1 the page changes (0 = at the beat, 800 = maximum early)';
-
-    const earlyLbl = document.createElement('span');
-    earlyLbl.textContent = 'early';
-
-    const earlyKnob = buildKnob(b.earlyChange, -1, 0, 0.25, v => {
-      b.earlyChange = v;
-    }, v => parseFloat(v.toFixed(2)) + 'b');
-
-    earlyGrp.appendChild(earlyLbl);
-    earlyGrp.appendChild(earlyKnob.el);
-
-    const _knobbsCol = document.createElement('div');
-    _knobbsCol.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    _knobbsCol.appendChild(fadeGrp);
-    _knobbsCol.appendChild(earlyGrp);
-
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
-    _visCtrlZone.appendChild(_knobbsCol);
+    _visCtrlZone.appendChild(fadeGrp);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -3475,7 +3402,7 @@ document.addEventListener('keydown', e => {
     b.activeSlot = (b.activeSlot + 1) % totalSlots;
   }
   pushHistory();
-  _commitPageChange(b.id, b.crossfadeDuration || 0, false);
+  _crossfadeBoard(b.id);
 });
 
 let _lastMetroTs = 0;
@@ -3508,44 +3435,24 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
   if (now - _lastMetroTs < 100) return;
   _lastMetroTs = now;
   const beatMs = 60000 / (bpm || 120);
-  const ms = msUntilBeat1 > 0 ? msUntilBeat1 : beatMs;
+  const delayMs = msUntilBeat1 > 0 ? msUntilBeat1 : beatMs;
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
     if (totalSlots <= 1 || !b.slotMeasures) return;
-
-    _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
-    if (_slotMeasureCounts[b.id] % b.slotMeasures !== 0) return;
-
-    // Determine which slot comes next
-    const pattern = _parsePattern(b);
-    const nextPos = pattern ? (b.patternPos + 1) % pattern.length : null;
-    const nextSlot = pattern ? pattern[nextPos] : (b.activeSlot + 1) % totalSlots;
-
-    // earlyMs: how many ms before beat 1 the fade-in should START (0 = at beat 1)
-    const earlyMs = -(b.earlyChange || 0) * beatMs;
-    const fadeDur = b.crossfadeDuration || 0;
-    const commitDelay = ms;                          // fires exactly at beat 1
-    const previewDelay = Math.max(0, ms - earlyMs);  // fires earlyMs before beat 1
-    const hasPreview = earlyMs > 0 && fadeDur > 0 && previewDelay < commitDelay;
-
-    if (hasPreview) {
-      // Start fade-in of incoming page earlyMs before beat 1
-      setTimeout(() => {
-        if (pattern && nextPos !== null) b.patternPos = nextPos;
-        b.activeSlot = nextSlot;
-        _startPagePreview(b.id, fadeDur);
-      }, previewDelay);
-    }
-
-    // At beat 1: snap off old page, commit new page
     setTimeout(() => {
-      if (!hasPreview) {
-        if (pattern && nextPos !== null) b.patternPos = nextPos;
-        b.activeSlot = nextSlot;
+      _slotMeasureCounts[b.id] = (_slotMeasureCounts[b.id] || 0) + 1;
+      if (_slotMeasureCounts[b.id] % b.slotMeasures === 0) {
+        const pattern = _parsePattern(b);
+        if (pattern) {
+          b.patternPos = (b.patternPos + 1) % pattern.length;
+          b.activeSlot = pattern[b.patternPos];
+        } else {
+          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+        }
+        _crossfadeBoard(b.id);
       }
-      _commitPageChange(b.id, fadeDur, hasPreview);
-    }, commitDelay);
+    }, delayMs);
   });
 }
 
