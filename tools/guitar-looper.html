@@ -535,6 +535,8 @@ let loopDur = 0, loopT0 = 0; // loopT0 = actx time when loop cycle last started
 
 // Metronome
 let metroOn = true, nextBeatT = 0, beatIdx = 0, schedId = null;
+let _bc = null;
+try { _bc = new BroadcastChannel('guitar-tools'); } catch(e){}
 
 // Settings
 let bpm = 120, bpMeasure = 4, numMeasures = 2, cdBeats = 4, cdOn = true;
@@ -864,6 +866,16 @@ function scheduleTick() {
     const local = (_dotTotal > 0 ? beatIdx % _dotTotal : beatIdx % bpMeasure);
     click(nextBeatT, local % bpMeasure === 0, false);
     const t = nextBeatT, li = local;
+    // Broadcast metro-measure at beat 1 of each measure (skip countdown)
+    if (local % bpMeasure === 0 && phase !== 'cd') {
+      const _t = nextBeatT, _msDur = bpMeasure * (60 / bpm) * 1000;
+      setTimeout(() => {
+        const msUntilBeat1 = Math.max(0, (_t - actx.currentTime) * 1000) + _msDur;
+        const msg = { type: 'metro-measure', bpm, msUntilBeat1 };
+        if (_bc) _bc.postMessage(msg);
+        if (window.parent !== window) window.parent.postMessage(msg, '*');
+      }, 0);
+    }
     setTimeout(() => activateDot(li), Math.max(0, (t - actx.currentTime) * 1000));
     beatIdx++;
     nextBeatT += 60 / bpm;
@@ -873,6 +885,9 @@ function scheduleTick() {
 function startMetro(startT) {
   stopMetro();
   nextBeatT = startT; beatIdx = 0;
+  const msg = { type: 'metro-start' };
+  if (_bc) _bc.postMessage(msg);
+  if (window.parent !== window) window.parent.postMessage(msg, '*');
   scheduleTick();
   schedId = setInterval(scheduleTick, SCHED_INT);
 }
