@@ -52,6 +52,7 @@ nav{
   transition:color .15s,border-color .15s;justify-self:end;
 }
 .nav-back:hover{color:var(--text);border-color:var(--border2)}
+body.embedded .uke-wrap { display: none; }
 .uke-wrap{
   display:inline-flex;align-items:center;gap:13px;justify-self:center;
   align-self:stretch;opacity:.8;transition:opacity .2s,transform .2s;
@@ -2040,6 +2041,8 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
   }
   window.addEventListener('scroll', check, { passive: true });
 })();
+
+if (window.parent !== window) document.body.classList.add('embedded');
 </script>
 </body>
 </html>
