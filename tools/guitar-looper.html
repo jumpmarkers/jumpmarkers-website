@@ -1459,14 +1459,13 @@ function pausePlayback() {
 }
 
 function resumePlayback() {
-  loopT0 = actx.currentTime - _pauseOffset;
+  _pauseOffset = 0;
+  loopT0 = actx.currentTime;
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
-  layers.forEach(l => { if (!l.muted) _play(l, _pauseOffset); });
+  layers.forEach(l => { if (!l.muted) _play(l, 0); });
   if (metroOn && mode === 'metro') {
-    const beatDur = 60 / bpm;
-    const nextBeatIdx = Math.ceil(_pauseOffset / beatDur);
-    nextBeatT = loopT0 + nextBeatIdx * beatDur;
-    beatIdx = nextBeatIdx;
+    nextBeatT = loopT0;
+    beatIdx = 0;
     scheduleTick();
     schedId = setInterval(scheduleTick, SCHED_INT);
   }
