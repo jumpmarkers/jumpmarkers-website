@@ -115,10 +115,12 @@
     }
     .nav-sep { color: var(--border2); font-weight: 300; }
     .nav-tool { color: var(--text); font-weight: 400; font-size: 0.85rem; opacity: 0.75; }
+    .nav-right { display: flex; align-items: center; gap: 8px; justify-self: end; }
+    .nav-right .btn { font-size: 0.72rem; padding: 5px 10px; }
     .nav-back {
       font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
       padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
-      transition: color .15s, border-color .15s; justify-self: end;
+      transition: color .15s, border-color .15s;
     }
     .nav-back:hover { color: var(--text); border-color: var(--border2); }
     .uke-wrap {
@@ -304,6 +306,39 @@
     }
     .chord-chart-wrap:hover .chord-chart-del { opacity: 1; }
     .chord-chart-del:hover { color: var(--red); background: rgba(255,107,107,.1); }
+    .chord-drag-handle {
+      position: absolute; bottom: 3px; left: 3px;
+      cursor: grab; color: var(--border2); font-size: 0.7rem; line-height: 1;
+      padding: 1px 2px; border-radius: 3px;
+      opacity: 0; transition: opacity .15s, color .15s; user-select: none;
+    }
+    .chord-chart-wrap:hover .chord-drag-handle { opacity: 1; }
+    .chord-drag-handle:hover { color: var(--muted); }
+    .chord-drag-handle:active { cursor: grabbing; }
+    .chord-chart-wrap.chord-drop-before { box-shadow: -3px 0 0 0 var(--accent2); }
+    .chord-chart-wrap.chord-drop-after  { box-shadow:  3px 0 0 0 var(--accent2); }
+    .chord-color-menu {
+      position: fixed; z-index: 9999;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 5px 8px;
+      display: flex; align-items: center; gap: 5px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.55);
+    }
+    .chord-color-swatch {
+      width: 17px; height: 17px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; flex-shrink: 0;
+      transition: transform .1s, border-color .1s;
+    }
+    .chord-color-swatch:hover { transform: scale(1.25); border-color: rgba(255,255,255,.55); }
+    .chord-color-swatch.current { border-color: #fff; }
+    .chord-color-none {
+      width: 17px; height: 17px; border-radius: 50%; cursor: pointer;
+      border: 1.5px solid var(--border2); background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: var(--muted); flex-shrink: 0;
+      transition: transform .1s, border-color .1s, color .1s;
+    }
+    .chord-color-none:hover { transform: scale(1.25); border-color: var(--muted); color: var(--text); }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
       color: var(--text); font-family: var(--mono); font-size: 0.68rem;
@@ -973,7 +1008,11 @@
     </span>
     <span class="uke-label">buy me ukulele strings</span>
   </a>
-  <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
+  <div class="nav-right">
+    <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
+    <button class="btn btn-outline" id="btn-fb-help">? Help</button>
+    <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
+  </div>
 </nav>
 
 <main>
@@ -990,8 +1029,6 @@
         <button class="btn btn-outline" id="btn-metronome-split" title="Show metronome side by side">🥁 Metronome</button>
         <button class="btn btn-outline" id="btn-looper-split" title="Show looper side by side">🔁 Looper</button>
         <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
-        <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
-        <button class="btn btn-outline" id="btn-fb-help">? Help</button>
         <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
       </div>
     </div>
@@ -1111,23 +1148,27 @@
 
       <div class="help-section-title">📄 Pages — Multiple configurations per fretboard</div>
       <p class="help-p">Each fretboard can hold up to <strong>10 independent pages</strong>, each with its own highlighted notes, root and visibility. Great for alternating between chord inversions, positions along the neck, or scale patterns.</p>
-      <svg viewBox="0 0 370 80" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
-        <text x="10" y="27" style="font-size:11px;font-family:monospace;fill:var(--muted);letter-spacing:.5px">PAT:</text>
-        <rect x="36" y="13" width="66" height="20" rx="4" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
-        <text x="69" y="27" style="font-size:12px;font-family:monospace;fill:var(--text)" text-anchor="middle">7, 1</text>
-        <rect x="112" y="13" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
-        <text x="124" y="28" style="font-size:15px;font-family:monospace;fill:var(--text)" text-anchor="middle">←</text>
-        <text x="151" y="27" style="font-size:12px;font-family:monospace;fill:var(--text)" text-anchor="middle">7/7</text>
-        <rect x="166" y="13" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--accent2);stroke-width:1"/>
-        <text x="178" y="28.5" style="font-size:18px;font-family:monospace;fill:var(--accent2)" text-anchor="middle">+</text>
-        <line x1="69"  y1="34" x2="69"  y2="54" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
-        <line x1="124" y1="34" x2="124" y2="54" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
-        <line x1="151" y1="34" x2="151" y2="54" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
-        <line x1="178" y1="34" x2="178" y2="54" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
-        <text x="69"  y="67" style="font-size:10px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page pattern</text>
-        <text x="124" y="67" style="font-size:10px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">prev page</text>
-        <text x="151" y="67" style="font-size:10px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page / total</text>
-        <text x="178" y="67" style="font-size:10px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">add page</text>
+      <svg viewBox="0 0 370 84" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+        <text x="10" y="28" style="font-size:11px;font-family:monospace;fill:var(--muted);letter-spacing:.5px">PAT:</text>
+        <rect x="38" y="14" width="74" height="20" rx="4" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="75" y="28" style="font-size:12px;font-family:monospace;fill:var(--text)" text-anchor="middle">7, 1</text>
+        <rect x="126" y="14" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
+        <text x="138" y="29" style="font-size:15px;font-family:monospace;fill:var(--text)" text-anchor="middle">←</text>
+        <text x="178" y="28" style="font-size:12px;font-family:monospace;fill:var(--text)" text-anchor="middle">7/7</text>
+        <rect x="204" y="14" width="24" height="20" rx="3" style="fill:var(--surface);stroke:var(--accent2);stroke-width:1"/>
+        <text x="216" y="29.5" style="font-size:18px;font-family:monospace;fill:var(--accent2)" text-anchor="middle">+</text>
+        <line x1="75"  y1="35" x2="75"  y2="52" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="138" y1="35" x2="138" y2="52" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="178" y1="35" x2="178" y2="52" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <line x1="216" y1="35" x2="216" y2="52" style="stroke:var(--border2);stroke-width:.8;stroke-dasharray:2,1.5"/>
+        <text x="75"  y="62" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page</text>
+        <text x="138" y="62" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">prev</text>
+        <text x="178" y="62" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page /</text>
+        <text x="216" y="62" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">add</text>
+        <text x="75"  y="74" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">pattern</text>
+        <text x="138" y="74" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page</text>
+        <text x="178" y="74" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">total</text>
+        <text x="216" y="74" style="font-size:9px;font-family:sans-serif;fill:var(--accent2)" text-anchor="middle">page</text>
       </svg>
       <table class="help-table">
         <tr><td>← N/M →</td><td>Navigate between existing pages. The + button replaces → when you're on the last page.</td></tr>
@@ -1138,23 +1179,28 @@
 
       <div class="help-section-title">🥁 Metronome Sync — Auto-advance pages in musical time</div>
       <p class="help-p">When the metronome plays, pages advance automatically every N bars. The controls below appear on the right side of the SHOW row once a fretboard has 2 or more pages.</p>
-      <svg viewBox="0 0 370 72" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+      <svg viewBox="0 0 370 80" style="width:100%;display:block;margin:6px 0 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
         <!-- change every N bars section -->
         <text x="10" y="37" style="font-size:11px;font-family:sans-serif;fill:var(--muted)">change every</text>
         <rect x="96" y="24" width="28" height="20" rx="3" style="fill:var(--surface);stroke:var(--border2);stroke-width:1"/>
         <text x="110" y="38" style="font-size:13px;font-family:monospace;fill:var(--text)" text-anchor="middle">1</text>
         <text x="130" y="37" style="font-size:11px;font-family:sans-serif;fill:var(--muted)">bars</text>
+        <!-- auto toggle button -->
+        <rect x="153" y="24" width="34" height="20" rx="10" style="fill:var(--accent);stroke:var(--accent);stroke-width:1"/>
+        <text x="170" y="38" style="font-size:9px;font-family:monospace;fill:#fff;font-weight:700" text-anchor="middle">auto</text>
+        <text x="170" y="68" style="font-size:8.5px;font-family:sans-serif;fill:var(--muted)" text-anchor="middle">on / off</text>
         <!-- vertical separator -->
-        <line x1="162" y1="6" x2="162" y2="66" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
+        <line x1="199" y1="6" x2="199" y2="74" style="stroke:var(--border2);stroke-width:.6;stroke-dasharray:3,2"/>
         <!-- ── fade knob ── -->
-        <text x="171" y="20" style="font-size:10px;font-family:sans-serif;fill:var(--muted)">fade</text>
-        <circle cx="216" cy="34" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
-        <path d="M206.8 43.2 A13 13 0 1 1 225.2 43.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
-        <circle cx="206.8" cy="43.2" r="2.3" style="fill:var(--muted)"/>
-        <text x="216" y="60" style="font-size:10px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
+        <text x="208" y="20" style="font-size:10px;font-family:sans-serif;fill:var(--muted)">fade</text>
+        <circle cx="250" cy="35" r="13" style="fill:var(--surface);stroke:var(--border2);stroke-width:1.5"/>
+        <path d="M240.8 44.2 A13 13 0 1 1 259.2 44.2" style="fill:none;stroke:var(--border2);stroke-width:2.4;stroke-linecap:round"/>
+        <circle cx="240.8" cy="44.2" r="2.3" style="fill:var(--muted)"/>
+        <text x="250" y="68" style="font-size:10px;font-family:monospace;fill:var(--muted)" text-anchor="middle">0ms</text>
       </svg>
       <table class="help-table">
         <tr><td>change every N</td><td>Advance to the next page every N bars. Accepts decimals when using the Looper — <strong>0.25</strong> = 1 beat, <strong>0.5</strong> = half bar, <strong>1.25</strong> = 1 bar + 1 beat (in 4/4). Integer values work with both the Looper and the standalone Metronome.</td></tr>
+        <tr><td>auto button</td><td>Toggles automatic page turning on or off. When lit (purple), pages advance every N bars in sync with the metronome. Click to pause auto-advance at any time — the metronome keeps playing and the "change every" value is preserved. Click again to resume.</td></tr>
         <tr><td>fade knob</td><td>Crossfade duration when switching pages. <strong>0ms</strong> = instant snap. Drag up or scroll to increase up to 2000ms. Double-click to reset.</td></tr>
       </table>
 
@@ -1831,7 +1877,8 @@ function buildPresetData(name) {
       chordCharts: b.chordCharts.map(cc => ({
         id: cc.id, label: cc.label, startFret: cc.startFret,
         numFrets: cc.numFrets, dots: cc.dots.slice(), headings: cc.headings.slice(),
-        rootDot: cc.rootDot ? {s: cc.rootDot.s, f: cc.rootDot.f} : null,
+        rootDot:     cc.rootDot ? {s: cc.rootDot.s, f: cc.rootDot.f} : null,
+        borderColor: cc.borderColor || null,
       })),
       extraSlots: b.extraSlots.map(s => ({
         notes:        [...s.notes],
@@ -2434,7 +2481,8 @@ function mkChordChart(opts = {}) {
     numFrets:  opts.numFrets  || 4,
     dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f})),
     headings:  opts.headings  ? [...opts.headings] : ['','','','','',''],
-    rootDot:   opts.rootDot   ? {s: opts.rootDot.s, f: opts.rootDot.f} : null,
+    rootDot:     opts.rootDot   ? {s: opts.rootDot.s, f: opts.rootDot.f} : null,
+    borderColor: opts.borderColor || null,
   };
 }
 
@@ -2503,9 +2551,43 @@ function buildChordChartsPanel(b) {
   const row = document.createElement('div');
   row.className = 'chord-charts-row';
 
+  let _ccDragId = null;
+
   b.chordCharts.forEach(cc => {
     const wrap = document.createElement('div');
     wrap.className = 'chord-chart-wrap';
+    if (cc.borderColor) { wrap.style.borderColor = cc.borderColor; wrap.style.borderWidth = '2px'; }
+
+    wrap.addEventListener('contextmenu', e => {
+      e.preventDefault(); e.stopPropagation();
+      document.querySelector('.chord-color-menu')?.remove();
+      const menu = document.createElement('div');
+      menu.className = 'chord-color-menu';
+      const noneBtn = document.createElement('span');
+      noneBtn.className = 'chord-color-none'; noneBtn.textContent = '✕'; noneBtn.title = 'Remove color';
+      noneBtn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        cc.borderColor = null; wrap.style.borderColor = ''; wrap.style.borderWidth = '';
+        pushHistory(); menu.remove();
+      });
+      menu.appendChild(noneBtn);
+      DEGREE_COL.forEach(col => {
+        const sw = document.createElement('span');
+        sw.className = 'chord-color-swatch' + (cc.borderColor === col ? ' current' : '');
+        sw.style.background = col; sw.title = col;
+        sw.addEventListener('click', ev => {
+          ev.stopPropagation();
+          cc.borderColor = col; wrap.style.borderColor = col; wrap.style.borderWidth = '2px';
+          pushHistory(); menu.remove();
+        });
+        menu.appendChild(sw);
+      });
+      menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+      menu.style.top  = (e.clientY + 8) + 'px';
+      document.body.appendChild(menu);
+      const close = ev => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } };
+      setTimeout(() => document.addEventListener('click', close), 0);
+    });
 
     const del = document.createElement('button');
     del.className = 'chord-chart-del'; del.title = 'Delete'; del.textContent = '✕';
@@ -2609,6 +2691,52 @@ function buildChordChartsPanel(b) {
     ctrlRow.appendChild(sfSpin);
     ctrlRow.appendChild(startLbl);
     wrap.appendChild(ctrlRow);
+
+    // ── chord drag handle (bottom-left) ──────────────────────────────────
+    const ccDragHandle = document.createElement('span');
+    ccDragHandle.className = 'chord-drag-handle';
+    ccDragHandle.textContent = '⠿';
+    ccDragHandle.title = 'Drag to reorder';
+    ccDragHandle.addEventListener('mousedown', () => { wrap.draggable = true; });
+    ccDragHandle.addEventListener('mouseup',   () => { wrap.draggable = false; });
+    wrap.addEventListener('dragstart', e => {
+      _ccDragId = cc.id;
+      e.dataTransfer.setData('text/plain', String(cc.id));
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    wrap.addEventListener('dragend', () => {
+      wrap.draggable = false;
+      _ccDragId = null;
+      row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
+    });
+    wrap.addEventListener('dragover', e => {
+      if (_ccDragId === cc.id) return;
+      e.preventDefault();
+      const rect = wrap.getBoundingClientRect();
+      const after = e.clientX > rect.left + rect.width / 2;
+      row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
+      wrap.classList.add(after ? 'chord-drop-after' : 'chord-drop-before');
+    });
+    wrap.addEventListener('dragleave', e => {
+      if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('chord-drop-before','chord-drop-after');
+    });
+    wrap.addEventListener('drop', e => {
+      e.preventDefault();
+      wrap.classList.remove('chord-drop-before','chord-drop-after');
+      const fromId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      if (fromId === cc.id) return;
+      const fromIdx = b.chordCharts.findIndex(x => x.id === fromId);
+      const toIdx   = b.chordCharts.findIndex(x => x.id === cc.id);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const rect = wrap.getBoundingClientRect();
+      const insertAfter = e.clientX > rect.left + rect.width / 2;
+      const [moved] = b.chordCharts.splice(fromIdx, 1);
+      const newToIdx = b.chordCharts.findIndex(x => x.id === cc.id);
+      b.chordCharts.splice(insertAfter ? newToIdx + 1 : newToIdx, 0, moved);
+      pushHistory(); refreshChordChartsPanel(b.id);
+    });
+    wrap.appendChild(ccDragHandle);
+
     row.appendChild(wrap);
   });
 
