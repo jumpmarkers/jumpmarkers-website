@@ -1009,9 +1009,9 @@
     <span class="uke-label">buy me ukulele strings</span>
   </a>
   <div class="nav-right">
+    <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
     <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
     <button class="btn btn-outline" id="btn-fb-help">? Help</button>
-    <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
   </div>
 </nav>
 
@@ -1559,7 +1559,8 @@ function addBoard(opts) {
 
 // ─── Drag overlay (mini-map) ──────────────────────────────────────────────────
 let _dndOverlay = null;
-let _activeDragId = null;
+let _activeDragId    = null;
+let _chordDragActive = false;
 
 function buildMiniThumb(b) {
   const cv = document.createElement('canvas');
@@ -1588,6 +1589,7 @@ function buildMiniThumb(b) {
 }
 
 function showDragOverlay(draggedId) {
+  if (_chordDragActive) return;
   hideDragOverlay();
   const ov = document.createElement('div');
   ov.className = 'dnd-overlay';
@@ -2700,11 +2702,13 @@ function buildChordChartsPanel(b) {
     ccDragHandle.addEventListener('mousedown', () => { wrap.draggable = true; });
     ccDragHandle.addEventListener('mouseup',   () => { wrap.draggable = false; });
     wrap.addEventListener('dragstart', e => {
+      _chordDragActive = true;
       _ccDragId = cc.id;
       e.dataTransfer.setData('text/plain', String(cc.id));
       e.dataTransfer.effectAllowed = 'move';
     });
     wrap.addEventListener('dragend', () => {
+      _chordDragActive = false;
       wrap.draggable = false;
       _ccDragId = null;
       row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
@@ -2902,18 +2906,21 @@ function buildCard(b) {
   }
   // dragenter fires instantly on entry — show line immediately
   card.addEventListener('dragenter', e => {
+    if (_chordDragActive) return;
     e.preventDefault();
     clearDropClasses();
     card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
   });
   // dragover keeps it updated as mouse moves within the card
   card.addEventListener('dragover', e => {
+    if (_chordDragActive) return;
     e.preventDefault();
     clearDropClasses();
     card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
   });
   card.addEventListener('dragleave', clearDropClasses);
   card.addEventListener('drop', e => {
+    if (_chordDragActive) return;
     e.preventDefault();
     const pos = getDropPosition(e);
     clearDropClasses();
