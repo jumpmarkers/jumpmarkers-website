@@ -268,6 +268,8 @@
     .slot-sync { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); }
     .slot-sync input[type="number"] { width: 52px; background: var(--bg2); border: 1px solid var(--border2); color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 0.72rem; font-family: var(--mono); text-align: center; -moz-appearance: textfield; }
     .slot-sync input[type="number"]::-webkit-outer-spin-button, .slot-sync input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .slot-auto-btn { appearance: none; background: transparent; border: 1px solid var(--border2); border-radius: 9px; padding: 0 5px; height: 17px; cursor: pointer; font-size: 0.62rem; font-family: var(--mono); color: var(--muted); letter-spacing: 0.05em; transition: background 0.15s, border-color 0.15s, color 0.15s; flex-shrink: 0; line-height: 15px; }
+    .slot-auto-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     .slot-ctrl-zone { display: flex; align-items: center; gap: 8px; background: rgba(128,128,128,0.08); border: 1px solid var(--border2); border-radius: 8px; padding: 3px 10px; margin-left: auto; }
     .slot-pattern-grp { display: flex; align-items: center; gap: 5px; }
     .slot-pattern-lbl { font-family: var(--mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
@@ -1437,6 +1439,7 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
+    autoAdvance:       opts.autoAdvance !== false,
     patternPos:        -1,
   };
 }
@@ -1470,6 +1473,7 @@ function _serializeBoards() {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
+      autoAdvance:       b.autoAdvance,
     })),
     presets,
     currentPresetName,
@@ -1834,6 +1838,7 @@ function buildPresetData(name) {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
+      autoAdvance:       b.autoAdvance,
     })),
   };
 }
@@ -3115,9 +3120,40 @@ function buildCard(b) {
     const syncUnit = document.createElement('span');
     syncUnit.textContent = 'bars';
 
+    const autoBtn = document.createElement('button');
+    autoBtn.className = 'slot-auto-btn' + (b.autoAdvance !== false ? ' on' : '');
+    autoBtn.textContent = 'auto';
+    autoBtn.title = 'Toggle automatic page turning on/off';
+    autoBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      b.autoAdvance = !b.autoAdvance;
+      autoBtn.classList.toggle('on', b.autoAdvance);
+      if (_metroActive) {
+        if (b.autoAdvance) {
+          if (totalSlots > 1 && b.slotMeasures > 0) {
+            _attachRing(b.id);
+            const cycleDurMs = _ringCycleDurMs[b.id] || 0;
+            if (cycleDurMs > 0) {
+              const s = _ringState[b.id];
+              if (s) {
+                const r = s.rect;
+                r.style.transition = 'none';
+                void r.getBoundingClientRect();
+                r.style.transition = `stroke-dashoffset ${cycleDurMs}ms linear`;
+                r.style.strokeDashoffset = '0';
+              }
+            }
+          }
+        } else {
+          _detachRing(b.id);
+        }
+      }
+    });
+
     syncGrp.appendChild(syncLbl);
     syncGrp.appendChild(syncInp);
     syncGrp.appendChild(syncUnit);
+    syncGrp.appendChild(autoBtn);
 
     const fadeGrp = document.createElement('div');
     fadeGrp.className = 'slot-sync';
@@ -3584,7 +3620,7 @@ function _onMetroStart() {
       b.patternPos = -1;
     }
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
-    if (totalSlots > 1 && b.slotMeasures > 0) _attachRing(b.id);
+    if (totalSlots > 1 && b.slotMeasures > 0 && b.autoAdvance !== false) _attachRing(b.id);
     else _detachRing(b.id);
   });
 }
@@ -3597,7 +3633,7 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
-    if (totalSlots <= 1 || !b.slotMeasures) return;
+    if (totalSlots <= 1 || !b.slotMeasures || b.autoAdvance === false) return;
     const sm       = b.slotMeasures;
     const cycleLen = Math.max(1, Math.round(sm));
 
