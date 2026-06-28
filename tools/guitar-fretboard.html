@@ -2949,6 +2949,7 @@ function buildCard(b) {
   dragHandle.addEventListener('mousedown', () => { card.draggable = true; });
   dragHandle.addEventListener('mouseup',   () => { card.draggable = false; });
   card.addEventListener('dragstart', e => {
+    _chordDragActive = false;
     _activeDragId = b.id;
     e.dataTransfer.setData('text/plain', String(b.id));
     showDragOverlay(b.id);
