@@ -1010,8 +1010,6 @@
   </a>
   <div class="nav-right">
     <a class="nav-back" href="../index.html#free-tools">← All Tools</a>
-    <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
-    <button class="btn btn-outline" id="btn-fb-help">? Help</button>
   </div>
 </nav>
 
@@ -1030,6 +1028,8 @@
         <button class="btn btn-outline" id="btn-looper-split" title="Show looper side by side">🔁 Looper</button>
         <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
         <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
+        <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
+        <button class="btn btn-outline" id="btn-fb-help">? Help</button>
       </div>
     </div>
     <div class="presets-wrap">
@@ -2706,6 +2706,7 @@ function buildChordChartsPanel(b) {
       _ccDragId = cc.id;
       e.dataTransfer.setData('text/plain', String(cc.id));
       e.dataTransfer.effectAllowed = 'move';
+      e.stopPropagation();
     });
     wrap.addEventListener('dragend', () => {
       _chordDragActive = false;
