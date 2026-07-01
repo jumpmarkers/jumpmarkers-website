@@ -3234,6 +3234,17 @@ function buildCard(b) {
     slotInd.className = 'slot-indicator';
     slotInd.textContent = `page ${b.activeSlot + 1}`;
     pageBadgeRow.appendChild(slotInd);
+    const slotNameInp = document.createElement('input');
+    slotNameInp.className = 'slot-name-input';
+    slotNameInp.type = 'text';
+    slotNameInp.maxLength = 32;
+    slotNameInp.placeholder = 'page name…';
+    slotNameInp.value = b.slotLabels[b.activeSlot] || '';
+    slotNameInp.addEventListener('input', () => {
+      b.slotLabels[b.activeSlot] = slotNameInp.value;
+    });
+    slotNameInp.addEventListener('change', () => { pushHistory(); });
+    pageBadgeRow.appendChild(slotNameInp);
     card.appendChild(pageBadgeRow);
   }
 
