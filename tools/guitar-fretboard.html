@@ -3104,8 +3104,27 @@ function buildCard(b) {
   // Remove button
   const rmBtn = document.createElement('button');
   rmBtn.className = 'btn btn-outline btn-sm btn-danger';
-  rmBtn.textContent = '✕ Remove';
-  rmBtn.addEventListener('click', () => removeBoard(b.id));
+  rmBtn.textContent = totalSlots > 1 ? '✕ Remove page' : '✕ Remove';
+  rmBtn.title = totalSlots > 1 ? 'Delete this page' : 'Remove this fretboard';
+  rmBtn.addEventListener('click', () => {
+    const tSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (tSlots <= 1) { removeBoard(b.id); return; }
+    // Delete current page
+    if (b.activeSlot === 0) {
+      // Promote extra slot 0 into base
+      const promoted = b.extraSlots.shift();
+      b.selectedNotes = promoted.notes;
+      b.tonic         = promoted.tonic !== undefined ? promoted.tonic : b.tonic;
+      b.visibleNotes  = promoted.visibleNotes || b.visibleNotes;
+      b.hiddenCells   = promoted.hiddenCells  || new Set();
+      b.activeSlot    = 0;
+    } else {
+      b.extraSlots.splice(b.activeSlot - 1, 1);
+      b.activeSlot = Math.max(0, b.activeSlot - 1);
+    }
+    pushHistory();
+    refreshBoard(b.id);
+  });
   settings.appendChild(rmBtn);
 
   hdr.appendChild(settings);
