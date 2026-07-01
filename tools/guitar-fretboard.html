@@ -289,6 +289,9 @@
     .knob-wrap:hover .knob-body { stroke: var(--accent2); }
     .knob-val { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); line-height: 1.2; }
     .slot-indicator { font-family: var(--mono); font-size: 0.6rem; color: var(--accent2); letter-spacing: 0.05em; text-transform: uppercase; opacity: .7; }
+    .slot-name-input { background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: 0.68rem; padding: 0 3px 1px; width: 120px; outline: none; margin-left: 6px; transition: border-color .15s, color .15s; }
+    .slot-name-input:focus { border-bottom-color: var(--accent2); color: var(--text); }
+    .slot-name-input::placeholder { color: var(--border2); font-style: italic; }
     .page-badge-row { padding: 1px 18px; display: flex; align-items: center; }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
@@ -1493,6 +1496,7 @@ function mkBoard(opts = {}) {
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
     autoAdvance:       opts.autoAdvance !== false,
+    slotLabels:        opts.slotLabels  || [],
     patternPos:        -1,
   };
 }
@@ -1527,6 +1531,7 @@ function _serializeBoards() {
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
+      slotLabels:        b.slotLabels,
     })),
     presets,
     currentPresetName,
@@ -1905,6 +1910,7 @@ function buildPresetData(name) {
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
+      slotLabels:        b.slotLabels,
     })),
   };
 }
