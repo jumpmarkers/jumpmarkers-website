@@ -1675,11 +1675,20 @@ function applyBoxDelete() {
   const isFullClear = toHide.size >= totalVisibleCells;
   pushHistory();
   if (isFullClear) {
-    b.selectedNotes.clear();
-    b.visibleNotes.clear();
-    b.hiddenCells.clear();
-    b.pinnedCells.clear();
-    b.tonic = null;
+    if (b.activeSlot === 0) {
+      b.selectedNotes.clear();
+      b.visibleNotes.clear();
+      b.hiddenCells.clear();
+      b.pinnedCells.clear();
+      b.tonic = null;
+    } else {
+      const s = b.extraSlots[b.activeSlot - 1];
+      if (s) {
+        s.notes.clear();
+        if (s.visibleNotes) s.visibleNotes.clear();
+        s.tonic = undefined;
+      }
+    }
   } else {
     toHide.forEach(key => b.hiddenCells.add(key));
   }
@@ -2391,6 +2400,7 @@ function buildFbOuter(b) {
         cell.classList.add('fc-empty');
         cell.addEventListener('click', e => {
           if (e.altKey) return;
+          if (e.shiftKey) { playFretNote(si, f); return; }
           if (!b.extraSlots || b.activeSlot === 0) {
             b.visibleNotes.add(noteIdx);
             b.selectedNotes.add(noteIdx);
@@ -3015,13 +3025,13 @@ function buildCard(b) {
 
   const slotNextBtn = document.createElement('button');
   slotNextBtn.className = 'slot-nav-btn';
-  slotNextBtn.textContent = totalSlots < 10 && b.activeSlot === totalSlots - 1 ? '+' : '→';
-  slotNextBtn.title = b.activeSlot < totalSlots - 1 ? 'Next highlight slot' : (totalSlots < 10 ? 'Add new highlight slot' : 'Max 10 slots');
-  slotNextBtn.disabled = (b.activeSlot === totalSlots - 1 && totalSlots >= 10);
+  slotNextBtn.textContent = totalSlots < 15 && b.activeSlot === totalSlots - 1 ? '+' : '→';
+  slotNextBtn.title = b.activeSlot < totalSlots - 1 ? 'Next highlight slot' : (totalSlots < 15 ? 'Add new highlight slot' : 'Max 15 slots');
+  slotNextBtn.disabled = (b.activeSlot === totalSlots - 1 && totalSlots >= 15);
   slotNextBtn.addEventListener('click', () => {
     if (b.activeSlot < totalSlots - 1) {
       b.activeSlot++;
-    } else if (totalSlots < 10) {
+    } else if (totalSlots < 15) {
       b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null });
       b.activeSlot++;
     }
