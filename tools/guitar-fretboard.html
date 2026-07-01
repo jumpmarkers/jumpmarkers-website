@@ -1695,7 +1695,25 @@ function applyBoxDelete() {
       }
     }
   } else {
-    toHide.forEach(key => b.hiddenCells.add(key));
+    const _sd = getActiveSlotData(b);
+    const notesToRemove = new Set();
+    toHide.forEach(key => {
+      const [si, f] = key.split('-').map(Number);
+      const ni = (OPEN[si] + f) % 12;
+      if (_sd.notes.has(ni)) notesToRemove.add(ni);
+    });
+    if (b.activeSlot === 0) {
+      notesToRemove.forEach(ni => {
+        b.selectedNotes.delete(ni);
+        if (b.tonic === ni) b.tonic = null;
+      });
+    } else {
+      const s = b.extraSlots[b.activeSlot - 1];
+      if (s) notesToRemove.forEach(ni => {
+        s.notes.delete(ni);
+        if (s.tonic === ni) s.tonic = undefined;
+      });
+    }
   }
   const bid = _boxSel.bid;
   clearBoxSelect();
@@ -2371,7 +2389,7 @@ function buildFbOuter(b) {
       const noteName = getDisplayName(noteIdx, b, _sd.tonic);
       const color = getDegreeColor(b, noteIdx, isPinned, _sd);
       const isOn  = color !== null;
-      const isVis = _sd.visibleNotes.has(noteIdx);
+      const isVis = _sd.visibleNotes.has(noteIdx) || _sd.notes.has(noteIdx);
       const isHidden = b.hiddenCells.has(cellKey);
 
       const cell = document.createElement('div');
