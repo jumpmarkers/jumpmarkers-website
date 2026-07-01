@@ -1449,14 +1449,15 @@ function getDegreeColor(board, noteIdx, isPinned = false, sd = null) {
 
 function getActiveSlotData(b) {
   if (!b.extraSlots || b.activeSlot === 0) {
-    return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes };
+    return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes, hiddenCells: b.hiddenCells };
   }
   const s = b.extraSlots[b.activeSlot - 1];
-  if (!s) return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes };
+  if (!s) return { notes: b.selectedNotes, tonic: b.tonic, visibleNotes: b.visibleNotes, hiddenCells: b.hiddenCells };
   return {
     notes:        s.notes,
     tonic:        s.tonic !== undefined ? s.tonic : b.tonic,
     visibleNotes: s.visibleNotes !== null ? s.visibleNotes : b.visibleNotes,
+    hiddenCells:  s.hiddenCells || b.hiddenCells,
   };
 }
 
@@ -1490,6 +1491,7 @@ function mkBoard(opts = {}) {
       notes:        new Set(s.notes || []),
       tonic:        s.tonic !== undefined ? s.tonic : undefined,
       visibleNotes: (s.visibleNotes !== undefined && s.visibleNotes !== null) ? new Set(s.visibleNotes) : null,
+      hiddenCells:  new Set(s.hiddenCells || []),
     })),
     activeSlot:    opts.activeSlot  || 0,
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
@@ -1525,6 +1527,7 @@ function _serializeBoards() {
         notes:        [...s.notes],
         tonic:        s.tonic,
         visibleNotes: s.visibleNotes ? [...s.visibleNotes] : null,
+        hiddenCells:  [...(s.hiddenCells || [])],
       })),
       activeSlot:    b.activeSlot,
       slotMeasures:      b.slotMeasures,
@@ -1679,6 +1682,7 @@ function applyBoxDelete() {
   const totalVisibleCells = outer ? outer.querySelectorAll('.fc .nc').length : 0;
   const isFullClear = toHide.size >= totalVisibleCells;
   pushHistory();
+  const _asd = getActiveSlotData(b);
   if (isFullClear) {
     if (b.activeSlot === 0) {
       b.selectedNotes.clear();
@@ -1691,29 +1695,12 @@ function applyBoxDelete() {
       if (s) {
         s.notes.clear();
         if (s.visibleNotes) s.visibleNotes.clear();
+        if (s.hiddenCells) s.hiddenCells.clear();
         s.tonic = undefined;
       }
     }
   } else {
-    const _sd = getActiveSlotData(b);
-    const notesToRemove = new Set();
-    toHide.forEach(key => {
-      const [si, f] = key.split('-').map(Number);
-      const ni = (OPEN[si] + f) % 12;
-      if (_sd.notes.has(ni)) notesToRemove.add(ni);
-    });
-    if (b.activeSlot === 0) {
-      notesToRemove.forEach(ni => {
-        b.selectedNotes.delete(ni);
-        if (b.tonic === ni) b.tonic = null;
-      });
-    } else {
-      const s = b.extraSlots[b.activeSlot - 1];
-      if (s) notesToRemove.forEach(ni => {
-        s.notes.delete(ni);
-        if (s.tonic === ni) s.tonic = undefined;
-      });
-    }
+    toHide.forEach(key => _asd.hiddenCells.add(key));
   }
   const bid = _boxSel.bid;
   clearBoxSelect();
@@ -1922,6 +1909,7 @@ function buildPresetData(name) {
         notes:        [...s.notes],
         tonic:        s.tonic,
         visibleNotes: s.visibleNotes ? [...s.visibleNotes] : null,
+        hiddenCells:  [...(s.hiddenCells || [])],
       })),
       activeSlot:        b.activeSlot,
       slotMeasures:      b.slotMeasures,
@@ -2390,7 +2378,7 @@ function buildFbOuter(b) {
       const color = getDegreeColor(b, noteIdx, isPinned, _sd);
       const isOn  = color !== null;
       const isVis = _sd.visibleNotes.has(noteIdx) || _sd.notes.has(noteIdx);
-      const isHidden = b.hiddenCells.has(cellKey);
+      const isHidden = _sd.hiddenCells.has(cellKey);
 
       const cell = document.createElement('div');
       cell.className = 'fc ' + (f === 0 ? 'fc-open' : 'fc-fret');
@@ -2402,9 +2390,10 @@ function buildFbOuter(b) {
       cell.addEventListener('click', e => {
         if (!e.altKey || e.shiftKey) return;
         e.stopPropagation();
-        if (b.pinnedCells.has(cellKey))       b.pinnedCells.delete(cellKey);
-        else if (b.hiddenCells.has(cellKey))  b.hiddenCells.delete(cellKey);
-        else if (b.visibleNotes.has(noteIdx)) b.hiddenCells.add(cellKey);
+        const _sd = getActiveSlotData(b);
+        if (b.pinnedCells.has(cellKey))        b.pinnedCells.delete(cellKey);
+        else if (_sd.hiddenCells.has(cellKey)) _sd.hiddenCells.delete(cellKey);
+        else if (_sd.visibleNotes.has(noteIdx)) _sd.hiddenCells.add(cellKey);
         else { b.pinnedCells.add(cellKey); }
         pushHistory();
         refreshBoard(b.id);
@@ -2483,7 +2472,7 @@ function buildFbOuter(b) {
         cell.classList.add('fc-hidden');
         cell.addEventListener('click', e => {
           if (e.altKey) return; // alt+click handled by the cell listener above
-          b.hiddenCells.delete(cellKey);
+          getActiveSlotData(b).hiddenCells.delete(cellKey);
           pushHistory();
           refreshBoard(b.id);
         });
@@ -3056,7 +3045,7 @@ function buildCard(b) {
     if (b.activeSlot < totalSlots - 1) {
       b.activeSlot++;
     } else if (totalSlots < 15) {
-      b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null });
+      b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null, hiddenCells: new Set() });
       b.activeSlot++;
     }
     pushHistory();
