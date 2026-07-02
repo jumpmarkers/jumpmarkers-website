@@ -1564,6 +1564,7 @@ function updatePageBar() {
     btn.classList.toggle('pg-active',   i === currentPage);
     btn.classList.toggle('pg-pending',  i === pendingPage);
     btn.classList.toggle('pg-has',      hasContent);
+    btn.style.setProperty('--pgc', pages[i].color);
   });
 }
 
@@ -1745,9 +1746,24 @@ function renderLayers() {
   updatePageBar();
 }
 
-document.querySelectorAll('.btn-page').forEach(btn =>
-  btn.addEventListener('click', () => queuePageSwitch(+btn.dataset.pg))
-);
+// Shared hidden color input for page color picking
+const _pgColorInput = Object.assign(document.createElement('input'), {type:'color'});
+_pgColorInput.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
+document.body.appendChild(_pgColorInput);
+_pgColorInput.addEventListener('input', () => { pages[currentPage].color = _pgColorInput.value; updatePageBar(); });
+
+document.querySelectorAll('.btn-page').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const idx = +btn.dataset.pg;
+    if (idx === currentPage) {
+      if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; pendingPage = null; updatePageBar(); }
+      _pgColorInput.value = pages[currentPage].color;
+      _pgColorInput.click();
+    } else {
+      queuePageSwitch(idx);
+    }
+  });
+});
 
 document.getElementById('layers-wrap').addEventListener('input', e => {
   if (e.target.dataset.id)    setVol(+e.target.dataset.id, +e.target.value);
@@ -1921,7 +1937,7 @@ document.addEventListener('keydown', e => {
   if (!blockKeys && !e.repeat) {
     if (e.code === 'KeyT') { e.preventDefault(); doTap(); }
     if (e.code === 'KeyP') { e.preventDefault(); toggleMetroPreview(); }
-    if (e.code === 'KeyM') { e.preventDefault(); document.getElementById('tw-metro').click(); }
+    if (PAGE_KEYS[e.code] !== undefined) { e.preventDefault(); queuePageSwitch(PAGE_KEYS[e.code]); }
     if (e.code === 'KeyQ' && mode === 'instant') { e.preventDefault(); document.getElementById('tw-quantize').click(); }
     if (e.code === 'KeyX')   { e.preventDefault(); doUndo(true); }
     if (e.code === 'Comma')  { e.preventDefault(); handleOverdub(); }
