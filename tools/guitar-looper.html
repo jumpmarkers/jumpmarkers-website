@@ -123,11 +123,11 @@ select{cursor:pointer}
 #page-bar{display:flex;align-items:center;gap:5px;margin-bottom:12px}
 #pg-label{font-size:.68rem;letter-spacing:.06em;margin-right:2px;flex-shrink:0;color:var(--muted)}
 .btn-page{width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);background:transparent;color:var(--text-sub);font-size:.7rem;cursor:pointer;line-height:1;transition:border-color .15s,background .15s,color .15s;position:relative;display:inline-flex;align-items:center;justify-content:center;padding:0}
-.btn-page:hover{border-color:var(--accent);color:var(--text)}
-.btn-page.pg-active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-.btn-page.pg-has::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--green)}
+.btn-page:hover:not(.pg-active){border-color:var(--pgc,var(--accent));color:var(--text)}
+.btn-page.pg-active{background:var(--pgc,var(--accent));border-color:var(--pgc,var(--accent));color:#fff;font-weight:700}
+.btn-page.pg-has::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--pgc,var(--green))}
 .btn-page.pg-active.pg-has::after{background:rgba(255,255,255,.7)}
-.btn-page.pg-pending{border-color:var(--accent);color:var(--accent);animation:blink .5s infinite}
+.btn-page.pg-pending{border-color:var(--pgc,var(--accent));color:var(--pgc,var(--accent));animation:blink .5s infinite}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -537,7 +537,9 @@ select{cursor:pointer}
 
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
-const COLORS = ['#f5a623','#52c77d','#5287e0','#e05252','#b04080','#7ecfb3','#e0a050','#a07cd0','#52b0e0','#e07070'];
+const COLORS      = ['#f5a623','#52c77d','#5287e0','#e05252','#b04080','#7ecfb3','#e0a050','#a07cd0','#52b0e0','#e07070'];
+const PAGE_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#14b8a6'];
+const PAGE_KEYS   = {KeyF:0,KeyG:1,KeyH:2,KeyJ:3,KeyV:4,KeyB:5,KeyN:6,KeyM:7};
 const LOOK_AHEAD = 0.12; // s — metronome scheduler look-ahead
 const SCHED_INT  = 50;   // ms — scheduler interval
 
@@ -551,7 +553,7 @@ const PEDAL_DOUBLE_MS = 320;
 const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
 // ─── Scenes (pages) ───────────────────────────────────────────────────────────
 const PAGE_COUNT = 8;
-let pages = Array.from({length: PAGE_COUNT}, () => ({layers:[], loopDur:0, loopT0:0, measureColors:{}}));
+let pages = Array.from({length: PAGE_COUNT}, (_, i) => ({layers:[], loopDur:0, loopT0:0, measureColors:{}, color:PAGE_COLORS[i]}));
 let currentPage = 0, pendingPage = null, _pageSwitchTid = null;
 
 let measureColors = pages[0].measureColors, selMeasures = new Set();
