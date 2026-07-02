@@ -119,6 +119,15 @@ select{cursor:pointer}
 #pedal-hints .ph-item{display:flex;align-items:center;gap:4px}
 #pedal-hints kbd{background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:.68rem;color:var(--text-sub);line-height:1.4}
 #loop-fill{height:100%;width:0%;border-radius:5px;background:var(--green);transition:none}
+/* ── Scene / Page bar ── */
+#page-bar{display:flex;align-items:center;gap:5px;margin-bottom:12px}
+#pg-label{font-size:.68rem;letter-spacing:.06em;margin-right:2px;flex-shrink:0;color:var(--muted)}
+.btn-page{width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);background:transparent;color:var(--text-sub);font-size:.7rem;cursor:pointer;line-height:1;transition:border-color .15s,background .15s,color .15s;position:relative;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.btn-page:hover{border-color:var(--accent);color:var(--text)}
+.btn-page.pg-active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.btn-page.pg-has::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--green)}
+.btn-page.pg-active.pg-has::after{background:rgba(255,255,255,.7)}
+.btn-page.pg-pending{border-color:var(--accent);color:var(--accent);animation:blink .5s infinite}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -408,6 +417,17 @@ select{cursor:pointer}
   <!-- Transport -->
   <div class="card">
     <div class="card-title">Transport <span class="dim" style="text-transform:none;letter-spacing:0;margin-left:6px" id="shortcut-hint">· Pedal: Space</span></div>
+    <div id="page-bar">
+      <span id="pg-label">SCENE</span>
+      <button class="btn-page pg-active" data-pg="0">1</button>
+      <button class="btn-page" data-pg="1">2</button>
+      <button class="btn-page" data-pg="2">3</button>
+      <button class="btn-page" data-pg="3">4</button>
+      <button class="btn-page" data-pg="4">5</button>
+      <button class="btn-page" data-pg="5">6</button>
+      <button class="btn-page" data-pg="6">7</button>
+      <button class="btn-page" data-pg="7">8</button>
+    </div>
     <div id="loop-progress"><div id="loop-fill"></div></div>
     <div class="beat-row" id="beat-row"></div>
     <div id="mc-bar">
@@ -529,8 +549,13 @@ let _cdResolve = null;
 let _pedalTid = null;
 const PEDAL_DOUBLE_MS = 320;
 const MC_COLORS = {blue:'#38bdf8', green:'#4ade80', red:'#f87171', yellow:'#fbbf24'};
-let measureColors = {}, selMeasures = new Set();
-let layers = [], nextId = 1;
+// ─── Scenes (pages) ───────────────────────────────────────────────────────────
+const PAGE_COUNT = 8;
+let pages = Array.from({length: PAGE_COUNT}, () => ({layers:[], loopDur:0, loopT0:0, measureColors:{}}));
+let currentPage = 0, pendingPage = null, _pageSwitchTid = null;
+
+let measureColors = pages[0].measureColors, selMeasures = new Set();
+let layers = pages[0].layers, nextId = 1;
 let phase = 'idle'; // idle | cd | rec | play | ovd
 let loopDur = 0, loopT0 = 0; // loopT0 = actx time when loop cycle last started
 
@@ -1523,9 +1548,77 @@ function handleClear() {
   _replaceTarget = null;
   stopPlayback();
   [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
-  layers = []; history = []; nextId = 1; loopDur = 0;
-  measureColors = {}; selectMeasure(null);
+  layers.splice(0); history = []; loopDur = 0;
+  pages[currentPage].loopDur = 0; pages[currentPage].loopT0 = 0;
+  measureColors = pages[currentPage].measureColors = {}; selectMeasure(null);
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
+}
+
+// ─── Scene switching ──────────────────────────────────────────────────────────
+function updatePageBar() {
+  document.querySelectorAll('.btn-page').forEach(btn => {
+    const i = +btn.dataset.pg;
+    const hasContent = (i === currentPage ? layers.length : pages[i].layers.length) > 0;
+    btn.classList.toggle('pg-active',   i === currentPage);
+    btn.classList.toggle('pg-pending',  i === pendingPage);
+    btn.classList.toggle('pg-has',      hasContent);
+  });
+}
+
+function doPageSwitch(newIdx) {
+  if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; }
+  if (newIdx === currentPage)  { pendingPage = null; updatePageBar(); return; }
+
+  // Save current page timing
+  pages[currentPage].loopDur = loopDur;
+  pages[currentPage].loopT0  = loopT0;
+  pages[currentPage].measureColors = measureColors;
+
+  // Stop current page audio
+  if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+  layers.forEach(l => { stopLayerSrc(l); try { l.panner.disconnect(); } catch(e){} });
+  stopMetro(); stopPos();
+
+  // Switch
+  currentPage = newIdx;
+  layers      = pages[currentPage].layers;
+  loopDur     = pages[currentPage].loopDur;
+  loopT0      = pages[currentPage].loopT0;
+  measureColors = pages[currentPage].measureColors;
+  pendingPage = null;
+  history     = [];
+  selMeasures.clear();
+
+  // Reconnect new page layers to master output
+  if (actx) layers.forEach(l => { try { l.panner.connect(masterGain || actx.destination); } catch(e){} });
+
+  if (actx && layers.length && loopDur > 0) {
+    loopT0 = actx.currentTime;
+    layers.forEach(l => playLayer(l, 0));
+    setPhase('play');
+    startPos();
+  } else {
+    setPhase('idle');
+  }
+
+  buildBeatRow(); renderLayers(); updateInfo(); updatePageBar();
+}
+
+function queuePageSwitch(idx) {
+  if (idx === currentPage) {
+    if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; pendingPage = null; updatePageBar(); }
+    return;
+  }
+  if (!actx || phase === 'idle' || !layers.length || loopDur === 0) { doPageSwitch(idx); return; }
+  if (phase === 'rec' || phase === 'ovd') return; // don't interrupt recording
+
+  if (_pageSwitchTid !== null) clearTimeout(_pageSwitchTid);
+  pendingPage = idx;
+  updatePageBar();
+
+  const elapsed = (actx.currentTime - loopT0) % loopDur;
+  const delay   = Math.max(0, (loopDur - elapsed) * 1000 - 20);
+  _pageSwitchTid = setTimeout(() => doPageSwitch(idx), delay);
 }
 
 function handlePedal() {
@@ -1647,7 +1740,12 @@ function renderLayers() {
     wrap.appendChild(div);
   });
   updateMergeButton();
+  updatePageBar();
 }
+
+document.querySelectorAll('.btn-page').forEach(btn =>
+  btn.addEventListener('click', () => queuePageSwitch(+btn.dataset.pg))
+);
 
 document.getElementById('layers-wrap').addEventListener('input', e => {
   if (e.target.dataset.id)    setVol(+e.target.dataset.id, +e.target.value);
@@ -2069,6 +2167,7 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
 })();
 
 if (window.parent !== window) document.body.classList.add('embedded');
+updatePageBar();
 </script>
 </body>
 </html>
