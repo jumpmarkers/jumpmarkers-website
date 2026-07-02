@@ -1576,7 +1576,7 @@ function updatePageBar() {
   });
 }
 
-function doPageSwitch(newIdx) {
+function doPageSwitch(newIdx, intent = null) {
   if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; }
   if (newIdx === currentPage)  { pendingPage = null; updatePageBar(); return; }
 
@@ -1597,6 +1597,8 @@ function doPageSwitch(newIdx) {
   loopDur     = pages[currentPage].loopDur;
   loopT0      = pages[currentPage].loopT0;
   measureColors = pages[currentPage].measureColors;
+  // Fallback: if loopDur was never saved for this page but layers exist, derive from buffer
+  if (loopDur === 0 && layers.length > 0) loopDur = layers[0].buf?.duration ?? 0;
   pendingPage = null;
   history     = [];
   selMeasures.clear();
@@ -1624,6 +1626,18 @@ function doPageSwitch(newIdx) {
   }
 
   buildBeatRow(); renderLayers(); updateInfo(); updatePageBar();
+
+  // Immediately light beat 0 so circles don't flash dark after buildBeatRow resets them
+  if (metroOn && mode === 'metro' && schedId) activateDot(0);
+
+  // Auto-action: start recording/overdubbing on new page
+  if (intent && actx) {
+    if (intent === 'ovd' && layers.length > 0) {
+      handleRecord(); // overdub on non-empty page
+    } else if (!layers.length) {
+      handleRecord(); // record first layer (or on top of globals)
+    }
+  }
 }
 
 function queuePageSwitch(idx) {
@@ -1631,8 +1645,15 @@ function queuePageSwitch(idx) {
     if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; pendingPage = null; updatePageBar(); }
     return;
   }
-  if (!actx || phase === 'idle' || phase === 'paused' || !layers.length || loopDur === 0) { doPageSwitch(idx); return; }
-  if (phase === 'rec' || phase === 'ovd') return; // don't interrupt recording
+  if (!actx || phase === 'idle' || !layers.length || loopDur === 0) { doPageSwitch(idx); return; }
+  if (phase === 'paused') { doPageSwitch(idx, 'play'); return; }
+  if (phase === 'rec') return; // don't interrupt first recording
+  if (phase === 'ovd') {
+    // Cancel current overdub and switch immediately, carrying the overdub intent
+    _discardRec = true; worklet?.port.postMessage({cmd:'stop'});
+    doPageSwitch(idx, 'ovd');
+    return;
+  }
 
   if (_pageSwitchTid !== null) clearTimeout(_pageSwitchTid);
   pendingPage = idx;
@@ -1640,7 +1661,7 @@ function queuePageSwitch(idx) {
 
   const elapsed = (actx.currentTime - loopT0) % loopDur;
   const delay   = Math.max(0, (loopDur - elapsed) * 1000 - 20);
-  _pageSwitchTid = setTimeout(() => doPageSwitch(idx), delay);
+  _pageSwitchTid = setTimeout(() => doPageSwitch(idx, 'play'), delay);
 }
 
 function handlePedal() {
