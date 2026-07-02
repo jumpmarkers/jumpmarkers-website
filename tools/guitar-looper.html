@@ -1616,6 +1616,7 @@ function doPageSwitch(newIdx) {
     loopT0 = actx.currentTime;
     layers.forEach(l => playLayer(l, 0));
     gl.filter(l => !l.muted).forEach(l => playLayer(l, 0));
+    if (metroOn && mode === 'metro') startMetro(loopT0);
     setPhase('play');
     startPos();
   } else {
@@ -1630,7 +1631,7 @@ function queuePageSwitch(idx) {
     if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; pendingPage = null; updatePageBar(); }
     return;
   }
-  if (!actx || phase === 'idle' || !layers.length || loopDur === 0) { doPageSwitch(idx); return; }
+  if (!actx || phase === 'idle' || phase === 'paused' || !layers.length || loopDur === 0) { doPageSwitch(idx); return; }
   if (phase === 'rec' || phase === 'ovd') return; // don't interrupt recording
 
   if (_pageSwitchTid !== null) clearTimeout(_pageSwitchTid);
