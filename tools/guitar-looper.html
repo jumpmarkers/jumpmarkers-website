@@ -2646,8 +2646,8 @@ updatePageBar();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
-  itmCopy .addEventListener('mousedown', e => { e.stopPropagation(); closeMenu(); copyScene(_ctxIdx); });
-  itmPaste.addEventListener('mousedown', e => { e.stopPropagation(); if (_ctxIdx >= 0 && _pgClipboard) { closeMenu(); pasteScene(_ctxIdx); } });
+  itmCopy .addEventListener('mousedown', e => { e.stopPropagation(); const i = _ctxIdx; closeMenu(); copyScene(i); });
+  itmPaste.addEventListener('mousedown', e => { e.stopPropagation(); if (_ctxIdx >= 0 && _pgClipboard) { const i = _ctxIdx; closeMenu(); pasteScene(i); } });
   itmClear.addEventListener('mousedown', e => { e.stopPropagation(); const i = _ctxIdx; closeMenu(); clearScene(i); });
 })();
 </script>
