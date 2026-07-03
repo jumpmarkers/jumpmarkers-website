@@ -133,6 +133,8 @@ select{cursor:pointer}
 #pg-ctx-menu .ctx-item:hover{background:var(--bg3,#313244)}
 #pg-ctx-menu .ctx-item.ctx-disabled{opacity:.38;cursor:default;pointer-events:none}
 #pg-ctx-menu hr{border:none;border-top:1px solid var(--border2,#3a3f55);margin:3px 0}
+#pg-ctx-menu .ctx-danger{color:var(--red,#f38ba8)}
+#pg-ctx-menu .ctx-danger:hover{background:rgba(243,139,168,.12)}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -1765,7 +1767,30 @@ function handleClear() {
 
 function globalLayers() { return pages[0].layers.filter(l => l.global); }
 
-// ─── Scene copy / paste ───────────────────────────────────────────────────────
+// ─── Scene utilities (copy / paste / clear) ───────────────────────────────────
+function clearScene(idx) {
+  const isActive = idx === currentPage;
+  const pg = pages[idx];
+  if (isActive) {
+    if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    stopMetro(); stopPos();
+    history = []; selMeasures.clear();
+    layers = []; pg.layers = [];
+    loopDur = 0; loopT0 = 0;
+    pg.loopDur = 0; pg.loopT0 = 0;
+    measureColors = {}; pg.measureColors = {};
+    setPhase('idle');
+    buildBeatRow(); renderLayers(); updateInfo(); updateIO();
+  } else {
+    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    pg.layers = []; pg.loopDur = 0; pg.loopT0 = 0; pg.measureColors = {};
+  }
+  updatePageBar();
+  showToast(`Scene ${idx + 1} vaciada`, 'confirm', 1500);
+}
+
+
 function _cloneAudioBuffer(src) {
   const nb = actx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
   for (let c = 0; c < src.numberOfChannels; c++) {
@@ -2129,7 +2154,9 @@ function renderLayers() {
 const _pgColorInput = Object.assign(document.createElement('input'), {type:'color'});
 _pgColorInput.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
 document.body.appendChild(_pgColorInput);
-_pgColorInput.addEventListener('input', () => { pages[currentPage].color = _pgColorInput.value; updatePageBar(); });
+let _pgColorTarget = null; // null = currentPage, number = specific page index
+_pgColorInput.addEventListener('input',  () => { const t = _pgColorTarget ?? currentPage; pages[t].color = _pgColorInput.value; updatePageBar(); });
+_pgColorInput.addEventListener('change', () => { _pgColorTarget = null; });
 
 document.querySelectorAll('.btn-page').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2574,19 +2601,23 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
 if (window.parent !== window) document.body.classList.add('embedded');
 updatePageBar();
 
-// ─── Scene context menu (right-click copy/paste) ──────────────────────────────
+// ─── Scene context menu ────────────────────────────────────────────────────────
 (function() {
-  const menu  = document.getElementById('pg-ctx-menu');
-  const itmCopy  = document.getElementById('ctx-copy');
-  const itmPaste = document.getElementById('ctx-paste');
+  const menu       = document.getElementById('pg-ctx-menu');
+  const itmCopy    = document.getElementById('ctx-copy');
+  const itmPaste   = document.getElementById('ctx-paste');
+  const itmColor   = document.getElementById('ctx-color');
+  const itmColorDot= document.getElementById('ctx-color-dot');
+  const itmClear   = document.getElementById('ctx-clear');
   let _ctxIdx = -1;
 
   function openMenu(e, idx) {
     e.preventDefault();
     _ctxIdx = idx;
     itmPaste.classList.toggle('ctx-disabled', !_pgClipboard);
+    itmColorDot.style.background = pages[idx].color;
     menu.style.display = 'block';
-    const mw = 160, mh = 72;
+    const mw = 168, mh = 150;
     const x = e.clientX + mw > window.innerWidth  ? e.clientX - mw : e.clientX;
     const y = e.clientY + mh > window.innerHeight ? e.clientY - mh : e.clientY;
     menu.style.left = x + 'px';
@@ -2599,8 +2630,15 @@ updatePageBar();
     btn.addEventListener('contextmenu', e => openMenu(e, +btn.dataset.pg));
   });
 
-  itmCopy.addEventListener('click',  () => { closeMenu(); copyScene(_ctxIdx); });
+  itmCopy .addEventListener('click', () => { closeMenu(); copyScene(_ctxIdx); });
   itmPaste.addEventListener('click', () => { closeMenu(); pasteScene(_ctxIdx); });
+  itmClear.addEventListener('click', () => { closeMenu(); clearScene(_ctxIdx); });
+  itmColor.addEventListener('click', () => {
+    closeMenu();
+    _pgColorTarget = _ctxIdx;
+    _pgColorInput.value = pages[_ctxIdx].color;
+    _pgColorInput.click();
+  });
 
   document.addEventListener('click',   closeMenu);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
@@ -2609,8 +2647,11 @@ updatePageBar();
 
 <div id="pg-ctx-menu">
   <div class="ctx-item" id="ctx-copy">Copiar scene</div>
-  <hr>
   <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
+  <hr>
+  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle"></span>Color de scene</div>
+  <hr>
+  <div class="ctx-item ctx-danger" id="ctx-clear">Limpiar scene</div>
 </div>
 </body>
 </html>
