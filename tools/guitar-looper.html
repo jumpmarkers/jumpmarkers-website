@@ -1585,6 +1585,10 @@ function doPageSwitch(newIdx, intent = null) {
   if (_pageSwitchTid !== null) { clearTimeout(_pageSwitchTid); _pageSwitchTid = null; }
   if (newIdx === currentPage)  { pendingPage = null; updatePageBar(); return; }
 
+  // Capture source-page beat reference BEFORE saving (needed for global sync)
+  const srcLoopT0  = loopT0;
+  const srcLoopDur = loopDur;
+
   // Save current page timing
   pages[currentPage].loopDur = loopDur;
   pages[currentPage].loopT0  = loopT0;
@@ -1597,13 +1601,15 @@ function doPageSwitch(newIdx, intent = null) {
   stopMetro(); stopPos();
 
   // Switch
-  currentPage = newIdx;
-  layers      = pages[currentPage].layers;
-  loopDur     = pages[currentPage].loopDur;
-  loopT0      = pages[currentPage].loopT0;
+  currentPage   = newIdx;
+  layers        = pages[currentPage].layers;
+  loopDur       = pages[currentPage].loopDur;
+  loopT0        = pages[currentPage].loopT0;
   measureColors = pages[currentPage].measureColors;
   // Fallback: if loopDur was never saved for this page but layers exist, derive from buffer
   if (loopDur === 0 && layers.length > 0) loopDur = layers[0].buf?.duration ?? 0;
+  // For ovd context: inherit loopDur from source so recording snaps to correct boundary
+  if (loopDur === 0 && intent === 'ovd' && srcLoopDur > 0) loopDur = srcLoopDur;
   pendingPage = null;
   history     = [];
   selMeasures.clear();
@@ -1619,28 +1625,61 @@ function doPageSwitch(newIdx, intent = null) {
   // If switching to empty page with globals, borrow page 0's loopDur for the progress bar
   if (!loopDur && gl.length) loopDur = pages[0].loopDur;
 
-  if (actx && (layers.length || gl.length) && loopDur > 0) {
-    loopT0 = actx.currentTime;
-    layers.forEach(l => playLayer(l, 0));
-    gl.filter(l => !l.muted).forEach(l => playLayer(l, 0));
-    if (metroOn && mode === 'metro') startMetro(loopT0);
+  // Global beat sync: how far into the beat cycle we are right now
+  const globalOffset = (intent && srcLoopDur > 0 && actx)
+    ? ((actx.currentTime - srcLoopT0) % srcLoopDur + srcLoopDur) % srcLoopDur
+    : 0;
+
+  if (actx && intent && (layers.length || gl.length) && loopDur > 0) {
+    loopT0 = actx.currentTime - globalOffset; // align to global beat clock
+    layers.forEach(l => playLayer(l, globalOffset));
+    gl.filter(l => !l.muted).forEach(l => playLayer(l, globalOffset));
     setPhase('play');
     startPos();
   } else {
+    // Update loopT0 for global sync even in idle (overdub scheduling depends on it)
+    if (intent && actx && srcLoopDur > 0) loopT0 = actx.currentTime - globalOffset;
     setPhase('idle');
   }
 
   buildBeatRow(); renderLayers(); updateInfo(); updatePageBar();
 
-  // Immediately light beat 0 so circles don't flash dark after buildBeatRow resets them
-  if (metroOn && mode === 'metro' && schedId) activateDot(0);
+  // Restart metro synced to global beat position (avoids firing past-beat clicks)
+  if (metroOn && mode === 'metro' && phase === 'play') {
+    const effectiveBpmSync = bpm * retimeRate;
+    const beatDurSync = 60 / effectiveBpmSync;
+    const beatsElapsed = globalOffset > 0 ? Math.floor(globalOffset / beatDurSync) : 0;
+    const totalDots = _dotTotal || numMeasures * bpMeasure;
+    clearInterval(schedId); schedId = null;
+    nextBeatT = loopT0 + (beatsElapsed + 1) * beatDurSync;
+    beatIdx   = (beatsElapsed + 1) % totalDots;
+    scheduleTick();
+    schedId = setInterval(scheduleTick, SCHED_INT);
+    activateDot(beatsElapsed % totalDots);
+  }
 
   // Auto-action: start recording/overdubbing on new page
   if (intent && actx) {
     if (intent === 'ovd' && layers.length > 0) {
-      handleRecord(true); // overdub on non-empty page, no countdown
+      // loopT0 is globally aligned, so handleRecord will snap to correct next boundary
+      handleRecord(true);
+    } else if (intent === 'ovd' && !layers.length && srcLoopDur > 0) {
+      // Empty page: schedule first recording to start at the next global beat boundary
+      const startAt = _ovdT0 > actx.currentTime + 0.02
+        ? _ovdT0
+        : actx.currentTime + (srcLoopDur - globalOffset);
+      loopDur = srcLoopDur;
+      const msUntil = Math.max(0, (startAt - actx.currentTime) * 1000 - 15);
+      setTimeout(() => {
+        if (!actx || phase !== 'idle') return;
+        loopT0 = startAt;
+        setPhase('rec');
+        buildBeatRow(false, bpMeasure); _dotTotal = bpMeasure;
+        worklet.port.postMessage({cmd:'start', startAt, stopAt: startAt + srcLoopDur});
+        startPos();
+      }, msUntil);
     } else if (!layers.length) {
-      handleRecord(true); // record first layer, no countdown
+      handleRecord(true); // 'play' intent → empty page: normal auto-record
     }
   }
 }
