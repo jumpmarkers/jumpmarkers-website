@@ -1643,6 +1643,7 @@ async function loadProject(file) {
     setPhase('idle');
   }
 
+  _dotTotal = mode === 'instant' ? bpMeasure : numMeasures * bpMeasure;
   buildBeatRow(); renderLayers(); updateInfo(); updateIO(); updatePageBar();
   showToast('Session loaded', 'confirm', 2000);
 }
