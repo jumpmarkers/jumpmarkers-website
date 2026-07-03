@@ -135,6 +135,7 @@ select{cursor:pointer}
 #pg-ctx-menu hr{border:none;border-top:1px solid var(--border2,#3a3f55);margin:3px 0}
 #pg-ctx-menu .ctx-danger{color:var(--red,#f38ba8)}
 #pg-ctx-menu .ctx-danger:hover{background:rgba(243,139,168,.12)}
+#ctx-color-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -556,7 +557,7 @@ select{cursor:pointer}
   <div class="ctx-item" id="ctx-copy">Copiar scene</div>
   <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
   <hr>
-  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle"></span>Color de scene</div>
+  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot"></span>Color de scene</div>
   <hr>
   <div class="ctx-item ctx-danger" id="ctx-clear">Limpiar scene</div>
 </div>
@@ -2620,44 +2621,48 @@ updatePageBar();
   const itmClear    = document.getElementById('ctx-clear');
   let _ctxIdx = -1;
 
-  function openMenu(e, idx) {
-    e.preventDefault();
-    e.stopPropagation();
+  function openMenu(x, y, idx) {
     _ctxIdx = idx;
     itmPaste.classList.toggle('ctx-disabled', !_pgClipboard);
     itmColorDot.style.background = pages[idx].color;
+    menu.style.left = '-9999px'; // measure offscreen first
+    menu.style.top  = '-9999px';
     menu.style.display = 'block';
-    const mw = 168, mh = 150;
-    const x = e.clientX + mw > window.innerWidth  ? e.clientX - mw : e.clientX;
-    const y = e.clientY + mh > window.innerHeight ? e.clientY - mh : e.clientY;
-    menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    const mw = menu.offsetWidth  || 168;
+    const mh = menu.offsetHeight || 160;
+    menu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
+    menu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
   }
 
-  function closeMenu() { menu.style.display = 'none'; }
+  function closeMenu() { menu.style.display = 'none'; _ctxIdx = -1; }
 
-  // Event delegation on document — reliable regardless of btn-page stacking
-  document.addEventListener('contextmenu', e => {
-    const btn = e.target.closest('.btn-page');
-    if (btn) { openMenu(e, +btn.dataset.pg); }
+  // Direct contextmenu listener on every scene button
+  document.querySelectorAll('.btn-page').forEach(btn => {
+    btn.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openMenu(e.clientX, e.clientY, +btn.dataset.pg);
+    });
   });
 
-  // stopPropagation prevents the document click listener from closing the menu
-  // in the same event cycle as the item action
-  itmCopy .addEventListener('click', e => { e.stopPropagation(); closeMenu(); copyScene(_ctxIdx); });
-  itmPaste.addEventListener('click', e => { e.stopPropagation(); closeMenu(); pasteScene(_ctxIdx); });
-  itmClear.addEventListener('click', e => { e.stopPropagation(); closeMenu(); clearScene(_ctxIdx); });
-  itmColor.addEventListener('click', e => {
-    e.stopPropagation();
-    closeMenu();
-    _pgColorTarget = _ctxIdx;
-    _pgColorInput.value = pages[_ctxIdx].color;
-    _pgColorInput.click();
+  // Close when mousedown fires outside the menu (works for both mouse buttons)
+  document.addEventListener('mousedown', e => {
+    if (menu.style.display !== 'none' && !menu.contains(e.target)) closeMenu();
   });
-
-  // Close on any outside click or Escape
-  document.addEventListener('click', closeMenu);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
+  // Use mousedown on items so the action fires before the outside-mousedown check
+  itmCopy .addEventListener('mousedown', e => { e.stopPropagation(); closeMenu(); copyScene(_ctxIdx); });
+  itmPaste.addEventListener('mousedown', e => { e.stopPropagation(); if (_ctxIdx >= 0 && _pgClipboard) { closeMenu(); pasteScene(_ctxIdx); } });
+  itmClear.addEventListener('mousedown', e => { e.stopPropagation(); const i = _ctxIdx; closeMenu(); clearScene(i); });
+  itmColor.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    const i = _ctxIdx;
+    closeMenu();
+    _pgColorTarget = i;
+    _pgColorInput.value = pages[i].color;
+    setTimeout(() => _pgColorInput.click(), 0);
+  });
 })();
 </script>
 </body>
