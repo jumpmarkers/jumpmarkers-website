@@ -1528,7 +1528,7 @@ function resumePlayback() {
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.muted) _play(l, 0); });
   if (currentPage !== 0) globalLayers().filter(l => !l.muted).forEach(l => _play(l, 0));
-  if (metroOn && mode === 'metro') {
+  if (mode === 'metro') {
     nextBeatT = loopT0;
     beatIdx = 0;
     scheduleTick();
@@ -1645,7 +1645,7 @@ function doPageSwitch(newIdx, intent = null) {
   buildBeatRow(); renderLayers(); updateInfo(); updatePageBar();
 
   // Restart metro synced to global beat position (avoids firing past-beat clicks)
-  if (metroOn && mode === 'metro' && phase === 'play') {
+  if (mode === 'metro' && phase === 'play') {
     const effectiveBpmSync = bpm * retimeRate;
     const beatDurSync = 60 / effectiveBpmSync;
     const beatsElapsed = globalOffset > 0 ? Math.floor(globalOffset / beatDurSync) : 0;
