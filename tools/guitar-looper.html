@@ -542,7 +542,7 @@ select{cursor:pointer}
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS      = ['#f5a623','#52c77d','#5287e0','#e05252','#b04080','#7ecfb3','#e0a050','#a07cd0','#52b0e0','#e07070'];
 const PAGE_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#14b8a6'];
-const PAGE_KEYS   = {KeyF:0,KeyG:1,KeyH:2,KeyJ:3,KeyV:4,KeyB:5,KeyN:6,KeyM:7};
+const PAGE_KEYS   = {KeyD:0,KeyF:1,KeyG:2,KeyH:3,KeyC:4,KeyV:5,KeyB:6,KeyN:7};
 const LOOK_AHEAD = 0.12; // s — metronome scheduler look-ahead
 const SCHED_INT  = 50;   // ms — scheduler interval
 
@@ -1443,7 +1443,7 @@ function updateIO() {
 }
 
 // ─── Main actions ─────────────────────────────────────────────────────────────
-async function handleRecord() {
+async function handleRecord(skipCountdown = false) {
   if (_measuringLatency) return;
   if (Math.abs(retimeRate - 1) > 0.01) {
     showToast('Set Speed to 1× before recording', 'warn', 2000);
@@ -1453,7 +1453,7 @@ async function handleRecord() {
   if (!actx) return;
   if (actx.state === 'suspended') await actx.resume();
   if (mode === 'instant') await handleRecInstant();
-  else await handleRecMetro();
+  else await handleRecMetro(skipCountdown);
 }
 
 async function handleRecInstant() {
@@ -1483,13 +1483,18 @@ async function handleRecInstant() {
   }
 }
 
-async function handleRecMetro() {
+async function handleRecMetro(skipCountdown = false) {
   if (phase === 'cd' || phase === 'rec' || phase === 'ovd') return;
   loopDur = calcDur();
   if (phase === 'idle') {
-    setPhase('cd');
-    const loopStart = await doCountdown();
-    if (loopStart === null) return; // cancelled during countdown
+    let loopStart;
+    if (skipCountdown) {
+      loopStart = actx.currentTime + 0.05;
+    } else {
+      setPhase('cd');
+      loopStart = await doCountdown();
+      if (loopStart === null) return; // cancelled during countdown
+    }
     setPhase('rec');
     buildBeatRow(false, numMeasures * bpMeasure);
     _dotTotal = numMeasures * bpMeasure;
@@ -1633,9 +1638,9 @@ function doPageSwitch(newIdx, intent = null) {
   // Auto-action: start recording/overdubbing on new page
   if (intent && actx) {
     if (intent === 'ovd' && layers.length > 0) {
-      handleRecord(); // overdub on non-empty page
+      handleRecord(true); // overdub on non-empty page, no countdown
     } else if (!layers.length) {
-      handleRecord(); // record first layer (or on top of globals)
+      handleRecord(true); // record first layer, no countdown
     }
   }
 }
