@@ -552,6 +552,15 @@ select{cursor:pointer}
   <span style="font-size:1.9rem">👇</span>
 </div>
 
+<div id="pg-ctx-menu">
+  <div class="ctx-item" id="ctx-copy">Copiar scene</div>
+  <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
+  <hr>
+  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle"></span>Color de scene</div>
+  <hr>
+  <div class="ctx-item ctx-danger" id="ctx-clear">Limpiar scene</div>
+</div>
+
 <script>
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS      = ['#f5a623','#52c77d','#5287e0','#e05252','#b04080','#7ecfb3','#e0a050','#a07cd0','#52b0e0','#e07070'];
@@ -2644,14 +2653,5 @@ updatePageBar();
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 })();
 </script>
-
-<div id="pg-ctx-menu">
-  <div class="ctx-item" id="ctx-copy">Copiar scene</div>
-  <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
-  <hr>
-  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle"></span>Color de scene</div>
-  <hr>
-  <div class="ctx-item ctx-danger" id="ctx-clear">Limpiar scene</div>
-</div>
 </body>
 </html>
