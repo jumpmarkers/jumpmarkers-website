@@ -128,6 +128,11 @@ select{cursor:pointer}
 .btn-page.pg-has::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--pgc,var(--green))}
 .btn-page.pg-active.pg-has::after{background:rgba(255,255,255,.7)}
 .btn-page.pg-pending{border-color:var(--pgc,var(--accent));color:var(--pgc,var(--accent));animation:blink .5s infinite}
+#pg-ctx-menu{display:none;position:fixed;z-index:9999;background:var(--bg2,#1e2030);border:1px solid var(--border2,#3a3f55);border-radius:7px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);min-width:150px}
+#pg-ctx-menu .ctx-item{padding:9px 15px;cursor:pointer;font-size:.8rem;color:var(--text,#cdd6f4);user-select:none}
+#pg-ctx-menu .ctx-item:hover{background:var(--bg3,#313244)}
+#pg-ctx-menu .ctx-item.ctx-disabled{opacity:.38;cursor:default;pointer-events:none}
+#pg-ctx-menu hr{border:none;border-top:1px solid var(--border2,#3a3f55);margin:3px 0}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -492,6 +497,13 @@ select{cursor:pointer}
         <input type="file" id="in-import" accept="audio/*" style="display:none">
       </label>
     </div>
+    <div class="io-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <button class="btn-io" id="btn-save-project">⬇ Guardar sesión</button>
+      <label class="btn-io" style="cursor:pointer">
+        ⬆ Cargar sesión
+        <input type="file" id="in-load-project" accept=".lpr" style="display:none">
+      </label>
+    </div>
   </div>
   <!-- Feedback -->
   <div class="card">
@@ -584,6 +596,7 @@ let autoQuantize = false, _pendingQuantizeDur = 0;
 // Recording guard
 let _discardRec = false;
 let _replaceTarget = null; // layer id being re-recorded, or null
+let _pgClipboard = null;   // { loopDur, measureColors, layers:[…] } snapshot for scene copy/paste
 let _draggingPan = null;  // { id, startY, startVal } during knob drag
 let micStream   = null;
 
@@ -1442,6 +1455,189 @@ function updateIO() {
   document.getElementById('btn-wav').disabled = !has;
 }
 
+// ─── Project save / load (.lpr binary format) ─────────────────────────────────
+// Format: magic(4) | jsonLen(4 LE) | json(UTF-8) | [per buffer: ch(4) frames(4) sr(4) pcm(ch×frames×4)]
+function saveProject() {
+  // Snapshot current page before collecting
+  pages[currentPage].loopDur      = loopDur;
+  pages[currentPage].loopT0       = loopT0;
+  pages[currentPage].measureColors = measureColors;
+
+  const bufList = [];
+  const pagesSnap = pages.map(pg => ({
+    color: pg.color,
+    loopDur: pg.loopDur,
+    measureColors: {...pg.measureColors},
+    layers: pg.layers.map(l => {
+      const bi = bufList.length;
+      bufList.push(l.buf);
+      return { name: l.name, vol: l.vol, pan: l.pan,
+               muted: l.muted, solo: l.solo, global: l.global,
+               color: l.color, bi };
+    })
+  }));
+
+  const meta = {
+    v: 1,
+    bpm, bpMeasure, numMeasures, cdBeats,
+    nv: +document.getElementById('in-nv').value,
+    mode, metroOn,
+    metroVol: +document.getElementById('in-metro-vol').value,
+    cdOn, latencyMs, autoQuantize,
+    masterVol: +document.getElementById('in-master-vol').value,
+    currentPage
+  };
+
+  const jsonBytes    = new TextEncoder().encode(JSON.stringify({meta, pages: pagesSnap}));
+  const jsonPadded   = (jsonBytes.length + 3) & ~3; // pad to 4-byte boundary for Float32Array alignment
+
+  // Calculate binary size
+  let bufBytes = 0;
+  for (const b of bufList) bufBytes += 12 + b.numberOfChannels * b.length * 4;
+  const total = 8 + jsonPadded + bufBytes;
+  const ab = new ArrayBuffer(total);
+  const dv = new DataView(ab);
+  let off = 0;
+
+  // Magic "LPR1"
+  dv.setUint8(off++, 76); dv.setUint8(off++, 80); dv.setUint8(off++, 82); dv.setUint8(off++, 49);
+  dv.setUint32(off, jsonBytes.length, true); off += 4; // store REAL length for parsing
+  new Uint8Array(ab, off, jsonBytes.length).set(jsonBytes); off += jsonPadded; // advance by padded size
+
+  for (const b of bufList) {
+    dv.setUint32(off, b.numberOfChannels, true); off += 4;
+    dv.setUint32(off, b.length,           true); off += 4;
+    dv.setUint32(off, b.sampleRate,       true); off += 4;
+    for (let c = 0; c < b.numberOfChannels; c++) {
+      new Float32Array(ab, off, b.length).set(b.getChannelData(c));
+      off += b.length * 4;
+    }
+  }
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ab], {type:'application/octet-stream'}));
+  a.download = 'looper-session.lpr';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  showToast('Sesión guardada', 'confirm', 2000);
+}
+
+async function loadProject(file) {
+  if (!file) return;
+  const raw = await file.arrayBuffer();
+  const dv  = new DataView(raw);
+  if (dv.getUint8(0) !== 76 || dv.getUint8(1) !== 80 || dv.getUint8(2) !== 82 || dv.getUint8(3) !== 49) {
+    showToast('Archivo no válido (.lpr)', 'error', 3000); return;
+  }
+  let off = 4;
+  const jsonLen    = dv.getUint32(off, true); off += 4;
+  const {meta, pages: pagesSnap} = JSON.parse(new TextDecoder().decode(new Uint8Array(raw, off, jsonLen)));
+  off += (jsonLen + 3) & ~3; // advance by padded size to stay 4-byte aligned
+
+  if (!actx) await initAudio();
+  if (!actx) return;
+
+  // Decode audio buffers
+  const audioBufs = [];
+  while (off < raw.byteLength) {
+    const ch  = dv.getUint32(off, true); off += 4;
+    const fr  = dv.getUint32(off, true); off += 4;
+    const sr  = dv.getUint32(off, true); off += 4;
+    const buf = actx.createBuffer(ch, fr, sr);
+    for (let c = 0; c < ch; c++) {
+      buf.copyToChannel(new Float32Array(raw.slice(off, off + fr * 4)), c);
+      off += fr * 4;
+    }
+    audioBufs.push(buf);
+  }
+
+  // Stop everything
+  if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+  pages.forEach(pg => pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} }));
+  stopMetro(); stopPos();
+
+  // Restore settings
+  bpm         = meta.bpm         ?? 120;
+  bpMeasure   = meta.bpMeasure   ?? 4;
+  numMeasures = meta.numMeasures ?? 2;
+  cdBeats     = meta.cdBeats     ?? 4;
+  mode        = meta.mode        ?? 'metro';
+  latencyMs   = meta.latencyMs   ?? 0;
+  metroVol    = (meta.metroVol   ?? 70) / 100;
+  metroOn     = meta.metroOn     ?? true;
+  cdOn        = meta.cdOn        ?? true;
+  autoQuantize = meta.autoQuantize ?? false;
+
+  document.getElementById('in-bpm').value      = bpm;
+  document.getElementById('in-beats').value    = bpMeasure;
+  document.getElementById('in-measures').value = numMeasures;
+  document.getElementById('in-cd').value       = cdBeats;
+  document.getElementById('in-latency').value  = latencyMs;
+  if (meta.nv) document.getElementById('in-nv').value = meta.nv;
+
+  const mv = meta.metroVol ?? 70;
+  document.getElementById('in-metro-vol').value   = mv;
+  document.getElementById('metro-vol-lbl').textContent = mv + '%';
+  const masterV = meta.masterVol ?? 100;
+  if (masterGain) masterGain.gain.value = masterV / 100;
+  document.getElementById('in-master-vol').value  = masterV;
+  document.getElementById('master-vol-lbl').textContent = masterV + '%';
+
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('tog-metro').classList.toggle('on', metroOn);
+  document.getElementById('tog-cd').classList.toggle('on', cdOn);
+  document.getElementById('in-cd').disabled = !cdOn;
+  document.getElementById('tog-quantize').classList.toggle('on', autoQuantize);
+  document.getElementById('lbl-quantize').textContent = autoQuantize ? 'On' : 'Off';
+
+  // Rebuild pages
+  pages.forEach((pg, i) => {
+    const snap = pagesSnap[i] || {layers:[], loopDur:0, measureColors:{}, color: PAGE_COLORS[i]};
+    pg.color        = snap.color || PAGE_COLORS[i];
+    pg.loopDur      = snap.loopDur ?? 0;
+    pg.loopT0       = 0;
+    pg.measureColors = {...(snap.measureColors ?? {})};
+    pg.layers = (snap.layers || []).map(ld => {
+      const id = nextId++;
+      const gain   = actx.createGain();
+      const panner = actx.createStereoPanner();
+      gain.gain.value   = ld.vol ?? 1;
+      panner.pan.value  = ld.pan ?? 0;
+      gain.connect(panner);
+      const buf = audioBufs[ld.bi];
+      return { id, name: ld.name || ('Layer ' + id), buf, origBuf: buf,
+               gain, panner, src: null,
+               vol: ld.vol ?? 1, pan: ld.pan ?? 0,
+               muted: ld.muted ?? false, solo: ld.solo ?? false,
+               global: ld.global ?? false, color: ld.color || COLORS[(id-1) % COLORS.length],
+               imported: false, selected: false };
+    });
+  });
+
+  // Activate saved current page
+  history = []; selMeasures.clear(); pendingPage = null; _pageSwitchTid = null;
+  currentPage   = Math.min(meta.currentPage ?? 0, pages.length - 1);
+  layers        = pages[currentPage].layers;
+  loopDur       = pages[currentPage].loopDur;
+  loopT0        = 0;
+  measureColors = pages[currentPage].measureColors;
+
+  layers.forEach(l => l.panner.connect(masterGain || actx.destination));
+  if (currentPage !== 0) pages[0].layers.filter(l => l.global).forEach(l => l.panner.connect(masterGain || actx.destination));
+
+  if (layers.length > 0 && loopDur > 0) {
+    loopT0 = actx.currentTime;
+    layers.forEach(l => { if (!l.muted) playLayer(l, 0); });
+    if (mode === 'metro') startMetro(loopT0);
+    setPhase('play'); startPos();
+  } else {
+    setPhase('idle');
+  }
+
+  buildBeatRow(); renderLayers(); updateInfo(); updateIO(); updatePageBar();
+  showToast('Sesión cargada', 'confirm', 2000);
+}
+
 // ─── Main actions ─────────────────────────────────────────────────────────────
 async function handleRecord(skipCountdown = false) {
   if (_measuringLatency) return;
@@ -1568,6 +1764,94 @@ function handleClear() {
 }
 
 function globalLayers() { return pages[0].layers.filter(l => l.global); }
+
+// ─── Scene copy / paste ───────────────────────────────────────────────────────
+function _cloneAudioBuffer(src) {
+  const nb = actx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const ch = new Float32Array(src.length);
+    src.copyFromChannel(ch, c);
+    nb.copyToChannel(ch, c);
+  }
+  return nb;
+}
+
+function copyScene(idx) {
+  if (idx === currentPage) {
+    pages[currentPage].loopDur = loopDur;
+    pages[currentPage].measureColors = measureColors;
+  }
+  const pg = pages[idx];
+  _pgClipboard = {
+    loopDur: pg.loopDur,
+    measureColors: {...pg.measureColors},
+    color: pg.color,
+    layers: pg.layers.map(l => ({
+      name: l.name, vol: l.vol, pan: l.pan,
+      muted: l.muted, solo: l.solo, global: l.global, color: l.color,
+      buf: l.buf, origBuf: l.origBuf
+    }))
+  };
+  showToast(`Scene ${idx + 1} copiada`, 'confirm', 1500);
+}
+
+function pasteScene(idx) {
+  if (!_pgClipboard) return;
+  if (!actx) { showToast('Inicia el audio primero', 'warn', 1500); return; }
+
+  const isActive = idx === currentPage;
+  const pg = pages[idx];
+
+  // Tear down existing layers on target page
+  if (isActive) {
+    if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
+    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    stopMetro(); stopPos();
+    history = []; selMeasures.clear();
+  } else {
+    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+  }
+
+  // Build cloned layers (new audio nodes + deep-copied buffers)
+  const newLayers = _pgClipboard.layers.map(cl => {
+    const id = nextId++;
+    const gain = actx.createGain();
+    const panner = actx.createStereoPanner();
+    gain.gain.value = cl.vol ?? 1;
+    panner.pan.value = cl.pan ?? 0;
+    gain.connect(panner);
+    if (isActive) panner.connect(masterGain || actx.destination);
+    const buf     = _cloneAudioBuffer(cl.buf);
+    const origBuf = cl.origBuf && cl.origBuf !== cl.buf ? _cloneAudioBuffer(cl.origBuf) : buf;
+    return { id, name: cl.name, buf, origBuf, gain, panner, src: null,
+             vol: cl.vol ?? 1, pan: cl.pan ?? 0,
+             muted: cl.muted, solo: cl.solo, global: cl.global,
+             color: cl.color, imported: false, selected: false };
+  });
+
+  // Apply to target page
+  pg.layers = newLayers;
+  pg.loopDur = _pgClipboard.loopDur;
+  pg.loopT0  = 0;
+  pg.measureColors = {..._pgClipboard.measureColors};
+
+  if (isActive) {
+    layers = newLayers;
+    loopDur = pg.loopDur;
+    measureColors = pg.measureColors;
+    if (layers.length > 0 && loopDur > 0) {
+      loopT0 = actx.currentTime;
+      layers.forEach(l => { if (!l.muted) playLayer(l, 0); });
+      if (mode === 'metro') startMetro(loopT0);
+      setPhase('play'); startPos();
+    } else {
+      setPhase('idle');
+    }
+    buildBeatRow(); renderLayers(); updateInfo();
+  }
+  updatePageBar();
+  showToast(`Scene ${idx + 1} actualizada`, 'confirm', 1500);
+}
 
 // ─── Scene switching ──────────────────────────────────────────────────────────
 function updatePageBar() {
@@ -1762,6 +2046,8 @@ function handleOverdub() {
 function handleReRecord(id) {
   if (phase !== 'play' || !actx) return;
   _replaceTarget = id;
+  const tgt = layers.find(l => l.id === id);
+  if (tgt) stopLayerSrc(tgt); // silence layer being replaced so it doesn't bleed into the new recording
   renderLayers();
   const elapsed = (actx.currentTime - loopT0) % loopDur;
   const ovdStart = actx.currentTime + (loopDur - elapsed); // next loop boundary
@@ -2167,6 +2453,10 @@ document.getElementById('btn-midi').addEventListener('click', async () => {
 });
 document.getElementById('btn-wav').addEventListener('click', exportWAV);
 document.getElementById('btn-merge').addEventListener('click', doMerge);
+document.getElementById('btn-save-project').addEventListener('click', saveProject);
+document.getElementById('in-load-project').addEventListener('change', e => {
+  const f = e.target.files[0]; e.target.value = ''; if (f) loadProject(f);
+});
 
 // ─── Feedback widget ───────────────────────────────────────────────────────────
 document.getElementById('fb-text').addEventListener('input', e => {
@@ -2283,6 +2573,44 @@ document.getElementById('btn-detect').addEventListener('click', detectDevices);
 
 if (window.parent !== window) document.body.classList.add('embedded');
 updatePageBar();
+
+// ─── Scene context menu (right-click copy/paste) ──────────────────────────────
+(function() {
+  const menu  = document.getElementById('pg-ctx-menu');
+  const itmCopy  = document.getElementById('ctx-copy');
+  const itmPaste = document.getElementById('ctx-paste');
+  let _ctxIdx = -1;
+
+  function openMenu(e, idx) {
+    e.preventDefault();
+    _ctxIdx = idx;
+    itmPaste.classList.toggle('ctx-disabled', !_pgClipboard);
+    menu.style.display = 'block';
+    const mw = 160, mh = 72;
+    const x = e.clientX + mw > window.innerWidth  ? e.clientX - mw : e.clientX;
+    const y = e.clientY + mh > window.innerHeight ? e.clientY - mh : e.clientY;
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+  }
+
+  function closeMenu() { menu.style.display = 'none'; }
+
+  document.querySelectorAll('.btn-page').forEach(btn => {
+    btn.addEventListener('contextmenu', e => openMenu(e, +btn.dataset.pg));
+  });
+
+  itmCopy.addEventListener('click',  () => { closeMenu(); copyScene(_ctxIdx); });
+  itmPaste.addEventListener('click', () => { closeMenu(); pasteScene(_ctxIdx); });
+
+  document.addEventListener('click',   closeMenu);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+})();
 </script>
+
+<div id="pg-ctx-menu">
+  <div class="ctx-item" id="ctx-copy">Copiar scene</div>
+  <hr>
+  <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
+</div>
 </body>
 </html>
