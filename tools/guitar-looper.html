@@ -1676,6 +1676,7 @@ function doPageSwitch(newIdx, intent = null) {
         setPhase('rec');
         buildBeatRow(false, bpMeasure); _dotTotal = bpMeasure;
         worklet.port.postMessage({cmd:'start', startAt, stopAt: startAt + srcLoopDur});
+        if (mode === 'metro') startMetro(startAt);
         startPos();
       }, msUntil);
     } else if (!layers.length) {
@@ -1693,9 +1694,16 @@ function queuePageSwitch(idx) {
   if (phase === 'paused') { doPageSwitch(idx, 'play'); return; }
   if (phase === 'rec') return; // don't interrupt first recording
   if (phase === 'ovd') {
-    // Cancel current overdub and switch immediately, carrying the overdub intent
+    // Cancel current overdub; revert to play while layers finish the cycle
     _discardRec = true; worklet?.port.postMessage({cmd:'stop'});
-    doPageSwitch(idx, 'ovd');
+    setPhase('play'); // ← keeps _discardRec clean for the new recording after the switch
+    // Queue boundary-aware switch with ovd intent (same timing as a play switch)
+    if (_pageSwitchTid !== null) clearTimeout(_pageSwitchTid);
+    pendingPage = idx;
+    updatePageBar();
+    const elapsedOvd = (actx.currentTime - loopT0) % loopDur;
+    const delayOvd   = Math.max(0, (loopDur - elapsedOvd) * 1000 - 20);
+    _pageSwitchTid = setTimeout(() => doPageSwitch(idx, 'ovd'), delayOvd);
     return;
   }
 
