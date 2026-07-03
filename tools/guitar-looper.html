@@ -1986,6 +1986,7 @@ document.addEventListener('keydown', e => {
   if (!blockKeys && !e.repeat) {
     if (e.code === 'KeyT') { e.preventDefault(); doTap(); }
     if (e.code === 'KeyP') { e.preventDefault(); toggleMetroPreview(); }
+    if (e.code === 'KeyM') { e.preventDefault(); document.getElementById('tw-metro').click(); }
     if (PAGE_KEYS[e.code] !== undefined) { e.preventDefault(); queuePageSwitch(PAGE_KEYS[e.code]); }
     if (e.code === 'KeyQ' && mode === 'instant') { e.preventDefault(); document.getElementById('tw-quantize').click(); }
     if (e.code === 'KeyX')   { e.preventDefault(); doUndo(true); }
