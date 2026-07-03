@@ -135,7 +135,6 @@ select{cursor:pointer}
 #pg-ctx-menu hr{border:none;border-top:1px solid var(--border2,#3a3f55);margin:3px 0}
 #pg-ctx-menu .ctx-danger{color:var(--red,#f38ba8)}
 #pg-ctx-menu .ctx-danger:hover{background:rgba(243,139,168,.12)}
-#ctx-color-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
 #loop-progress.is-rec #loop-fill{background:var(--red);animation:rec-pulse .8s ease-in-out infinite}
 #loop-progress.is-ovd #loop-fill{background:var(--accent)}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -501,9 +500,9 @@ select{cursor:pointer}
       </label>
     </div>
     <div class="io-row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-      <button class="btn-io" id="btn-save-project">⬇ Guardar sesión</button>
+      <button class="btn-io" id="btn-save-project">⬇ Save session</button>
       <label class="btn-io" style="cursor:pointer">
-        ⬆ Cargar sesión
+        ⬆ Load session
         <input type="file" id="in-load-project" accept=".lpr" style="display:none">
       </label>
     </div>
@@ -554,12 +553,10 @@ select{cursor:pointer}
 </div>
 
 <div id="pg-ctx-menu">
-  <div class="ctx-item" id="ctx-copy">Copiar scene</div>
-  <div class="ctx-item ctx-disabled" id="ctx-paste">Pegar scene</div>
+  <div class="ctx-item" id="ctx-copy">Copy scene</div>
+  <div class="ctx-item ctx-disabled" id="ctx-paste">Paste scene</div>
   <hr>
-  <div class="ctx-item" id="ctx-color"><span id="ctx-color-dot"></span>Color de scene</div>
-  <hr>
-  <div class="ctx-item ctx-danger" id="ctx-clear">Limpiar scene</div>
+  <div class="ctx-item ctx-danger" id="ctx-clear">Clear scene</div>
 </div>
 
 <script>
@@ -1531,7 +1528,7 @@ function saveProject() {
   a.download = 'looper-session.lpr';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  showToast('Sesión guardada', 'confirm', 2000);
+  showToast('Session saved', 'confirm', 2000);
 }
 
 async function loadProject(file) {
@@ -1539,7 +1536,7 @@ async function loadProject(file) {
   const raw = await file.arrayBuffer();
   const dv  = new DataView(raw);
   if (dv.getUint8(0) !== 76 || dv.getUint8(1) !== 80 || dv.getUint8(2) !== 82 || dv.getUint8(3) !== 49) {
-    showToast('Archivo no válido (.lpr)', 'error', 3000); return;
+    showToast('Invalid file (.lpr required)', 'error', 3000); return;
   }
   let off = 4;
   const jsonLen    = dv.getUint32(off, true); off += 4;
@@ -1647,7 +1644,7 @@ async function loadProject(file) {
   }
 
   buildBeatRow(); renderLayers(); updateInfo(); updateIO(); updatePageBar();
-  showToast('Sesión cargada', 'confirm', 2000);
+  showToast('Session loaded', 'confirm', 2000);
 }
 
 // ─── Main actions ─────────────────────────────────────────────────────────────
@@ -1797,7 +1794,7 @@ function clearScene(idx) {
     pg.layers = []; pg.loopDur = 0; pg.loopT0 = 0; pg.measureColors = {};
   }
   updatePageBar();
-  showToast(`Scene ${idx + 1} vaciada`, 'confirm', 1500);
+  showToast(`Scene ${idx + 1} cleared`, 'confirm', 1500);
 }
 
 
@@ -1827,12 +1824,12 @@ function copyScene(idx) {
       buf: l.buf, origBuf: l.origBuf
     }))
   };
-  showToast(`Scene ${idx + 1} copiada`, 'confirm', 1500);
+  showToast(`Scene ${idx + 1} copied`, 'confirm', 1500);
 }
 
 function pasteScene(idx) {
   if (!_pgClipboard) return;
-  if (!actx) { showToast('Inicia el audio primero', 'warn', 1500); return; }
+  if (!actx) { showToast('Start audio first', 'warn', 1500); return; }
 
   const isActive = idx === currentPage;
   const pg = pages[idx];
@@ -1885,7 +1882,7 @@ function pasteScene(idx) {
     buildBeatRow(); renderLayers(); updateInfo();
   }
   updatePageBar();
-  showToast(`Scene ${idx + 1} actualizada`, 'confirm', 1500);
+  showToast(`Scene ${idx + 1} pasted`, 'confirm', 1500);
 }
 
 // ─── Scene switching ──────────────────────────────────────────────────────────
@@ -2613,30 +2610,26 @@ updatePageBar();
 
 // ─── Scene context menu ────────────────────────────────────────────────────────
 (function() {
-  const menu        = document.getElementById('pg-ctx-menu');
-  const itmCopy     = document.getElementById('ctx-copy');
-  const itmPaste    = document.getElementById('ctx-paste');
-  const itmColor    = document.getElementById('ctx-color');
-  const itmColorDot = document.getElementById('ctx-color-dot');
-  const itmClear    = document.getElementById('ctx-clear');
+  const menu    = document.getElementById('pg-ctx-menu');
+  const itmCopy  = document.getElementById('ctx-copy');
+  const itmPaste = document.getElementById('ctx-paste');
+  const itmClear = document.getElementById('ctx-clear');
   let _ctxIdx = -1;
 
   function openMenu(x, y, idx) {
     _ctxIdx = idx;
     itmPaste.classList.toggle('ctx-disabled', !_pgClipboard);
-    itmColorDot.style.background = pages[idx].color;
-    menu.style.left = '-9999px'; // measure offscreen first
+    menu.style.left = '-9999px';
     menu.style.top  = '-9999px';
     menu.style.display = 'block';
-    const mw = menu.offsetWidth  || 168;
-    const mh = menu.offsetHeight || 160;
+    const mw = menu.offsetWidth  || 140;
+    const mh = menu.offsetHeight || 100;
     menu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
     menu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
   }
 
   function closeMenu() { menu.style.display = 'none'; _ctxIdx = -1; }
 
-  // Direct contextmenu listener on every scene button
   document.querySelectorAll('.btn-page').forEach(btn => {
     btn.addEventListener('contextmenu', e => {
       e.preventDefault();
@@ -2645,24 +2638,14 @@ updatePageBar();
     });
   });
 
-  // Close when mousedown fires outside the menu (works for both mouse buttons)
   document.addEventListener('mousedown', e => {
     if (menu.style.display !== 'none' && !menu.contains(e.target)) closeMenu();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
-  // Use mousedown on items so the action fires before the outside-mousedown check
   itmCopy .addEventListener('mousedown', e => { e.stopPropagation(); closeMenu(); copyScene(_ctxIdx); });
   itmPaste.addEventListener('mousedown', e => { e.stopPropagation(); if (_ctxIdx >= 0 && _pgClipboard) { closeMenu(); pasteScene(_ctxIdx); } });
   itmClear.addEventListener('mousedown', e => { e.stopPropagation(); const i = _ctxIdx; closeMenu(); clearScene(i); });
-  itmColor.addEventListener('mousedown', e => {
-    e.stopPropagation();
-    const i = _ctxIdx;
-    closeMenu();
-    _pgColorTarget = i;
-    _pgColorInput.value = pages[i].color;
-    setTimeout(() => _pgColorInput.click(), 0);
-  });
 })();
 </script>
 </body>
