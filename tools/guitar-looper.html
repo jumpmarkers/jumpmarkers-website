@@ -2612,16 +2612,17 @@ updatePageBar();
 
 // ─── Scene context menu ────────────────────────────────────────────────────────
 (function() {
-  const menu       = document.getElementById('pg-ctx-menu');
-  const itmCopy    = document.getElementById('ctx-copy');
-  const itmPaste   = document.getElementById('ctx-paste');
-  const itmColor   = document.getElementById('ctx-color');
-  const itmColorDot= document.getElementById('ctx-color-dot');
-  const itmClear   = document.getElementById('ctx-clear');
+  const menu        = document.getElementById('pg-ctx-menu');
+  const itmCopy     = document.getElementById('ctx-copy');
+  const itmPaste    = document.getElementById('ctx-paste');
+  const itmColor    = document.getElementById('ctx-color');
+  const itmColorDot = document.getElementById('ctx-color-dot');
+  const itmClear    = document.getElementById('ctx-clear');
   let _ctxIdx = -1;
 
   function openMenu(e, idx) {
     e.preventDefault();
+    e.stopPropagation();
     _ctxIdx = idx;
     itmPaste.classList.toggle('ctx-disabled', !_pgClipboard);
     itmColorDot.style.background = pages[idx].color;
@@ -2635,21 +2636,27 @@ updatePageBar();
 
   function closeMenu() { menu.style.display = 'none'; }
 
-  document.querySelectorAll('.btn-page').forEach(btn => {
-    btn.addEventListener('contextmenu', e => openMenu(e, +btn.dataset.pg));
+  // Event delegation on document — reliable regardless of btn-page stacking
+  document.addEventListener('contextmenu', e => {
+    const btn = e.target.closest('.btn-page');
+    if (btn) { openMenu(e, +btn.dataset.pg); }
   });
 
-  itmCopy .addEventListener('click', () => { closeMenu(); copyScene(_ctxIdx); });
-  itmPaste.addEventListener('click', () => { closeMenu(); pasteScene(_ctxIdx); });
-  itmClear.addEventListener('click', () => { closeMenu(); clearScene(_ctxIdx); });
-  itmColor.addEventListener('click', () => {
+  // stopPropagation prevents the document click listener from closing the menu
+  // in the same event cycle as the item action
+  itmCopy .addEventListener('click', e => { e.stopPropagation(); closeMenu(); copyScene(_ctxIdx); });
+  itmPaste.addEventListener('click', e => { e.stopPropagation(); closeMenu(); pasteScene(_ctxIdx); });
+  itmClear.addEventListener('click', e => { e.stopPropagation(); closeMenu(); clearScene(_ctxIdx); });
+  itmColor.addEventListener('click', e => {
+    e.stopPropagation();
     closeMenu();
     _pgColorTarget = _ctxIdx;
     _pgColorInput.value = pages[_ctxIdx].color;
     _pgColorInput.click();
   });
 
-  document.addEventListener('click',   closeMenu);
+  // Close on any outside click or Escape
+  document.addEventListener('click', closeMenu);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 })();
 </script>
