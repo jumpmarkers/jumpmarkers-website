@@ -2091,7 +2091,7 @@ document.getElementById('in-retime').addEventListener('input', e => {
   _retimeTid = setTimeout(() => { if (actx) applyRetime(rate); }, 250);
 });
 document.getElementById('btn-tap').addEventListener('click', doTap);
-document.getElementById('btn-rec').addEventListener('click', handleRecord);
+document.getElementById('btn-rec').addEventListener('click', () => handleRecord());
 document.getElementById('btn-play').addEventListener('click', handlePlay);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
