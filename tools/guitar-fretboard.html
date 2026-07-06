@@ -2535,7 +2535,7 @@ function mkChordChart(opts = {}) {
   return {
     id, label: opts.label || '',
     startFret: opts.startFret || 1,
-    numFrets:  opts.numFrets  || 4,
+    numFrets:  opts.numFrets  || 5,
     dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f})),
     headings:  opts.headings  ? [...opts.headings] : ['','','','','',''],
     rootDot:     opts.rootDot   ? {s: opts.rootDot.s, f: opts.rootDot.f} : null,
@@ -2803,7 +2803,11 @@ function buildChordChartsPanel(b) {
   const addBtn = document.createElement('button');
   addBtn.className = 'add-chord-btn'; addBtn.textContent = '+ Add chord';
   addBtn.addEventListener('click', () => {
-    b.chordCharts.push(mkChordChart()); pushHistory(); refreshChordChartsPanel(b.id);
+    const raw = window.prompt('How many chords do you want to add?', '1');
+    if (raw === null) return;
+    const n = Math.max(1, Math.min(30, parseInt(raw, 10) || 1));
+    for (let i = 0; i < n; i++) b.chordCharts.push(mkChordChart());
+    pushHistory(); refreshChordChartsPanel(b.id);
   });
   row.appendChild(addBtn);
   panel.appendChild(row);
