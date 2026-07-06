@@ -1818,6 +1818,14 @@ function removeBoard(id) {
   renderAll();
 }
 
+function _clearHiddenForNote(b, noteIdx) {
+  const hc = getActiveSlotData(b).hiddenCells;
+  for (const key of [...hc]) {
+    const [si, f] = key.split('-').map(Number);
+    if ((OPEN[si] + f) % 12 === noteIdx) hc.delete(key);
+  }
+}
+
 function toggleNote(boardId, noteIdx) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
@@ -1828,6 +1836,7 @@ function toggleNote(boardId, noteIdx) {
     } else {
       b.selectedNotes.add(noteIdx);
       b.visibleNotes.add(noteIdx);
+      _clearHiddenForNote(b, noteIdx);
     }
   } else {
     const s = b.extraSlots[b.activeSlot - 1];
@@ -1837,6 +1846,7 @@ function toggleNote(boardId, noteIdx) {
       if (s.tonic === noteIdx) s.tonic = undefined;
     } else {
       s.notes.add(noteIdx);
+      _clearHiddenForNote(b, noteIdx);
     }
   }
   pushHistory();
@@ -1875,6 +1885,7 @@ function toggleVisible(boardId, noteIdx) {
     vis.delete(noteIdx);
   } else {
     vis.add(noteIdx);
+    _clearHiddenForNote(b, noteIdx);
   }
   pushHistory();
   refreshBoard(boardId);
