@@ -323,6 +323,7 @@
     .chord-drag-handle:active { cursor: grabbing; }
     .chord-chart-wrap.chord-drop-before { box-shadow: -3px 0 0 0 var(--accent2); }
     .chord-chart-wrap.chord-drop-after  { box-shadow:  3px 0 0 0 var(--accent2); }
+    .chord-chart-wrap.chord-drop-fb     { outline: 2px solid var(--accent); outline-offset: 2px; background: rgba(130,80,255,0.12); }
     .chord-color-menu {
       position: fixed; z-index: 9999;
       background: var(--bg2); border: 1px solid var(--border2);
@@ -1573,6 +1574,7 @@ let _dndOverlay = null;
 let _activeDragId    = null;
 let _chordDragActive = false;
 let _noteClipboard   = null; // { selectedNotes, tonic, visibleNotes }
+let _fbSelDragActive = false;
 
 function buildMiniThumb(b) {
   const cv = document.createElement('canvas');
@@ -1659,6 +1661,7 @@ let _boxSel   = null; // { bid, x0, y0, rect, cells: Set<cellKey> }
 let _bsAccum  = null; // { bid, cells } — cells accumulated across Ctrl+drags
 
 function clearBoxSelect() {
+  _detachFbSelDrag();
   _bsAnchor = null;
   _bsAccum  = null;
   if (_boxSel) {
@@ -1666,6 +1669,40 @@ function clearBoxSelect() {
     document.querySelectorAll('.fc.sel-active').forEach(c => c.classList.remove('sel-active'));
     _boxSel = null;
   }
+}
+
+function _detachFbSelDrag() {
+  _fbSelDragActive = false;
+  document.querySelectorAll('.fc').forEach(cell => {
+    if (!cell._fbDragStart) return;
+    cell.draggable = false;
+    cell.removeEventListener('dragstart', cell._fbDragStart);
+    cell.removeEventListener('dragend',   cell._fbDragEnd);
+    delete cell._fbDragStart;
+    delete cell._fbDragEnd;
+  });
+  document.querySelectorAll('.chord-drop-fb').forEach(el => el.classList.remove('chord-drop-fb'));
+}
+
+function _attachFbSelDrag() {
+  if (!_boxSel?.cells?.size || !_boxSel.bid) return;
+  const bid = _boxSel.bid;
+  document.querySelectorAll(`.fretboard-outer[data-bid="${bid}"] .fc.sel-active`).forEach(cell => {
+    cell.draggable = true;
+    cell._fbDragStart = e => {
+      if (!_boxSel?.cells?.size) { e.preventDefault(); return; }
+      _fbSelDragActive = true;
+      e.dataTransfer.setData('application/x-fb-sel', JSON.stringify({ bid, cells: [..._boxSel.cells] }));
+      e.dataTransfer.effectAllowed = 'copy';
+      e.stopPropagation();
+    };
+    cell._fbDragEnd = () => {
+      _detachFbSelDrag();
+      _attachFbSelDrag(); // allow re-dragging same selection to multiple chords
+    };
+    cell.addEventListener('dragstart', cell._fbDragStart);
+    cell.addEventListener('dragend',   cell._fbDragEnd);
+  });
 }
 
 function applyBoxDelete() {
@@ -1749,6 +1786,7 @@ document.addEventListener('mouseup', () => {
     _boxSel.rect?.remove();
     _boxSel.rect = null;
     if (!_boxSel.cells?.size) clearBoxSelect();
+    else _attachFbSelDrag();
   }
 });
 
@@ -2770,6 +2808,11 @@ function buildChordChartsPanel(b) {
       row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
     });
     wrap.addEventListener('dragover', e => {
+      if (_fbSelDragActive) {
+        e.preventDefault();
+        wrap.classList.add('chord-drop-fb');
+        return;
+      }
       if (_ccDragId === cc.id) return;
       e.preventDefault();
       const rect = wrap.getBoundingClientRect();
@@ -2778,11 +2821,39 @@ function buildChordChartsPanel(b) {
       wrap.classList.add(after ? 'chord-drop-after' : 'chord-drop-before');
     });
     wrap.addEventListener('dragleave', e => {
-      if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('chord-drop-before','chord-drop-after');
+      if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('chord-drop-before','chord-drop-after','chord-drop-fb');
     });
     wrap.addEventListener('drop', e => {
       e.preventDefault();
-      wrap.classList.remove('chord-drop-before','chord-drop-after');
+      wrap.classList.remove('chord-drop-before','chord-drop-after','chord-drop-fb');
+
+      if (_fbSelDragActive) {
+        const raw = e.dataTransfer.getData('application/x-fb-sel');
+        if (!raw) return;
+        const { bid, cells } = JSON.parse(raw);
+        const srcBoard = boards.find(x => x.id === bid);
+        if (!srcBoard || !cells.length) return;
+        const sd = getActiveSlotData(srcBoard);
+        const validCells = cells.filter(key => {
+          const [si, f] = key.split('-').map(Number);
+          const noteIdx = (OPEN[si] + f) % 12;
+          return sd.notes.has(noteIdx) && !sd.hiddenCells.has(key);
+        });
+        if (!validCells.length) return;
+        const fretsOnly = validCells.map(k => +k.split('-')[1]).filter(f => f > 0);
+        const minFret = fretsOnly.length ? Math.min(...fretsOnly) : 1;
+        const maxFret = fretsOnly.length ? Math.max(...fretsOnly) : 1;
+        cc.startFret = minFret;
+        cc.numFrets  = Math.max(5, maxFret - minFret + 1);
+        cc.dots = validCells.map(key => {
+          const [si, f] = key.split('-').map(Number);
+          return { s: si, f: f === 0 ? 0 : f - minFret + 1 };
+        });
+        pushHistory();
+        refreshChordChartsPanel(b.id);
+        return;
+      }
+
       const fromId = parseInt(e.dataTransfer.getData('text/plain'), 10);
       if (fromId === cc.id) return;
       const fromIdx = b.chordCharts.findIndex(x => x.id === fromId);
