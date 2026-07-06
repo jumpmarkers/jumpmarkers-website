@@ -1574,7 +1574,8 @@ let _dndOverlay = null;
 let _activeDragId    = null;
 let _chordDragActive = false;
 let _noteClipboard   = null; // { selectedNotes, tonic, visibleNotes }
-let _fbSelDragActive = false;
+let _fbSelDragActive  = false;
+let _selDragPending   = false; // true after mousedown on sel-active, until dragstart or mouseup
 
 function buildMiniThumb(b) {
   const cv = document.createElement('canvas');
@@ -1690,6 +1691,7 @@ function _attachFbSelDrag() {
   document.querySelectorAll(`.fretboard-outer[data-bid="${bid}"] .fc.sel-active`).forEach(cell => {
     cell.draggable = true;
     cell._fbDragStart = e => {
+      _selDragPending = false; // drag started — suppress the mouseup clearBoxSelect
       if (!_boxSel?.cells?.size) { e.preventDefault(); return; }
       _fbSelDragActive = true;
       e.dataTransfer.setData('application/x-fb-sel', JSON.stringify({ bid, cells: [..._boxSel.cells] }));
@@ -1782,6 +1784,11 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener('mouseup', () => {
   _bsAnchor = null;
+  if (_selDragPending) {
+    _selDragPending = false;
+    clearBoxSelect(); // clicked sel-active cell without dragging — clear stale selection
+    return;
+  }
   if (_boxSel) {
     _boxSel.rect?.remove();
     _boxSel.rect = null;
@@ -2395,6 +2402,8 @@ function buildFbOuter(b) {
 
   outer.addEventListener('mousedown', e => {
     if (e.button !== 0 || e.altKey || e.shiftKey || e.metaKey) return;
+    // If clicking on a sel-active cell, let the drag start — don't clear.
+    if (e.target.closest('.fc.sel-active')) { _selDragPending = true; return; }
     // Clear selection on any non-ctrl click — even on .nc — so stale
     // _boxSel doesn't accidentally accumulate into future Ctrl+drags.
     if (!e.ctrlKey && !e.metaKey) clearBoxSelect();
