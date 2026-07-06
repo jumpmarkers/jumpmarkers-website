@@ -1777,19 +1777,36 @@ function duplicateBoard(id) {
   const src = boards.find(b => b.id === id);
   if (!src) return;
   boards.push(mkBoard({
-    label:        src.label + ' (copy)',
-    totalFrets:   src.totalFrets,
-    startFret:    src.startFret,
-    endFret:      src.endFret,
-    fretWidth:    src.fretWidth,
-    tonic:        src.tonic,
-    colorShift:   src.colorShift || 0,
-    hiddenCells:  [...src.hiddenCells],
-    pinnedCells:  [...src.pinnedCells],
-    sticker:      src.sticker,
-    stickerStyle: src.stickerStyle,
-    visibleNotes: [...src.visibleNotes],
-    selectedNotes:[...src.selectedNotes],
+    label:             src.label + ' (copy)',
+    totalFrets:        src.totalFrets,
+    startFret:         src.startFret,
+    endFret:           src.endFret,
+    fretWidth:         src.fretWidth,
+    tonic:             src.tonic,
+    colorShift:        src.colorShift || 0,
+    hiddenCells:       [...src.hiddenCells],
+    pinnedCells:       [...src.pinnedCells],
+    sticker:           src.sticker,
+    stickerStyle:      src.stickerStyle,
+    visibleNotes:      [...src.visibleNotes],
+    selectedNotes:     [...src.selectedNotes],
+    activeSlot:        src.activeSlot,
+    slotMeasures:      src.slotMeasures,
+    slotPattern:       src.slotPattern,
+    crossfadeDuration: src.crossfadeDuration,
+    autoAdvance:       src.autoAdvance,
+    slotLabels:        [...(src.slotLabels || [])],
+    chordCharts:       src.chordCharts.map(cc => ({
+      ...cc,
+      dots:     cc.dots.map(d => ({ ...d })),
+      headings: [...cc.headings],
+    })),
+    extraSlots: src.extraSlots.map(s => ({
+      notes:        [...s.notes],
+      tonic:        s.tonic,
+      visibleNotes: s.visibleNotes ? [...s.visibleNotes] : null,
+      hiddenCells:  [...(s.hiddenCells || [])],
+    })),
   }));
   pushHistory();
   renderAll();
@@ -2799,8 +2816,13 @@ function refreshChordChartsPanel(bid) {
   const b = boards.find(x => x.id === +bid);
   if (!b) return;
   const existing = card.querySelector('.chord-charts-panel');
+  const savedScroll = existing?.querySelector('.chord-charts-row')?.scrollTop ?? 0;
   const panel = buildChordChartsPanel(b);
   if (existing) existing.replaceWith(panel); else card.appendChild(panel);
+  if (savedScroll) {
+    const newRow = panel.querySelector('.chord-charts-row');
+    if (newRow) newRow.scrollTop = savedScroll;
+  }
   setTimeout(syncAllChordRowMaxHeights, 0);
 }
 
