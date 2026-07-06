@@ -2856,7 +2856,7 @@ function buildChordChartsPanel(b) {
         cc.numFrets  = Math.max(5, maxFret - minFret + 1);
         cc.dots = validCells.map(key => {
           const [si, f] = key.split('-').map(Number);
-          return { s: si, f: f === 0 ? 0 : f - minFret + 1 };
+          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + 1 };
         });
         pushHistory();
         refreshChordChartsPanel(b.id);
