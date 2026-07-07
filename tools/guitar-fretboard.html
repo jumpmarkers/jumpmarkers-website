@@ -346,6 +346,10 @@
       transition: transform .1s, border-color .1s, color .1s;
     }
     .chord-color-none:hover { transform: scale(1.25); border-color: var(--muted); color: var(--text); }
+    .chord-cp-sep { width: 1px; height: 17px; background: var(--border2); flex-shrink: 0; margin: 0 2px; }
+    .chord-cp-btn { background: none; border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-size: 0.72rem; cursor: pointer; padding: 1px 7px; transition: background .15s; }
+    .chord-cp-btn:hover { background: rgba(255,255,255,.1); }
+    .chord-cp-btn:disabled { opacity: .35; cursor: default; }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
       color: var(--text); font-family: var(--mono); font-size: 0.68rem;
@@ -1574,6 +1578,7 @@ let _dndOverlay = null;
 let _activeDragId    = null;
 let _chordDragActive = false;
 let _noteClipboard   = null; // { selectedNotes, tonic, visibleNotes }
+let _ccClipboard     = null; // chord chart clipboard { label, startFret, numFrets, dots, headings, rootDot, borderColor }
 let _fbSelDragActive  = false;
 let _selDragPending   = false; // true after mousedown on sel-active, until dragstart or mouseup
 
@@ -2629,6 +2634,57 @@ function chordSVG(cc) {
   return o + '</svg>';
 }
 
+function _attachChordSvgClick(b, cc, svgEl) {
+  const NS = 6, SG = 14, FG = 15, TP = 22;
+  svgEl.addEventListener('click', e => {
+    const LP = 24;
+    const rect = svgEl.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * (svgEl.viewBox.baseVal.width / rect.width);
+    const py = (e.clientY - rect.top)  * (svgEl.viewBox.baseVal.height / rect.height);
+    if (py < TP) {
+      const si = Math.round((px - LP) / SG);
+      if (si >= 0 && si < NS) {
+        const cur = cc.headings[si];
+        cc.headings[si] = cur === '' ? 'x' : cur === 'x' ? 'o' : '';
+        pushHistory(); refreshOneChordSVG(b, cc);
+      }
+      return;
+    }
+    const si = Math.round((px - LP) / SG);
+    const fi = Math.floor((py - TP) / FG) + 1;
+    if (si < 0 || si >= NS || fi < 1 || fi > cc.numFrets) return;
+    if (e.ctrlKey || e.metaKey) {
+      if (!cc.dots.some(d => d.s === si && d.f === fi)) return;
+      const alreadyRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi;
+      cc.rootDot = alreadyRoot ? null : {s: si, f: fi};
+      pushHistory(); refreshOneChordSVG(b, cc);
+      return;
+    }
+    const idx = cc.dots.findIndex(d => d.s === si && d.f === fi);
+    if (idx >= 0) {
+      if (cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi) cc.rootDot = null;
+      cc.dots.splice(idx, 1);
+    } else {
+      cc.dots.push({s: si, f: fi});
+    }
+    pushHistory(); refreshOneChordSVG(b, cc);
+  });
+}
+
+function refreshOneChordSVG(b, cc) {
+  const wrap = document.querySelector(
+    `.chord-charts-panel[data-bid="${b.id}"] .chord-chart-wrap[data-ccid="${cc.id}"]`
+  );
+  if (!wrap) { refreshChordChartsPanel(b.id); return; }
+  const oldSvg = wrap.querySelector('.chord-svg');
+  if (!oldSvg) { refreshChordChartsPanel(b.id); return; }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = chordSVG(cc);
+  const newSvg = tmp.firstElementChild;
+  _attachChordSvgClick(b, cc, newSvg);
+  oldSvg.replaceWith(newSvg);
+}
+
 function buildChordChartsPanel(b) {
   const panel = document.createElement('div');
   panel.className = 'chord-charts-panel';
@@ -2660,6 +2716,7 @@ function buildChordChartsPanel(b) {
   b.chordCharts.forEach(cc => {
     const wrap = document.createElement('div');
     wrap.className = 'chord-chart-wrap';
+    wrap.dataset.ccid = cc.id;
     if (cc.borderColor) { wrap.style.borderColor = cc.borderColor; wrap.style.borderWidth = '2px'; }
 
     wrap.addEventListener('contextmenu', e => {
@@ -2686,7 +2743,50 @@ function buildChordChartsPanel(b) {
         });
         menu.appendChild(sw);
       });
-      menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+      const sep = document.createElement('span');
+      sep.className = 'chord-cp-sep';
+      menu.appendChild(sep);
+
+      const cpBtn = document.createElement('button');
+      cpBtn.className = 'chord-cp-btn'; cpBtn.textContent = 'Copy';
+      cpBtn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        _ccClipboard = {
+          label:       cc.label,
+          startFret:   cc.startFret,
+          numFrets:    cc.numFrets,
+          dots:        cc.dots.map(d => ({...d})),
+          headings:    [...cc.headings],
+          rootDot:     cc.rootDot ? {...cc.rootDot} : null,
+          borderColor: cc.borderColor,
+        };
+        menu.remove();
+      });
+      menu.appendChild(cpBtn);
+
+      const paBtn = document.createElement('button');
+      paBtn.className = 'chord-cp-btn'; paBtn.textContent = 'Paste';
+      paBtn.disabled = !_ccClipboard;
+      paBtn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        if (!_ccClipboard) return;
+        cc.label       = _ccClipboard.label;
+        cc.startFret   = _ccClipboard.startFret;
+        cc.numFrets    = _ccClipboard.numFrets;
+        cc.dots        = _ccClipboard.dots.map(d => ({...d}));
+        cc.headings    = [..._ccClipboard.headings];
+        cc.rootDot     = _ccClipboard.rootDot ? {..._ccClipboard.rootDot} : null;
+        cc.borderColor = _ccClipboard.borderColor;
+        if (cc.borderColor) { wrap.style.borderColor = cc.borderColor; wrap.style.borderWidth = '2px'; }
+        else { wrap.style.borderColor = ''; wrap.style.borderWidth = ''; }
+        const nameEl = wrap.querySelector('.chord-chart-name');
+        if (nameEl) nameEl.value = cc.label;
+        pushHistory(); refreshOneChordSVG(b, cc);
+        menu.remove();
+      });
+      menu.appendChild(paBtn);
+
+      menu.style.left = Math.min(e.clientX, window.innerWidth - 280) + 'px';
       menu.style.top  = (e.clientY + 8) + 'px';
       document.body.appendChild(menu);
       const close = ev => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } };
@@ -2705,40 +2805,7 @@ function buildChordChartsPanel(b) {
     const tmp = document.createElement('div');
     tmp.innerHTML = chordSVG(cc);
     const svgEl = tmp.firstElementChild;
-    const NS = 6, SG = 14, FG = 15, TP = 22;
-    svgEl.addEventListener('click', e => {
-      const LP = 24;
-      const rect = svgEl.getBoundingClientRect();
-      const px = (e.clientX - rect.left) * (svgEl.viewBox.baseVal.width / rect.width);
-      const py = (e.clientY - rect.top)  * (svgEl.viewBox.baseVal.height / rect.height);
-      if (py < TP) {
-        const si = Math.round((px - LP) / SG);
-        if (si >= 0 && si < NS) {
-          const cur = cc.headings[si];
-          cc.headings[si] = cur === '' ? 'x' : cur === 'x' ? 'o' : '';
-          pushHistory(); refreshChordChartsPanel(b.id);
-        }
-        return;
-      }
-      const si = Math.round((px - LP) / SG);
-      const fi = Math.floor((py - TP) / FG) + 1;
-      if (si < 0 || si >= NS || fi < 1 || fi > cc.numFrets) return;
-      if (e.ctrlKey || e.metaKey) {
-        if (!cc.dots.some(d => d.s === si && d.f === fi)) return;
-        const alreadyRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi;
-        cc.rootDot = alreadyRoot ? null : {s: si, f: fi};
-        pushHistory(); refreshChordChartsPanel(b.id);
-        return;
-      }
-      const idx = cc.dots.findIndex(d => d.s === si && d.f === fi);
-      if (idx >= 0) {
-        if (cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi) cc.rootDot = null;
-        cc.dots.splice(idx, 1);
-      } else {
-        cc.dots.push({s: si, f: fi});
-      }
-      pushHistory(); refreshChordChartsPanel(b.id);
-    });
+    _attachChordSvgClick(b, cc, svgEl);
     wrap.appendChild(svgEl);
 
     // Name input
