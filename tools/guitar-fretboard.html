@@ -2914,11 +2914,13 @@ function refreshChordChartsPanel(bid) {
   const savedScroll = existing?.querySelector('.chord-charts-row')?.scrollTop ?? 0;
   const panel = buildChordChartsPanel(b);
   if (existing) existing.replaceWith(panel); else card.appendChild(panel);
-  if (savedScroll) {
-    const newRow = panel.querySelector('.chord-charts-row');
-    if (newRow) newRow.scrollTop = savedScroll;
-  }
-  setTimeout(syncAllChordRowMaxHeights, 0);
+  setTimeout(() => {
+    syncAllChordRowMaxHeights(); // must run first — sets maxHeight, which creates the overflow
+    if (savedScroll) {
+      const newRow = panel.querySelector('.chord-charts-row');
+      if (newRow) newRow.scrollTop = savedScroll;
+    }
+  }, 0);
 }
 
 // ─── Circular knob ────────────────────────────────────────────────────────────
