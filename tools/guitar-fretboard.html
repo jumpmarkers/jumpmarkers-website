@@ -350,6 +350,13 @@
     .chord-cp-btn { background: none; border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-size: 0.72rem; cursor: pointer; padding: 1px 7px; transition: background .15s; }
     .chord-cp-btn:hover { background: rgba(255,255,255,.1); }
     .chord-cp-btn:disabled { opacity: .35; cursor: default; }
+    /* ── Strum / mic control ── */
+    .mic-ctrl-wrap { display: inline-flex; align-items: center; gap: 5px; }
+    #btn-mic-input.active { color: #ff4060; border-color: #ff4060; background: rgba(255,60,80,0.08); }
+    .mic-level-wrap { width: 34px; height: 4px; background: var(--bg3,#1a1a1a); border-radius: 2px; position: relative; overflow: visible; margin-top: 2px; }
+    .mic-level-fill { height: 100%; background: var(--accent2); border-radius: 2px; width: 0%; transition: width 60ms linear; }
+    .mic-thresh-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
+    #mic-device-select { width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border2); background: var(--bg2); color: var(--text); font-size: 0.78rem; margin-top: 4px; }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
       color: var(--text); font-family: var(--mono); font-size: 0.68rem;
@@ -1037,6 +1044,10 @@
       <div class="toolbar-top-right">
         <button class="btn btn-outline" id="btn-metronome-split" title="Show metronome side by side">🥁 Metronome</button>
         <button class="btn btn-outline" id="btn-looper-split" title="Show looper side by side">🔁 Looper</button>
+        <div class="mic-ctrl-wrap">
+          <button class="btn btn-outline" id="btn-mic-input" title="Strum detection — plays next page when you play above the noise gate">🎙 Strum</button>
+          <div id="mic-knob-slot"></div>
+        </div>
         <button class="btn btn-outline" id="btn-chord-charts" title="Show/hide chord charts">⬡ Chords</button>
         <button class="btn btn-outline" id="btn-layout-toggle" title="Switch to 2 columns">⊞ 2 Col</button>
         <button class="btn btn-outline" id="btn-fb-settings">⚙ Settings</button>
@@ -1113,6 +1124,11 @@
           <button class="btn btn-outline" data-s="noteDisplay" data-v="intervals">Intervals</button>
         </div>
         <span class="fb-setting-desc">Intervals require a Root note (Ctrl+click) to be set on each fretboard.</span>
+      </div>
+      <div class="fb-setting-group">
+        <span class="fb-setting-label">🎙 Strum Input Device</span>
+        <select id="mic-device-select"><option value="">— Default microphone —</option></select>
+        <span class="fb-setting-desc">Audio input used for strum detection. Open Settings while Strum is ON to refresh the device list.</span>
       </div>
     </div>
   </div>
@@ -4259,6 +4275,146 @@ window.addEventListener('afterprint', () => {
     window._singleBoardPrint = null;
   }
 });
+
+// ─── Strum detection (mic → page advance) ────────────────────────────────────
+let _micActive     = false;
+let _micStream     = null;
+let _micAudioCtx   = null;
+let _micAnalyser   = null;
+let _micAnimId     = null;
+let _micGatePct    = appSettings.micGate ?? 15; // 0-100 %
+let _micCooldownTs = 0;
+const _MIC_COOLDOWN_MS = 800;
+let _micLevelFill  = null;
+let _micThreshLine = null;
+
+function _micTrigger() {
+  if (_lastActiveBoardId === null) return;
+  const b = boards.find(x => x.id === _lastActiveBoardId);
+  if (!b) return;
+  const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+  if (totalSlots < 2) return;
+  const pattern = _parsePattern(b);
+  if (pattern) {
+    const pLen = pattern.length;
+    b.patternPos = b.patternPos < 0 ? 0 : (b.patternPos + 1) % pLen;
+    b.activeSlot = pattern[b.patternPos];
+  } else {
+    b.activeSlot = (b.activeSlot + 1) % totalSlots;
+  }
+  pushHistory();
+  _crossfadeBoard(b.id);
+}
+
+function _micLoop() {
+  if (!_micActive || !_micAnalyser) return;
+  const buf = new Uint8Array(_micAnalyser.frequencyBinCount);
+  _micAnalyser.getByteTimeDomainData(buf);
+  let peak = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = Math.abs(buf[i] - 128) / 128;
+    if (v > peak) peak = v;
+  }
+  // Update level bar
+  if (_micLevelFill)  _micLevelFill.style.width  = Math.min(100, peak * 100) + '%';
+  if (_micThreshLine) _micThreshLine.style.left   = _micGatePct + '%';
+  const now = Date.now();
+  if (peak > _micGatePct / 100 && now - _micCooldownTs > _MIC_COOLDOWN_MS) {
+    _micCooldownTs = now;
+    _micTrigger();
+  }
+  _micAnimId = requestAnimationFrame(_micLoop);
+}
+
+async function _startMic() {
+  try {
+    const deviceId = appSettings.micDeviceId || undefined;
+    const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false };
+    _micStream    = await navigator.mediaDevices.getUserMedia(constraints);
+    _micAudioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+    const source  = _micAudioCtx.createMediaStreamSource(_micStream);
+    _micAnalyser  = _micAudioCtx.createAnalyser();
+    _micAnalyser.fftSize = 256;
+    source.connect(_micAnalyser);
+    _micActive = true;
+    document.getElementById('btn-mic-input')?.classList.add('active');
+    _micLoop();
+    _micPopulateDevices(); // refresh device list now that permission is granted
+  } catch (err) {
+    _micActive = false;
+    alert('Could not access microphone: ' + err.message);
+  }
+}
+
+function _stopMic() {
+  _micActive = false;
+  cancelAnimationFrame(_micAnimId);
+  _micAnalyser = null;
+  if (_micStream)   { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
+  if (_micAudioCtx) { _micAudioCtx.close().catch(() => {}); _micAudioCtx = null; }
+  document.getElementById('btn-mic-input')?.classList.remove('active');
+  if (_micLevelFill) _micLevelFill.style.width = '0%';
+}
+
+async function _micPopulateDevices() {
+  const sel = document.getElementById('mic-device-select');
+  if (!sel) return;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs  = devices.filter(d => d.kind === 'audioinput');
+    const cur     = appSettings.micDeviceId || '';
+    sel.innerHTML = '<option value="">— Default microphone —</option>';
+    inputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Microphone (${d.deviceId.slice(0,8)}…)`;
+      if (d.deviceId === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+// Wire up mic button
+document.getElementById('btn-mic-input').addEventListener('click', () => {
+  if (_micActive) _stopMic(); else _startMic();
+});
+
+// Wire up device selector
+document.getElementById('mic-device-select').addEventListener('change', e => {
+  appSettings.micDeviceId = e.target.value;
+  saveAppSettings();
+  if (_micActive) { _stopMic(); _startMic(); } // restart with new device
+});
+
+// Refresh device list when settings open (in case mic permission just granted)
+document.getElementById('btn-fb-settings').addEventListener('click', _micPopulateDevices, { capture: false });
+
+// Build noise gate knob and level bar, inject into toolbar slot
+(function () {
+  const slot = document.getElementById('mic-knob-slot');
+  if (!slot) return;
+  const knob = buildKnob(_micGatePct, 0, 100, 1, v => {
+    _micGatePct = v;
+    appSettings.micGate = v;
+    saveAppSettings();
+    if (_micThreshLine) _micThreshLine.style.left = v + '%';
+  }, v => v + '%');
+  knob.title = 'Noise gate — drag up/down to set trigger threshold';
+
+  // Add level bar to the knob wrap
+  const levelWrap = document.createElement('div');
+  levelWrap.className = 'mic-level-wrap';
+  _micLevelFill = document.createElement('div');
+  _micLevelFill.className = 'mic-level-fill';
+  _micThreshLine = document.createElement('div');
+  _micThreshLine.className = 'mic-thresh-line';
+  _micThreshLine.style.left = _micGatePct + '%';
+  levelWrap.appendChild(_micLevelFill);
+  levelWrap.appendChild(_micThreshLine);
+  knob.appendChild(levelWrap);
+
+  slot.appendChild(knob);
+})();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 const _lastPreset = localStorage.getItem('gfv-last-preset');
