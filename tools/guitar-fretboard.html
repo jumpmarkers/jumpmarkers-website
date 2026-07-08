@@ -4400,7 +4400,8 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
     saveAppSettings();
     if (_micThreshLine) _micThreshLine.style.left = v + '%';
   }, v => v + '%');
-  knob.title = 'Noise gate — drag up/down to set trigger threshold';
+  const knobEl = knob.el;
+  knobEl.title = 'Noise gate — drag up/down to set trigger threshold';
 
   // Add level bar to the knob wrap
   const levelWrap = document.createElement('div');
@@ -4412,9 +4413,9 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   _micThreshLine.style.left = _micGatePct + '%';
   levelWrap.appendChild(_micLevelFill);
   levelWrap.appendChild(_micThreshLine);
-  knob.appendChild(levelWrap);
+  knobEl.appendChild(levelWrap);
 
-  slot.appendChild(knob);
+  slot.appendChild(knobEl);
 })();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
