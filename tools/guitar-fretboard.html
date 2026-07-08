@@ -3713,7 +3713,77 @@ function buildCard(b) {
   card.appendChild(mainCol);
   card.appendChild(buildChordChartsPanel(b));
 
+  // Right-click context menu on fretboard area
+  card.addEventListener('contextmenu', e => {
+    if (e.target.closest('button, input, select, .chord-charts-panel, .chord-color-menu')) return;
+    e.preventDefault(); e.stopPropagation();
+    document.querySelector('.fb-ctx-menu')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'fb-ctx-menu chord-color-menu';
+    const pdfBtn = document.createElement('button');
+    pdfBtn.className = 'chord-cp-btn';
+    pdfBtn.textContent = '⬇ Export PDF';
+    pdfBtn.addEventListener('click', ev => { ev.stopPropagation(); menu.remove(); _exportBoardPDF(b); });
+    menu.appendChild(pdfBtn);
+    menu.style.left = Math.min(e.clientX, window.innerWidth - 160) + 'px';
+    menu.style.top  = (e.clientY + 8) + 'px';
+    document.body.appendChild(menu);
+    const close = ev => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  });
+
   return card;
+}
+
+function _exportBoardPDF(b) {
+  const container = document.getElementById('boards-container');
+  if (!container) return;
+  const totalSlots = 1 + (b.extraSlots?.length || 0);
+  const allCards = [...container.querySelectorAll(':scope > .board-card')];
+  const snapCards = [];
+
+  for (let slot = 0; slot < totalSlots; slot++) {
+    let slotNotes, slotTonic, slotVisible, slotHidden;
+    if (slot === 0) {
+      slotNotes   = b.selectedNotes;
+      slotTonic   = b.tonic;
+      slotVisible = b.visibleNotes;
+      slotHidden  = b.hiddenCells;
+    } else {
+      const s = b.extraSlots[slot - 1];
+      slotNotes   = s.notes;
+      slotTonic   = s.tonic !== undefined ? s.tonic : b.tonic;
+      slotVisible = s.visibleNotes !== null ? s.visibleNotes : b.visibleNotes;
+      slotHidden  = s.hiddenCells || new Set();
+    }
+    const slotName = totalSlots > 1
+      ? (b.slotLabels?.[slot] || `Page ${slot + 1}`)
+      : b.label;
+
+    const tempB = mkBoard({
+      label:         slotName,
+      sticker:       totalSlots === 1 ? b.sticker     : undefined,
+      stickerStyle:  totalSlots === 1 ? b.stickerStyle : undefined,
+      totalFrets:    b.totalFrets,
+      startFret:     b.startFret,
+      endFret:       b.endFret,
+      fretWidth:     b.fretWidth,
+      tonic:         slotTonic,
+      colorShift:    b.colorShift || 0,
+      hiddenCells:   [...slotHidden],
+      pinnedCells:   slot === 0 ? [...b.pinnedCells] : [],
+      visibleNotes:  [...slotVisible],
+      selectedNotes: [...slotNotes],
+      activeSlot:    0,
+      chordCharts:   [],
+    });
+    snapCards.push(buildCard(tempB));
+  }
+
+  allCards.forEach(c => c.remove());
+  snapCards.forEach(c => container.appendChild(c));
+  window._singleBoardPrint = { allCards, snapCards };
+  window.print();
 }
 
 // ─── Global event bindings ────────────────────────────────────────────────────
@@ -4161,8 +4231,7 @@ window.addEventListener('beforeprint', () => {
   }
 });
 window.addEventListener('afterprint', () => {
-  if (!window._printState) return;
-  const { table, noteDiv, cards } = window._printState;
+  const { table, noteDiv, cards } = window._printState || {};
   if (table) {
     const container = table.parentNode;
     cards.forEach(card => container.insertBefore(card, table));
@@ -4170,6 +4239,14 @@ window.addEventListener('afterprint', () => {
   }
   if (noteDiv) noteDiv.remove();
   window._printState = null;
+
+  if (window._singleBoardPrint) {
+    const { allCards, snapCards } = window._singleBoardPrint;
+    const container = document.getElementById('boards-container');
+    snapCards.forEach(c => c.remove());
+    allCards.forEach(c => container.appendChild(c));
+    window._singleBoardPrint = null;
+  }
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
