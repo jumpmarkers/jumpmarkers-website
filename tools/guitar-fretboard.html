@@ -4348,7 +4348,14 @@ async function _startMic() {
     _micAnalyser  = _micAudioCtx.createAnalyser();
     _micAnalyser.fftSize = 2048;
     _micAnalyser.smoothingTimeConstant = 0;
+    // Connect source → analyser for metering
     source.connect(_micAnalyser);
+    // Chrome won't process the graph unless it reaches destination —
+    // route through a silent gain node to force processing without output
+    const _silentGain = _micAudioCtx.createGain();
+    _silentGain.gain.value = 0;
+    source.connect(_silentGain);
+    _silentGain.connect(_micAudioCtx.destination);
     _micActive = true;
     document.getElementById('btn-mic-input')?.classList.add('active');
     _micLoop();
