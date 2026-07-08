@@ -351,13 +351,14 @@
     .chord-cp-btn:hover { background: rgba(255,255,255,.1); }
     .chord-cp-btn:disabled { opacity: .35; cursor: default; }
     /* ── Strum / mic control ── */
-    .mic-ctrl-wrap { display: inline-flex; align-items: center; gap: 5px; }
+    .mic-ctrl-wrap { display: inline-flex; align-items: center; gap: 8px; }
     #btn-mic-input.active { color: #ff4060; border-color: #ff4060; background: rgba(255,60,80,0.08); }
     #btn-mic-input.mic-flash { background: rgba(255,60,80,0.45) !important; }
-    .mic-level-wrap { width: 70px; height: 7px; background: var(--bg3,#1a1a1a); border-radius: 3px; position: relative; overflow: visible; margin-top: 3px; }
-    .mic-level-fill { height: 100%; background: var(--accent2); border-radius: 3px; width: 0%; transition: width 50ms linear; }
+    .mic-meter-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .mic-level-wrap { width: 90px; height: 10px; background: var(--bg3,#1a1a1a); border-radius: 4px; position: relative; overflow: visible; }
+    .mic-level-fill { height: 100%; background: #22c55e; border-radius: 4px; width: 0%; transition: width 40ms linear; }
     .mic-thresh-line { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
-    .mic-peak-label { font-family: var(--mono); font-size: 0.58rem; color: var(--muted); text-align: center; margin-top: 1px; }
+    .mic-peak-label { font-family: var(--mono); font-size: 0.62rem; color: #22c55e; letter-spacing: 0.02em; }
     #mic-device-select { width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border2); background: var(--bg2); color: var(--text); font-size: 0.78rem; margin-top: 4px; }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
@@ -4402,10 +4403,12 @@ document.getElementById('mic-device-select').addEventListener('change', e => {
 // Refresh device list when settings open (in case mic permission just granted)
 document.getElementById('btn-fb-settings').addEventListener('click', _micPopulateDevices, { capture: false });
 
-// Build noise gate knob and level bar, inject into toolbar slot
+// Build noise gate knob + level meter, inject into toolbar slot
 (function () {
   const slot = document.getElementById('mic-knob-slot');
   if (!slot) return;
+
+  // Knob (threshold control)
   const knob = buildKnob(_micGatePct, 0, 100, 1, v => {
     _micGatePct = v;
     appSettings.micGate = v;
@@ -4414,8 +4417,12 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   }, v => v + '%');
   const knobEl = knob.el;
   knobEl.title = 'Noise gate — drag up/down to set trigger threshold';
+  slot.appendChild(knobEl);
 
-  // Add level bar to the knob wrap
+  // Separate meter column (level bar + peak label)
+  const meterWrap = document.createElement('div');
+  meterWrap.className = 'mic-meter-wrap';
+
   const levelWrap = document.createElement('div');
   levelWrap.className = 'mic-level-wrap';
   _micLevelFill = document.createElement('div');
@@ -4425,13 +4432,15 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   _micThreshLine.style.left = _micGatePct + '%';
   levelWrap.appendChild(_micLevelFill);
   levelWrap.appendChild(_micThreshLine);
-  knobEl.appendChild(levelWrap);
+  meterWrap.appendChild(levelWrap);
+
   _micPeakLabel = document.createElement('div');
   _micPeakLabel.className = 'mic-peak-label';
   _micPeakLabel.textContent = '0%';
-  knobEl.appendChild(_micPeakLabel);
+  meterWrap.appendChild(_micPeakLabel);
 
-  slot.appendChild(knobEl);
+  // Inject meter next to the knob inside mic-ctrl-wrap
+  slot.parentElement.appendChild(meterWrap);
 })();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
