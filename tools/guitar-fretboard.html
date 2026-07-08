@@ -4008,10 +4008,21 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots < 2) return;
-  if (e.key === 'ArrowLeft') {
-    b.activeSlot = (b.activeSlot - 1 + totalSlots) % totalSlots;
+  const pattern = _parsePattern(b);
+  if (pattern) {
+    const pLen = pattern.length;
+    if (e.key === 'ArrowRight') {
+      b.patternPos = b.patternPos < 0 ? 0 : (b.patternPos + 1) % pLen;
+    } else {
+      b.patternPos = b.patternPos < 0 ? pLen - 1 : (b.patternPos - 1 + pLen) % pLen;
+    }
+    b.activeSlot = pattern[b.patternPos];
   } else {
-    b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    if (e.key === 'ArrowLeft') {
+      b.activeSlot = (b.activeSlot - 1 + totalSlots) % totalSlots;
+    } else {
+      b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    }
   }
   pushHistory();
   _crossfadeBoard(b.id);
