@@ -4288,7 +4288,8 @@ let _micAnalyser   = null;
 let _micAnimId     = null;
 let _micGatePct    = appSettings.micGate ?? 15; // 0-100 %
 let _micCooldownTs = 0;
-const _MIC_COOLDOWN_MS = 800;
+const _MIC_MIN_COOLDOWN_MS = 200; // prevents double-detection of the same strum
+let _micArmed = true;             // re-armed when signal drops below 40% of gate
 let _micLevelFill  = null;
 let _micThreshLine = null;
 let _micPeakLabel  = null;
@@ -4330,8 +4331,12 @@ function _micLoop() {
   if (_micThreshLine) _micThreshLine.style.left   = _micGatePct + '%';
   if (_micPeakLabel)  _micPeakLabel.textContent   = Math.round(peak * 100) + '%';
   const now = Date.now();
-  if (peak > _micGatePct / 100 && now - _micCooldownTs > _MIC_COOLDOWN_MS) {
+  const gate = _micGatePct / 100;
+  const cooldownDone = now - _micCooldownTs > _MIC_MIN_COOLDOWN_MS;
+  if (!_micArmed && cooldownDone && peak < gate * 0.4) _micArmed = true;
+  if (_micArmed && peak > gate) {
     _micCooldownTs = now;
+    _micArmed = false;
     _micTrigger();
   }
   _micAnimId = requestAnimationFrame(_micLoop);
@@ -4368,6 +4373,7 @@ async function _startMic() {
 
 function _stopMic() {
   _micActive = false;
+  _micArmed = true;
   cancelAnimationFrame(_micAnimId);
   _micAnalyser = null;
   if (_micStream)   { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
