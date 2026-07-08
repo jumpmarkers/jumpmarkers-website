@@ -354,9 +354,10 @@
     .mic-ctrl-wrap { display: inline-flex; align-items: center; gap: 5px; }
     #btn-mic-input.active { color: #ff4060; border-color: #ff4060; background: rgba(255,60,80,0.08); }
     #btn-mic-input.mic-flash { background: rgba(255,60,80,0.45) !important; }
-    .mic-level-wrap { width: 34px; height: 4px; background: var(--bg3,#1a1a1a); border-radius: 2px; position: relative; overflow: visible; margin-top: 2px; }
-    .mic-level-fill { height: 100%; background: var(--accent2); border-radius: 2px; width: 0%; transition: width 60ms linear; }
-    .mic-thresh-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
+    .mic-level-wrap { width: 70px; height: 7px; background: var(--bg3,#1a1a1a); border-radius: 3px; position: relative; overflow: visible; margin-top: 3px; }
+    .mic-level-fill { height: 100%; background: var(--accent2); border-radius: 3px; width: 0%; transition: width 50ms linear; }
+    .mic-thresh-line { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
+    .mic-peak-label { font-family: var(--mono); font-size: 0.58rem; color: var(--muted); text-align: center; margin-top: 1px; }
     #mic-device-select { width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border2); background: var(--bg2); color: var(--text); font-size: 0.78rem; margin-top: 4px; }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
@@ -4289,6 +4290,7 @@ let _micCooldownTs = 0;
 const _MIC_COOLDOWN_MS = 800;
 let _micLevelFill  = null;
 let _micThreshLine = null;
+let _micPeakLabel  = null;
 
 function _micTrigger() {
   const bid = _lastActiveBoardId ?? boards[0]?.id;
@@ -4315,16 +4317,17 @@ function _micTrigger() {
 
 function _micLoop() {
   if (!_micActive || !_micAnalyser) return;
-  const buf = new Uint8Array(_micAnalyser.frequencyBinCount);
+  const buf = new Uint8Array(_micAnalyser.fftSize);
   _micAnalyser.getByteTimeDomainData(buf);
   let peak = 0;
   for (let i = 0; i < buf.length; i++) {
     const v = Math.abs(buf[i] - 128) / 128;
     if (v > peak) peak = v;
   }
-  // Update level bar
+  // Update level bar + peak readout
   if (_micLevelFill)  _micLevelFill.style.width  = Math.min(100, peak * 100) + '%';
   if (_micThreshLine) _micThreshLine.style.left   = _micGatePct + '%';
+  if (_micPeakLabel)  _micPeakLabel.textContent   = Math.round(peak * 100) + '%';
   const now = Date.now();
   if (peak > _micGatePct / 100 && now - _micCooldownTs > _MIC_COOLDOWN_MS) {
     _micCooldownTs = now;
@@ -4342,7 +4345,8 @@ async function _startMic() {
     if (_micAudioCtx.state === 'suspended') await _micAudioCtx.resume();
     const source  = _micAudioCtx.createMediaStreamSource(_micStream);
     _micAnalyser  = _micAudioCtx.createAnalyser();
-    _micAnalyser.fftSize = 256;
+    _micAnalyser.fftSize = 2048;
+    _micAnalyser.smoothingTimeConstant = 0;
     source.connect(_micAnalyser);
     _micActive = true;
     document.getElementById('btn-mic-input')?.classList.add('active');
@@ -4361,7 +4365,8 @@ function _stopMic() {
   if (_micStream)   { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
   if (_micAudioCtx) { _micAudioCtx.close().catch(() => {}); _micAudioCtx = null; }
   document.getElementById('btn-mic-input')?.classList.remove('active');
-  if (_micLevelFill) _micLevelFill.style.width = '0%';
+  if (_micLevelFill)  _micLevelFill.style.width = '0%';
+  if (_micPeakLabel)  _micPeakLabel.textContent = '0%';
 }
 
 async function _micPopulateDevices() {
@@ -4421,6 +4426,10 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   levelWrap.appendChild(_micLevelFill);
   levelWrap.appendChild(_micThreshLine);
   knobEl.appendChild(levelWrap);
+  _micPeakLabel = document.createElement('div');
+  _micPeakLabel.className = 'mic-peak-label';
+  _micPeakLabel.textContent = '0%';
+  knobEl.appendChild(_micPeakLabel);
 
   slot.appendChild(knobEl);
 })();
