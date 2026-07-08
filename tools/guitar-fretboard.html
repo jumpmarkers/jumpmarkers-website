@@ -1039,6 +1039,7 @@
 
   <div class="toolbar">
     <div class="toolbar-top">
+      <button class="btn btn-primary" id="btn-add-board">+ Add Fretboard</button>
       <button class="btn btn-outline" id="btn-export">⬇ Export PDF</button>
       <button class="btn btn-outline" id="btn-clear-all" style="color:var(--red);border-color:var(--red)">✕ Clear All</button>
       <div class="toolbar-top-right">
@@ -3803,7 +3804,7 @@ function _exportBoardPDF(b) {
 }
 
 // ─── Global event bindings ────────────────────────────────────────────────────
-// btn-add is now rendered dynamically at the bottom of boards-container
+document.getElementById('btn-add-board').addEventListener('click', () => addBoard());
 document.getElementById('btn-export').addEventListener('click', () => {
   window.print();
 });
