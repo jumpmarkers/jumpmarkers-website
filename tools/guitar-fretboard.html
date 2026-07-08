@@ -353,6 +353,7 @@
     /* ── Strum / mic control ── */
     .mic-ctrl-wrap { display: inline-flex; align-items: center; gap: 5px; }
     #btn-mic-input.active { color: #ff4060; border-color: #ff4060; background: rgba(255,60,80,0.08); }
+    #btn-mic-input.mic-flash { background: rgba(255,60,80,0.45) !important; }
     .mic-level-wrap { width: 34px; height: 4px; background: var(--bg3,#1a1a1a); border-radius: 2px; position: relative; overflow: visible; margin-top: 2px; }
     .mic-level-fill { height: 100%; background: var(--accent2); border-radius: 2px; width: 0%; transition: width 60ms linear; }
     .mic-thresh-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
@@ -4290,11 +4291,16 @@ let _micLevelFill  = null;
 let _micThreshLine = null;
 
 function _micTrigger() {
-  if (_lastActiveBoardId === null) return;
-  const b = boards.find(x => x.id === _lastActiveBoardId);
+  const bid = _lastActiveBoardId ?? boards[0]?.id;
+  if (bid == null) return;
+  const b = boards.find(x => x.id === bid);
   if (!b) return;
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots < 2) return;
+  // Flash strum button as visual confirmation
+  const btn = document.getElementById('btn-mic-input');
+  btn?.classList.add('mic-flash');
+  setTimeout(() => btn?.classList.remove('mic-flash'), 120);
   const pattern = _parsePattern(b);
   if (pattern) {
     const pLen = pattern.length;
@@ -4333,6 +4339,7 @@ async function _startMic() {
     const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false };
     _micStream    = await navigator.mediaDevices.getUserMedia(constraints);
     _micAudioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+    if (_micAudioCtx.state === 'suspended') await _micAudioCtx.resume();
     const source  = _micAudioCtx.createMediaStreamSource(_micStream);
     _micAnalyser  = _micAudioCtx.createAnalyser();
     _micAnalyser.fftSize = 256;
