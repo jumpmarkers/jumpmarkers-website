@@ -359,6 +359,15 @@
     .mic-level-fill { height: 100%; background: #22c55e; border-radius: 4px; width: 0%; transition: width 40ms linear; }
     .mic-thresh-line { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; left: 15%; }
     .mic-peak-label { font-family: var(--mono); font-size: 0.62rem; color: #22c55e; letter-spacing: 0.02em; }
+
+    /* ── Strum HUD — fixed badge when toolbar scrolls off screen ── */
+    .mic-hud { position: fixed; top: 10px; right: 12px; z-index: 9500; display: none; align-items: center; gap: 6px; background: rgba(8,8,14,0.92); border: 1px solid rgba(255,60,80,0.4); border-radius: 20px; padding: 5px 11px 5px 9px; backdrop-filter: blur(8px); box-shadow: 0 2px 12px rgba(0,0,0,0.55); transition: border-color 80ms, background 80ms; }
+    .mic-hud.mic-hud-flash { border-color: #ff4060 !important; background: rgba(255,60,80,0.18) !important; }
+    .mic-hud-icon { font-size: 0.8rem; opacity: 0.75; }
+    .mic-hud-bar { width: 72px; height: 7px; background: #111; border-radius: 3px; position: relative; overflow: visible; }
+    .mic-hud-fill { height: 100%; background: #22c55e; border-radius: 3px; width: 0%; transition: width 40ms linear; }
+    .mic-hud-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #ff4060; border-radius: 1px; pointer-events: none; }
+    .mic-hud-pct { font-family: var(--mono); font-size: 0.6rem; color: #22c55e; min-width: 26px; text-align: right; letter-spacing: 0.02em; }
     #mic-device-select { width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border2); background: var(--bg2); color: var(--text); font-size: 0.78rem; margin-top: 4px; }
     .chord-chart-name {
       background: none; border: none; border-bottom: 1px solid transparent;
@@ -4300,6 +4309,11 @@ let _micArmed = true;             // re-armed when signal drops below 40% of gat
 let _micLevelFill  = null;
 let _micThreshLine = null;
 let _micPeakLabel  = null;
+let _micHudEl      = null;
+let _micHudFill    = null;
+let _micHudLine    = null;
+let _micHudPct     = null;
+let _micCtrlHidden = false;
 
 function _micTrigger() {
   const bid = _lastActiveBoardId ?? boards[0]?.id;
@@ -4308,10 +4322,12 @@ function _micTrigger() {
   if (!b) return;
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots < 2) return;
-  // Flash strum button as visual confirmation
+  // Flash strum button + HUD as visual confirmation
   const btn = document.getElementById('btn-mic-input');
   btn?.classList.add('mic-flash');
   setTimeout(() => btn?.classList.remove('mic-flash'), 120);
+  _micHudEl?.classList.add('mic-hud-flash');
+  setTimeout(() => _micHudEl?.classList.remove('mic-hud-flash'), 120);
   const pattern = _parsePattern(b);
   if (pattern) {
     const pLen = pattern.length;
@@ -4337,6 +4353,9 @@ function _micLoop() {
   if (_micLevelFill)  _micLevelFill.style.width  = Math.min(100, peak * 100) + '%';
   if (_micThreshLine) _micThreshLine.style.left   = _micGatePct + '%';
   if (_micPeakLabel)  _micPeakLabel.textContent   = Math.round(peak * 100) + '%';
+  const _pctStr = Math.round(peak * 100) + '%';
+  if (_micHudFill)    _micHudFill.style.width     = Math.min(100, peak * 100) + '%';
+  if (_micHudPct)     _micHudPct.textContent      = _pctStr;
   const now = Date.now();
   const gate = _micGatePct / 100;
   const cooldownDone = now - _micCooldownTs > _MIC_MIN_COOLDOWN_MS;
@@ -4370,6 +4389,7 @@ async function _startMic() {
     _silentGain.connect(_micAudioCtx.destination);
     _micActive = true;
     document.getElementById('btn-mic-input')?.classList.add('active');
+    if (_micHudEl && _micCtrlHidden) _micHudEl.style.display = 'flex';
     _micLoop();
     _micPopulateDevices(); // refresh device list now that permission is granted
   } catch (err) {
@@ -4388,6 +4408,9 @@ function _stopMic() {
   document.getElementById('btn-mic-input')?.classList.remove('active');
   if (_micLevelFill)  _micLevelFill.style.width = '0%';
   if (_micPeakLabel)  _micPeakLabel.textContent = '0%';
+  if (_micHudEl)    { _micHudEl.style.display = 'none'; }
+  if (_micHudFill)    _micHudFill.style.width = '0%';
+  if (_micHudPct)     _micHudPct.textContent  = '0%';
 }
 
 async function _micPopulateDevices() {
@@ -4434,6 +4457,7 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
     appSettings.micGate = v;
     saveAppSettings();
     if (_micThreshLine) _micThreshLine.style.left = v + '%';
+    if (_micHudLine)    _micHudLine.style.left    = v + '%';
   }, v => v + '%');
   const knobEl = knob.el;
   knobEl.title = 'Noise gate — drag up/down to set trigger threshold';
@@ -4461,6 +4485,39 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
 
   // Inject meter next to the knob inside mic-ctrl-wrap
   slot.parentElement.appendChild(meterWrap);
+
+  // ── Floating HUD — visible when toolbar scrolls off screen ──────────────────
+  _micHudEl = document.createElement('div');
+  _micHudEl.className = 'mic-hud';
+
+  const _hudIcon = document.createElement('span');
+  _hudIcon.className = 'mic-hud-icon';
+  _hudIcon.textContent = '🎙';
+  _micHudEl.appendChild(_hudIcon);
+
+  const _hudBar = document.createElement('div');
+  _hudBar.className = 'mic-hud-bar';
+  _micHudFill = document.createElement('div');
+  _micHudFill.className = 'mic-hud-fill';
+  _micHudLine = document.createElement('div');
+  _micHudLine.className = 'mic-hud-line';
+  _micHudLine.style.left = _micGatePct + '%';
+  _hudBar.appendChild(_micHudFill);
+  _hudBar.appendChild(_micHudLine);
+  _micHudEl.appendChild(_hudBar);
+
+  _micHudPct = document.createElement('span');
+  _micHudPct.className = 'mic-hud-pct';
+  _micHudPct.textContent = '0%';
+  _micHudEl.appendChild(_micHudPct);
+
+  document.body.appendChild(_micHudEl);
+
+  // Show HUD only when the toolbar mic control scrolls off screen
+  new IntersectionObserver(([entry]) => {
+    _micCtrlHidden = !entry.isIntersecting;
+    if (_micHudEl) _micHudEl.style.display = (_micActive && _micCtrlHidden) ? 'flex' : 'none';
+  }, { threshold: 0.5 }).observe(slot.parentElement); // slot.parentElement = .mic-ctrl-wrap
 })();
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
