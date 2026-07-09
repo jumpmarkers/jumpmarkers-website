@@ -888,6 +888,13 @@
 
       /* Active notes → keep inline color, white text */
       .nc.on { color: rgba(255,255,255,0.95) !important; border: none !important; }
+
+      /* Remove pointer/grab cursors — Chrome renders them as hand icons in PDF */
+      .fretboard-outer, .fretboard-outer * { cursor: default !important; }
+
+      /* Hide page badge row and ring SVG */
+      .page-badge-row { display: none !important; }
+      .fb-ring-svg { display: none !important; }
     }
 
     /* ── Print-only note — injected by JS beforeprint, static div stays hidden ── */
