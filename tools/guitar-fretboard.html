@@ -3127,7 +3127,7 @@ function buildKnob(initVal, min, max, step, onChange, format) {
 
   wrap.addEventListener('click', e => e.stopPropagation());
 
-  return { el: wrap, getValue: () => _v };
+  return { el: wrap, getValue: () => _v, setValue: v => paint(v) };
 }
 
 // ─── Build a board card DOM element ──────────────────────────────────────────
@@ -4451,17 +4451,23 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   const slot = document.getElementById('mic-knob-slot');
   if (!slot) return;
 
-  // Knob (threshold control)
-  const knob = buildKnob(_micGatePct, 0, 100, 1, v => {
+  // Shared onChange — used by both toolbar and HUD knobs; setValue() on the peer
+  // only calls paint() internally, never re-fires onChange, so no recursion.
+  let _tbKnob, _hudKnob;
+  const _gateOnChange = v => {
     _micGatePct = v;
     appSettings.micGate = v;
     saveAppSettings();
     if (_micThreshLine) _micThreshLine.style.left = v + '%';
     if (_micHudLine)    _micHudLine.style.left    = v + '%';
-  }, v => v + '%');
-  const knobEl = knob.el;
-  knobEl.title = 'Noise gate — drag up/down to set trigger threshold';
-  slot.appendChild(knobEl);
+    _tbKnob?.setValue(v);
+    _hudKnob?.setValue(v);
+  };
+
+  // Toolbar knob
+  _tbKnob = buildKnob(_micGatePct, 0, 100, 1, _gateOnChange, v => v + '%');
+  _tbKnob.el.title = 'Noise gate — drag up/down to set trigger threshold';
+  slot.appendChild(_tbKnob.el);
 
   // Separate meter column (level bar + peak label)
   const meterWrap = document.createElement('div');
@@ -4494,6 +4500,11 @@ document.getElementById('btn-fb-settings').addEventListener('click', _micPopulat
   _hudIcon.className = 'mic-hud-icon';
   _hudIcon.textContent = '🎙';
   _micHudEl.appendChild(_hudIcon);
+
+  // HUD gate knob — fully interactive, syncs with toolbar knob
+  _hudKnob = buildKnob(_micGatePct, 0, 100, 1, _gateOnChange, v => v + '%');
+  _hudKnob.el.title = 'Noise gate — drag up/down';
+  _micHudEl.appendChild(_hudKnob.el);
 
   const _hudBar = document.createElement('div');
   _hudBar.className = 'mic-hud-bar';
