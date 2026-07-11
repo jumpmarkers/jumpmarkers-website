@@ -3231,7 +3231,7 @@ function buildChordChartsPanel(b) {
         const validCells = cells.filter(key => {
           const [si, f] = key.split('-').map(Number);
           const noteIdx = (OPEN[si] + f) % 12;
-          return sd.notes.has(noteIdx) && !sd.hiddenCells.has(key);
+          return (sd.notes.has(noteIdx) || srcBoard.pinnedCells.has(key)) && !sd.hiddenCells.has(key);
         });
         if (!validCells.length) return;
         const fretsOnly = validCells.map(k => +k.split('-')[1]).filter(f => f > 0);
@@ -3279,7 +3279,7 @@ function buildChordChartsPanel(b) {
     const validCells = cells.filter(key => {
       const [si, f] = key.split('-').map(Number);
       const noteIdx = (OPEN[si] + f) % 12;
-      return sd.notes.has(noteIdx) && !sd.hiddenCells.has(key);
+      return (sd.notes.has(noteIdx) || srcBoard.pinnedCells.has(key)) && !sd.hiddenCells.has(key);
     });
     if (!validCells.length) return;
     const fretsOnly = validCells.map(k => +k.split('-')[1]).filter(f => f > 0);
