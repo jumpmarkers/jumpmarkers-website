@@ -2137,122 +2137,33 @@ function _fillModes(b, rootIdx, parentIntervals) {
   refreshBoard(b.id);
 }
 
-// ─── Scale harmonizer ─────────────────────────────────────────────────────────
-// s=0 = low E, s=5 = high e  (chord chart string order)
-const _CHD_OPEN  = [4, 9, 2, 7, 11, 4];
-const _HARM_NOTE = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-
-function _chordLabel(cn) {
-  const r = _HARM_NOTE[cn[0] % 12];
-  const t3 = ((cn[1] - cn[0]) % 12 + 12) % 12;
-  const t5 = ((cn[2] - cn[0]) % 12 + 12) % 12;
-  if (cn.length === 3) {
-    if (t3===3&&t5===7) return r+'m';
-    if (t3===4&&t5===7) return r;
-    if (t3===3&&t5===6) return r+'dim';
-    if (t3===4&&t5===8) return r+'aug';
-    return r+'?';
+function _fillKeepRoot(b, rootIdx, parentIntervals) {
+  // Each slot gets the notes of one mode, all starting from rootIdx
+  const n = parentIntervals.length;
+  b.extraSlots = b.extraSlots || [];
+  while (1 + b.extraSlots.length < n) {
+    b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null, hiddenCells: new Set() });
   }
-  const t7 = ((cn[3] - cn[0]) % 12 + 12) % 12;
-  if (t3===3&&t5===7&&t7===10) return r+'m7';
-  if (t3===4&&t5===7&&t7===11) return r+'maj7';
-  if (t3===4&&t5===7&&t7===10) return r+'7';
-  if (t3===3&&t5===6&&t7===10) return r+'m7b5';
-  if (t3===3&&t5===6&&t7===9)  return r+'dim7';
-  if (t3===4&&t5===8&&t7===10) return r+'aug7';
-  if (t3===3&&t5===7&&t7===11) return r+'mM7';
-  if (t3===4&&t5===8&&t7===11) return r+'maj7#5';
-  return r+'?';
-}
-
-function _findVoicing(chordNotes, invIdx) {
-  const bassNote = chordNotes[invIdx];
-  let best = null, bestScore = -Infinity;
-
-  for (const preferFretted of [false, true]) {
-  for (let w = 0; w <= 9; w++) {
-    const wEnd = w + 3;
-    for (let bassSt = 0; bassSt <= Math.min(3, 5 - chordNotes.length + 1); bassSt++) {
-      for (let bf = 0; bf <= 12; bf++) {
-        if ((_CHD_OPEN[bassSt] + bf) % 12 !== bassNote) continue;
-        if (bf > 0 && (bf < w || bf > wEnd)) continue;
-
-        const headings = Array(6).fill('x');
-        const aDots = [];
-        const covered = new Set();
-
-        if (bf === 0) headings[bassSt] = 'o';
-        else { aDots.push({s: bassSt, f: bf}); headings[bassSt] = ''; }
-        covered.add(bassNote);
-
-        for (let st = bassSt + 1; st < 6; st++) {
-          let bF = null, bN = null, bPri = -1;
-          for (let f = 0; f <= wEnd; f++) {
-            if (f > 0 && f < w) continue;
-            const n = (_CHD_OPEN[st] + f) % 12;
-            if (!chordNotes.includes(n)) continue;
-            const pri = covered.has(n) ? 0 : 1;
-            const eff  = (preferFretted && f  === 0) ? 999 : f;
-            const effB = (preferFretted && bF === 0) ? 999 : (bF ?? 999);
-            if (pri > bPri || (pri === bPri && eff < effB)) { bPri = pri; bF = f; bN = n; }
-          }
-          if (bF !== null) {
-            covered.add(bN);
-            if (bF === 0) headings[st] = 'o';
-            else { aDots.push({s: st, f: bF}); headings[st] = ''; }
-          }
-        }
-
-        if (!chordNotes.every(n => covered.has(n))) continue;
-        const fPos = aDots.map(d => d.f);
-        const minF = fPos.length ? Math.min(...fPos) : 1;
-        const maxF = fPos.length ? Math.max(...fPos) : 1;
-        if (maxF - minF > 4) continue;
-
-        const played = aDots.length + headings.filter(h => h === 'o').length;
-        const span   = maxF - minF;
-        const score  = played * 15 - minF * 15 - span * 10 - bassSt * 3;
-        if (score > bestScore) {
-          bestScore = score;
-          const sf = Math.max(1, minF);
-          best = {
-            dots: aDots.map(d => ({s: d.s, f: d.f - sf + 1})),
-            headings: [...headings], startFret: sf, numFrets: 5,
-            bassSt, bassAbsF: bf,
-          };
-        }
-      }
-    }
-  }
-  } // preferFretted
-  return best;
-}
-
-function _harmonizeScale(b, rootIdx, scaleIv, use7ths) {
-  const n = scaleIv.length;
-  const charts = [];
-  for (let deg = 0; deg < n; deg++) {
-    const numNotes = use7ths ? 4 : 3;
-    const chordNotes = Array.from({length: numNotes}, (_, k) =>
-      (rootIdx + scaleIv[(deg + k * 2) % n]) % 12
+  for (let i = 0; i < n; i++) {
+    // Intervals of mode i relative to its own root, re-anchored to rootIdx
+    const modeNotes = new Set(
+      Array.from({length: n}, (_, k) =>
+        (rootIdx + ((parentIntervals[(i + k) % n] - parentIntervals[i] + 12) % 12)) % 12
+      )
     );
-    const baseName = _chordLabel(chordNotes);
-    for (let inv = 0; inv < chordNotes.length; inv++) {
-      const v = _findVoicing(chordNotes, inv);
-      if (!v) continue;
-      const bassName = _HARM_NOTE[chordNotes[inv] % 12];
-      const label = inv === 0 ? baseName : `${baseName}/${bassName}`;
-      let rootDot = null;
-      if (v.bassAbsF > 0) rootDot = {s: v.bassSt, f: v.bassAbsF - v.startFret + 1};
-      charts.push(mkChordChart({
-        label, startFret: v.startFret, numFrets: v.numFrets,
-        dots: v.dots, headings: v.headings, rootDot,
-      }));
+    if (i === 0) {
+      b.selectedNotes = modeNotes;
+      b.tonic = rootIdx;
+      b.visibleNotes = new Set(modeNotes);
+    } else {
+      b.extraSlots[i - 1].notes = modeNotes;
+      b.extraSlots[i - 1].tonic = rootIdx;
+      b.extraSlots[i - 1].visibleNotes = new Set(modeNotes);
     }
   }
-  b.chordCharts = charts;
+  b.activeSlot = 0;
   pushHistory();
-  refreshChordChartsPanel(b.id);
+  refreshBoard(b.id);
 }
 
 function clearBoard(boardId) {
@@ -3510,63 +3421,50 @@ function _buildScaleRow(b) {
   const fillBtn = document.createElement('button');
   fillBtn.className = 'btn btn-outline btn-sm scale-fill-btn';
   fillBtn.textContent = '⇶ Fill modes';
-  fillBtn.title = 'Populate all 7 slots with each mode of this scale';
-  fillBtn.addEventListener('click', () => {
-    const sc = SCALE_DB.find(s => s.n === scaleSel.value);
-    if (!sc || !SCALE_MODAL_GROUPS.has(sc.g)) return;
-    _fillModes(b, +rootSel.value, sc.iv);
-  });
-  row.appendChild(fillBtn);
+  fillBtn.title = 'Populate all slots with each mode of this scale';
 
-  // Harmonize button + dropdown
-  const harmBtn  = document.createElement('button');
-  harmBtn.className = 'btn btn-outline btn-sm scale-harm-btn';
-  harmBtn.textContent = '↓ Harmonize';
-  harmBtn.title = 'Generate diatonic chord voicings for this scale';
+  const fillMenu = document.createElement('div');
+  fillMenu.className = 'scale-harm-menu';
+  fillMenu.style.display = 'none';
 
-  const harmMenu = document.createElement('div');
-  harmMenu.className = 'scale-harm-menu';
-  harmMenu.style.display = 'none';
-
-  const _mkHOpt = (lbl, use7) => {
+  const _mkFOpt = (lbl, keepRoot) => {
     const o = document.createElement('button');
     o.className = 'scale-harm-opt';
     o.textContent = lbl;
     o.addEventListener('click', e => {
       e.stopPropagation();
-      harmMenu.style.display = 'none';
+      fillMenu.style.display = 'none';
       const sc = SCALE_DB.find(s => s.n === scaleSel.value);
-      if (!sc) return;
-      _harmonizeScale(b, +rootSel.value, sc.iv, use7);
+      if (!sc || !SCALE_MODAL_GROUPS.has(sc.g)) return;
+      if (keepRoot) _fillKeepRoot(b, +rootSel.value, sc.iv);
+      else          _fillModes(b, +rootSel.value, sc.iv);
     });
-    harmMenu.appendChild(o);
+    fillMenu.appendChild(o);
   };
-  _mkHOpt('Triads (3 notes)', false);
-  _mkHOpt('7th chords (4 notes)', true);
-  harmBtn.appendChild(harmMenu);
+  _mkFOpt('Move root', false);
+  _mkFOpt('Keep root', true);
+  fillBtn.appendChild(fillMenu);
 
-  harmBtn.addEventListener('click', e => {
+  fillBtn.addEventListener('click', e => {
     e.stopPropagation();
     const sc = SCALE_DB.find(s => s.n === scaleSel.value);
-    if (!sc) return;
-    harmMenu.style.display = harmMenu.style.display === 'none' ? '' : 'none';
+    if (!sc || !SCALE_MODAL_GROUPS.has(sc.g)) return;
+    fillMenu.style.display = fillMenu.style.display === 'none' ? '' : 'none';
   });
-  document.addEventListener('click', () => { harmMenu.style.display = 'none'; });
-  row.appendChild(harmBtn);
+  document.addEventListener('click', () => { fillMenu.style.display = 'none'; });
+  row.appendChild(fillBtn);
 
-  // Show/hide Fill Modes and Harmonize based on selected scale
+  // Show/hide Fill Modes based on selected scale
   scaleSel.addEventListener('change', () => {
     b.scaleSelected = scaleSel.value;
     const sc = SCALE_DB.find(s => s.n === scaleSel.value);
     fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
-    harmBtn.style.display = sc ? 'inline-flex' : 'none';
   });
 
   // Restore button visibility for already-selected scale (after DOM rebuild)
   if (b.scaleSelected) {
     const sc = SCALE_DB.find(s => s.n === b.scaleSelected);
     fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
-    harmBtn.style.display = sc ? 'inline-flex' : 'none';
   }
 
   return row;
