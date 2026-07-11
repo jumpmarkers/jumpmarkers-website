@@ -378,7 +378,8 @@
     .chord-chart-wrap.chord-drop-before { box-shadow: -3px 0 0 0 var(--accent2); }
     .chord-chart-wrap.chord-drop-after  { box-shadow:  3px 0 0 0 var(--accent2); }
     .chord-chart-wrap.chord-drop-fb     { outline: 2px solid var(--accent); outline-offset: 2px; background: rgba(130,80,255,0.12); }
-    .chord-charts-row.chord-row-drop-fb { outline: 2px dashed var(--accent2); outline-offset: -3px; background: rgba(130,80,255,0.08); border-radius: 4px; }
+    .chord-charts-panel.chord-panel-drop-fb { background: rgba(130,80,255,0.08); }
+    .chord-charts-panel.chord-panel-drop-fb .chord-charts-row { outline: 2px dashed var(--accent2); outline-offset: -3px; border-radius: 4px; min-height: 80px; }
     .chord-color-menu {
       position: fixed; z-index: 9999;
       background: var(--bg2); border: 1px solid var(--border2);
@@ -3216,17 +3217,9 @@ function buildChordChartsPanel(b) {
     row.appendChild(wrap);
   });
 
-  // Drop fretboard selection onto empty chord area → create new chord
-  row.addEventListener('dragover', e => {
-    if (!_fbSelDragActive || e.target.closest('.chord-chart-wrap')) return;
-    e.preventDefault();
-    row.classList.add('chord-row-drop-fb');
-  });
-  row.addEventListener('dragleave', e => {
-    if (!row.contains(e.relatedTarget)) row.classList.remove('chord-row-drop-fb');
-  });
-  row.addEventListener('drop', e => {
-    row.classList.remove('chord-row-drop-fb');
+  // Drop fretboard selection onto panel empty area → create new chord
+  function _fbSelDropNewChord(e) {
+    panel.classList.remove('chord-panel-drop-fb');
     if (!_fbSelDragActive || e.target.closest('.chord-chart-wrap')) return;
     e.preventDefault();
     const raw = e.dataTransfer.getData('application/x-fb-sel');
@@ -3254,7 +3247,16 @@ function buildChordChartsPanel(b) {
     }));
     pushHistory();
     refreshChordChartsPanel(b.id);
+  }
+  panel.addEventListener('dragover', e => {
+    if (!_fbSelDragActive || e.target.closest('.chord-chart-wrap')) return;
+    e.preventDefault();
+    panel.classList.add('chord-panel-drop-fb');
   });
+  panel.addEventListener('dragleave', e => {
+    if (!panel.contains(e.relatedTarget)) panel.classList.remove('chord-panel-drop-fb');
+  });
+  panel.addEventListener('drop', _fbSelDropNewChord);
 
   const addBtn = document.createElement('button');
   addBtn.className = 'add-chord-btn'; addBtn.textContent = '+ Add chord';
