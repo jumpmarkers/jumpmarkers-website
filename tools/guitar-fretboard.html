@@ -4639,9 +4639,11 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
     const count = _slotBeatCounts[b.id];
 
-    // No anticipation on the first page advance so the opening page isn't skipped early
+    // Fire at the START of the next beat after the trigger (= downbeat of next cycle),
+    // then subtract earlyMs for anticipation. First advance always fires on time.
+    const beatDurationMs = 60000 / (bpm || 120);
     const earlyMs = _slotFirstTriggered[b.id] ? (b.slotEarlyMs || 0) : 0;
-    const delayMs = Math.max(0, baseMs - earlyMs);
+    const delayMs = Math.max(0, baseMs + beatDurationMs - earlyMs);
 
     setTimeout(() => {
       if (count % targetBeats === 0) {
