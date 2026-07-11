@@ -2169,6 +2169,7 @@ function _findVoicing(chordNotes, invIdx) {
   const bassNote = chordNotes[invIdx];
   let best = null, bestScore = -Infinity;
 
+  for (const preferFretted of [false, true]) {
   for (let w = 0; w <= 9; w++) {
     const wEnd = w + 3;
     for (let bassSt = 0; bassSt <= Math.min(3, 5 - chordNotes.length + 1); bassSt++) {
@@ -2191,7 +2192,9 @@ function _findVoicing(chordNotes, invIdx) {
             const n = (_CHD_OPEN[st] + f) % 12;
             if (!chordNotes.includes(n)) continue;
             const pri = covered.has(n) ? 0 : 1;
-            if (pri > bPri || (pri === bPri && f < (bF ?? 999))) { bPri = pri; bF = f; bN = n; }
+            const eff  = (preferFretted && f  === 0) ? 999 : f;
+            const effB = (preferFretted && bF === 0) ? 999 : (bF ?? 999);
+            if (pri > bPri || (pri === bPri && eff < effB)) { bPri = pri; bF = f; bN = n; }
           }
           if (bF !== null) {
             covered.add(bN);
@@ -2207,7 +2210,8 @@ function _findVoicing(chordNotes, invIdx) {
         if (maxF - minF > 4) continue;
 
         const played = aDots.length + headings.filter(h => h === 'o').length;
-        const score  = played * 20 - minF * 15 - bassSt * 2;
+        const span   = maxF - minF;
+        const score  = played * 15 - minF * 15 - span * 10 - bassSt * 3;
         if (score > bestScore) {
           bestScore = score;
           const sf = Math.max(1, minF);
@@ -2220,6 +2224,7 @@ function _findVoicing(chordNotes, invIdx) {
       }
     }
   }
+  } // preferFretted
   return best;
 }
 
@@ -3459,12 +3464,14 @@ function _buildScaleRow(b) {
   // Root note selector — init from current tonic
   const rootSel = document.createElement('select');
   rootSel.className = 'scale-picker-root';
+  const _restoredRoot = b.scalePickerRoot ?? b.tonic ?? 0;
   NOTES.forEach((note, i) => {
     const opt = document.createElement('option');
     opt.value = i; opt.textContent = note;
-    if (i === (b.tonic ?? 0)) opt.selected = true;
+    if (i === _restoredRoot) opt.selected = true;
     rootSel.appendChild(opt);
   });
+  rootSel.addEventListener('change', () => { b.scalePickerRoot = +rootSel.value; });
   row.appendChild(rootSel);
 
   // Scale selector grouped by category
@@ -3485,6 +3492,7 @@ function _buildScaleRow(b) {
     });
     scaleSel.appendChild(og);
   });
+  if (b.scaleSelected) scaleSel.value = b.scaleSelected;
   row.appendChild(scaleSel);
 
   // Apply button
@@ -3548,10 +3556,18 @@ function _buildScaleRow(b) {
 
   // Show/hide Fill Modes and Harmonize based on selected scale
   scaleSel.addEventListener('change', () => {
+    b.scaleSelected = scaleSel.value;
     const sc = SCALE_DB.find(s => s.n === scaleSel.value);
     fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
     harmBtn.style.display = sc ? 'inline-flex' : 'none';
   });
+
+  // Restore button visibility for already-selected scale (after DOM rebuild)
+  if (b.scaleSelected) {
+    const sc = SCALE_DB.find(s => s.n === b.scaleSelected);
+    fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
+    harmBtn.style.display = sc ? 'inline-flex' : 'none';
+  }
 
   return row;
 }
