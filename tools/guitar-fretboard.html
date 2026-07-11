@@ -1624,8 +1624,9 @@ const PRESET_COLORS = [
 let boards  = [];
 let presets = [];
 let nextId  = 1;
-const _slotMeasureCounts = {};
-const _slotBeatCounts    = {};
+const _slotMeasureCounts   = {};
+const _slotBeatCounts      = {};
+const _slotFirstTriggered  = {}; // boardId → true after first page advance fires
 const _ringState         = {}; // boardId → { svg, rect }
 const _ringCycleDurMs    = {}; // boardId → full-cycle animation duration in ms
 let   _metroActive       = false;
@@ -1694,6 +1695,7 @@ function mkBoard(opts = {}) {
     })),
     activeSlot:    opts.activeSlot  || 0,
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
+    slotEarlyMs:       opts.slotEarlyMs       !== undefined ? opts.slotEarlyMs       : 0,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
     autoAdvance:       opts.autoAdvance !== false,
@@ -1730,6 +1732,7 @@ function _serializeBoards() {
       })),
       activeSlot:    b.activeSlot,
       slotMeasures:      b.slotMeasures,
+      slotEarlyMs:       b.slotEarlyMs,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -2036,6 +2039,7 @@ function duplicateBoard(id) {
     selectedNotes:     [...src.selectedNotes],
     activeSlot:        src.activeSlot,
     slotMeasures:      src.slotMeasures,
+    slotEarlyMs:       src.slotEarlyMs,
     slotPattern:       src.slotPattern,
     crossfadeDuration: src.crossfadeDuration,
     autoAdvance:       src.autoAdvance,
@@ -2256,6 +2260,7 @@ function buildPresetData(name) {
       })),
       activeSlot:        b.activeSlot,
       slotMeasures:      b.slotMeasures,
+      slotEarlyMs:       b.slotEarlyMs,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -4011,10 +4016,20 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeKnob.el);
 
+    const earlyGrp = document.createElement('div');
+    earlyGrp.className = 'slot-sync';
+    earlyGrp.title = 'Show next page this many ms before the beat (first page is always on time)';
+    const earlyLbl = document.createElement('span');
+    earlyLbl.textContent = 'early';
+    const earlyKnob = buildKnob(b.slotEarlyMs, 0, 1000, 10, v => { b.slotEarlyMs = v; });
+    earlyGrp.appendChild(earlyLbl);
+    earlyGrp.appendChild(earlyKnob.el);
+
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
     _visCtrlZone.appendChild(fadeGrp);
+    _visCtrlZone.appendChild(earlyGrp);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -4538,9 +4553,10 @@ function _onMetroStart() {
   _beatModeActive = false;
   _metroActive    = true;
   boards.forEach(b => {
-    _slotMeasureCounts[b.id] = 0;
-    _slotBeatCounts[b.id]    = 0;
-    _ringCycleDurMs[b.id]    = 0;
+    _slotMeasureCounts[b.id]  = 0;
+    _slotBeatCounts[b.id]     = 0;
+    _ringCycleDurMs[b.id]     = 0;
+    delete _slotFirstTriggered[b.id];
     const pattern = _parsePattern(b);
     if (pattern) {
       b.patternPos = 0;
@@ -4589,25 +4605,30 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
     }
 
     // Page change (measure-only mode — when metro-beat events are not available)
-    if (!_beatModeActive) setTimeout(() => {
-      if (count % sm === 0) {
-        const pattern = _parsePattern(b);
-        if (pattern) {
-          b.patternPos = (b.patternPos + 1) % pattern.length;
-          b.activeSlot = pattern[b.patternPos];
-        } else {
-          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    if (!_beatModeActive) {
+      const earlyMs = _slotFirstTriggered[b.id] ? (b.slotEarlyMs || 0) : 0;
+      const fireMs  = Math.max(0, delayMs - earlyMs);
+      setTimeout(() => {
+        if (count % sm === 0) {
+          _slotFirstTriggered[b.id] = true;
+          const pattern = _parsePattern(b);
+          if (pattern) {
+            b.patternPos = (b.patternPos + 1) % pattern.length;
+            b.activeSlot = pattern[b.patternPos];
+          } else {
+            b.activeSlot = (b.activeSlot + 1) % totalSlots;
+          }
+          _crossfadeBoard(b.id);
         }
-        _crossfadeBoard(b.id);
-      }
-    }, delayMs);
+      }, fireMs);
+    }
   });
 }
 
 function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
   _beatModeActive = true;
   _metroBeatsPerMeasure = beatsPerMeasure || 4;
-  const delayMs = msUntilBeat > 0 ? msUntilBeat : 60000 / (bpm || 120);
+  const baseMs = msUntilBeat > 0 ? msUntilBeat : 60000 / (bpm || 120);
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
@@ -4618,8 +4639,13 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
     const count = _slotBeatCounts[b.id];
 
+    // No anticipation on the first page advance so the opening page isn't skipped early
+    const earlyMs = _slotFirstTriggered[b.id] ? (b.slotEarlyMs || 0) : 0;
+    const delayMs = Math.max(0, baseMs - earlyMs);
+
     setTimeout(() => {
       if (count % targetBeats === 0) {
+        _slotFirstTriggered[b.id] = true;
         const pattern = _parsePattern(b);
         if (pattern) {
           b.patternPos = (b.patternPos + 1) % pattern.length;
