@@ -327,6 +327,13 @@
     .slot-name-input:focus { border-bottom-color: var(--accent2); color: var(--text); }
     .slot-name-input::placeholder { color: var(--border2); font-style: italic; }
     .page-badge-row { padding: 1px 18px; display: flex; align-items: center; }
+    .scale-picker-row { display: flex; align-items: center; gap: 6px; padding: 3px 12px; background: rgba(128,128,128,0.04); border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .scale-picker-lbl { font-size: 0.65rem; font-family: var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; flex-shrink: 0; }
+    .scale-picker-sel { font-size: 0.72rem; background: var(--bg2); color: var(--text); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 5px; max-width: 190px; }
+    .scale-picker-root { font-size: 0.72rem; background: var(--bg2); color: var(--text); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 4px; width: 52px; }
+    .scale-picker-sel:focus, .scale-picker-root:focus { outline: none; border-color: var(--accent2); }
+    .scale-fill-btn { display: none; }
+    @media print { .scale-picker-row { display: none !important; } }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
     .chord-charts-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: start; overflow-y: auto; padding-right: 4px; }
@@ -1391,6 +1398,62 @@ const NOTES_LAT_FLAT = ['Do','Reb','Re','Mib','Mi','Fa','Solb','Sol','Lab','La',
 const NOTES_LAT_SH   = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
 const INTERVAL_NAMES = ['P1','m2','M2','m3','M3','P4','A4','P5','m6','M6','m7','M7'];
 
+// ─── Scale database ───────────────────────────────────────────────────────────
+// iv = semitone intervals from root (0–11). Groups that support Fill-Modes
+// are listed in SCALE_MODAL_GROUPS below.
+const SCALE_DB = [
+  // Pentatonic
+  { g:'Pentatonic',       n:'Major Pentatonic',           iv:[0,2,4,7,9]          },
+  { g:'Pentatonic',       n:'Minor Pentatonic',           iv:[0,3,5,7,10]         },
+  { g:'Pentatonic',       n:'Suspended Pentatonic',       iv:[0,2,5,7,10]         },
+  // Blues
+  { g:'Blues',            n:'Minor Blues',                iv:[0,3,5,6,7,10]       },
+  { g:'Blues',            n:'Major Blues',                iv:[0,2,3,4,7,9]        },
+  // Major Scale Modes
+  { g:'Major Modes',      n:'Ionian (Major)',             iv:[0,2,4,5,7,9,11]     },
+  { g:'Major Modes',      n:'Dorian',                    iv:[0,2,3,5,7,9,10]     },
+  { g:'Major Modes',      n:'Phrygian',                  iv:[0,1,3,5,7,8,10]     },
+  { g:'Major Modes',      n:'Lydian',                    iv:[0,2,4,6,7,9,11]     },
+  { g:'Major Modes',      n:'Mixolydian',                iv:[0,2,4,5,7,9,10]     },
+  { g:'Major Modes',      n:'Aeolian (Natural Minor)',    iv:[0,2,3,5,7,8,10]     },
+  { g:'Major Modes',      n:'Locrian',                   iv:[0,1,3,5,6,8,10]     },
+  // Melodic Minor Modes
+  { g:'Melodic Minor',    n:'Melodic Minor',             iv:[0,2,3,5,7,9,11]     },
+  { g:'Melodic Minor',    n:'Dorian b2',                 iv:[0,1,3,5,7,9,10]     },
+  { g:'Melodic Minor',    n:'Lydian Augmented',          iv:[0,2,4,6,8,9,11]     },
+  { g:'Melodic Minor',    n:'Lydian Dominant',           iv:[0,2,4,6,7,9,10]     },
+  { g:'Melodic Minor',    n:'Mixolydian b6',             iv:[0,2,4,5,7,8,10]     },
+  { g:'Melodic Minor',    n:'Locrian Natural 2',         iv:[0,2,3,5,6,8,10]     },
+  { g:'Melodic Minor',    n:'Altered (Super Locrian)',   iv:[0,1,3,4,6,8,10]     },
+  // Harmonic Minor Modes
+  { g:'Harmonic Minor',   n:'Harmonic Minor',            iv:[0,2,3,5,7,8,11]     },
+  { g:'Harmonic Minor',   n:'Locrian Natural 6',         iv:[0,1,3,5,6,9,10]     },
+  { g:'Harmonic Minor',   n:'Ionian #5',                 iv:[0,2,4,5,8,9,11]     },
+  { g:'Harmonic Minor',   n:'Dorian #4',                 iv:[0,2,3,6,7,9,10]     },
+  { g:'Harmonic Minor',   n:'Phrygian Dominant',         iv:[0,1,4,5,7,8,10]     },
+  { g:'Harmonic Minor',   n:'Lydian #2',                 iv:[0,3,4,6,7,9,11]     },
+  { g:'Harmonic Minor',   n:'Super Locrian Dim.',        iv:[0,1,3,4,6,8,9]      },
+  // Harmonic Major Modes
+  { g:'Harmonic Major',   n:'Harmonic Major',            iv:[0,2,4,5,7,8,11]     },
+  { g:'Harmonic Major',   n:'Dorian b5',                 iv:[0,2,3,5,6,9,10]     },
+  { g:'Harmonic Major',   n:'Phrygian b4',               iv:[0,1,3,4,7,8,10]     },
+  { g:'Harmonic Major',   n:'Lydian b3',                 iv:[0,2,3,6,7,9,11]     },
+  { g:'Harmonic Major',   n:'Mixolydian b2',             iv:[0,1,4,5,7,9,10]     },
+  { g:'Harmonic Major',   n:'Lydian Aug. #2',            iv:[0,3,4,6,8,9,11]     },
+  { g:'Harmonic Major',   n:'Locrian bb7',               iv:[0,1,3,5,6,8,9]      },
+  // Bebop
+  { g:'Bebop',            n:'Dominant Bebop',            iv:[0,2,4,5,7,9,10,11]  },
+  { g:'Bebop',            n:'Major Bebop',               iv:[0,2,4,5,7,8,9,11]   },
+  { g:'Bebop',            n:'Dorian Bebop',              iv:[0,2,3,4,5,7,9,10]   },
+  { g:'Bebop',            n:'Melodic Minor Bebop',       iv:[0,2,3,5,7,8,9,11]   },
+  // Symmetric
+  { g:'Symmetric',        n:'Whole Tone',                iv:[0,2,4,6,8,10]        },
+  { g:'Symmetric',        n:'Diminished (WH)',           iv:[0,2,3,5,6,8,9,11]   },
+  { g:'Symmetric',        n:'Dominant Dim. (HW)',        iv:[0,1,3,4,6,7,9,10]   },
+  { g:'Symmetric',        n:'Augmented',                 iv:[0,3,4,7,8,11]        },
+];
+const SCALE_MODAL_GROUPS = new Set(['Major Modes','Melodic Minor','Harmonic Minor','Harmonic Major']);
+
 // ─── App settings ─────────────────────────────────────────────────────────────
 let appSettings = { noteSystem:'anglo', accidentals:'flats', noteDisplay:'names', theme:'ebony', showChordCharts: false, showChordControls: true };
 try { Object.assign(appSettings, JSON.parse(localStorage.getItem('gfv-settings') || '{}')); } catch(e){}
@@ -2017,6 +2080,45 @@ function toggleNote(boardId, noteIdx) {
   }
   pushHistory();
   refreshBoard(boardId);
+}
+
+// ─── Scale helpers ────────────────────────────────────────────────────────────
+function _applyScale(b, rootIdx, intervals) {
+  const notes = new Set(intervals.map(i => (rootIdx + i) % 12));
+  if (b.activeSlot === 0) {
+    b.selectedNotes = notes;
+    b.tonic = rootIdx;
+  } else {
+    const s = b.extraSlots[b.activeSlot - 1];
+    if (s) { s.notes = notes; s.tonic = rootIdx; }
+  }
+  pushHistory();
+  refreshBoard(b.id);
+}
+
+function _fillModes(b, rootIdx, parentIntervals) {
+  // Compute the absolute note set for this key (same notes for all modes)
+  const parentNotes = new Set(parentIntervals.map(i => (rootIdx + i) % 12));
+  const n = parentIntervals.length;
+  // Ensure enough slots exist
+  b.extraSlots = b.extraSlots || [];
+  while (1 + b.extraSlots.length < n) {
+    b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null, hiddenCells: new Set() });
+  }
+  // Fill each mode slot: same notes, different tonic (root of that mode)
+  parentIntervals.forEach((interval, i) => {
+    const modeRoot = (rootIdx + interval) % 12;
+    if (i === 0) {
+      b.selectedNotes = new Set(parentNotes);
+      b.tonic = modeRoot;
+    } else {
+      b.extraSlots[i - 1].notes = new Set(parentNotes);
+      b.extraSlots[i - 1].tonic = modeRoot;
+    }
+  });
+  b.activeSlot = 0;
+  pushHistory();
+  refreshBoard(b.id);
 }
 
 function clearBoard(boardId) {
@@ -3210,6 +3312,79 @@ function buildKnob(initVal, min, max, step, onChange, format) {
   return { el: wrap, getValue: () => _v, setValue: v => paint(v) };
 }
 
+// ─── Scale picker row ────────────────────────────────────────────────────────
+function _buildScaleRow(b) {
+  const row = document.createElement('div');
+  row.className = 'scale-picker-row';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'scale-picker-lbl';
+  lbl.textContent = '♩ Scale';
+  row.appendChild(lbl);
+
+  // Root note selector — init from current tonic
+  const rootSel = document.createElement('select');
+  rootSel.className = 'scale-picker-root';
+  NOTES.forEach((note, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = note;
+    if (i === (b.tonic ?? 0)) opt.selected = true;
+    rootSel.appendChild(opt);
+  });
+  row.appendChild(rootSel);
+
+  // Scale selector grouped by category
+  const scaleSel = document.createElement('select');
+  scaleSel.className = 'scale-picker-sel';
+  const none = document.createElement('option');
+  none.value = ''; none.textContent = '— pick a scale —';
+  scaleSel.appendChild(none);
+  const groups = {};
+  SCALE_DB.forEach(s => { (groups[s.g] = groups[s.g] || []).push(s); });
+  Object.entries(groups).forEach(([gName, scales]) => {
+    const og = document.createElement('optgroup');
+    og.label = gName;
+    scales.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.n; o.textContent = s.n;
+      og.appendChild(o);
+    });
+    scaleSel.appendChild(og);
+  });
+  row.appendChild(scaleSel);
+
+  // Apply button
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'btn btn-outline btn-sm';
+  applyBtn.textContent = 'Apply';
+  applyBtn.addEventListener('click', () => {
+    const sc = SCALE_DB.find(s => s.n === scaleSel.value);
+    if (!sc) return;
+    _applyScale(b, +rootSel.value, sc.iv);
+  });
+  row.appendChild(applyBtn);
+
+  // Fill Modes button — only for modal scale groups
+  const fillBtn = document.createElement('button');
+  fillBtn.className = 'btn btn-outline btn-sm scale-fill-btn';
+  fillBtn.textContent = '⇶ Fill modes';
+  fillBtn.title = 'Populate all 7 slots with each mode of this scale';
+  fillBtn.addEventListener('click', () => {
+    const sc = SCALE_DB.find(s => s.n === scaleSel.value);
+    if (!sc || !SCALE_MODAL_GROUPS.has(sc.g)) return;
+    _fillModes(b, +rootSel.value, sc.iv);
+  });
+  row.appendChild(fillBtn);
+
+  // Show/hide Fill Modes based on selected scale group
+  scaleSel.addEventListener('change', () => {
+    const sc = SCALE_DB.find(s => s.n === scaleSel.value);
+    fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
+  });
+
+  return row;
+}
+
 // ─── Build a board card DOM element ──────────────────────────────────────────
 function buildCard(b) {
   clampStart(b);
@@ -3575,6 +3750,8 @@ function buildCard(b) {
     pageBadgeRow.appendChild(slotNameInp);
     card.appendChild(pageBadgeRow);
   }
+
+  card.appendChild(_buildScaleRow(b));
 
   // ── Visibility row ────────────────────────────────────────────────────────
   const visRow = document.createElement('div');
