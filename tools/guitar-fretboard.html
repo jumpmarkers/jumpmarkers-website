@@ -333,6 +333,19 @@
     .scale-picker-root { font-size: 0.72rem; background: var(--bg2); color: var(--text); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 4px; width: 52px; }
     .scale-picker-sel:focus, .scale-picker-root:focus { outline: none; border-color: var(--accent2); }
     .scale-fill-btn { display: none; }
+    .scale-harm-btn { display: none; position: relative; }
+    .scale-harm-menu {
+      position: absolute; top: calc(100% + 3px); left: 0; z-index: 500;
+      background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
+      padding: 3px; min-width: 152px;
+      box-shadow: 0 4px 14px rgba(0,0,0,.5);
+    }
+    .scale-harm-opt {
+      display: block; width: 100%; font-size: 0.7rem; font-family: var(--mono);
+      color: var(--text); background: none; border: none; cursor: pointer;
+      padding: 5px 8px; text-align: left; border-radius: 4px; transition: background .1s;
+    }
+    .scale-harm-opt:hover { background: rgba(255,255,255,.1); }
     @media print { .scale-picker-row { display: none !important; } }
     /* Hide controls when toggled off */
     body.hide-chord-controls .chord-ctrl-row   { display: none !important; }
@@ -2124,6 +2137,119 @@ function _fillModes(b, rootIdx, parentIntervals) {
   refreshBoard(b.id);
 }
 
+// ─── Scale harmonizer ─────────────────────────────────────────────────────────
+// s=0 = low E, s=5 = high e  (chord chart string order)
+const _CHD_OPEN  = [4, 9, 2, 7, 11, 4];
+const _HARM_NOTE = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+
+function _chordLabel(cn) {
+  const r = _HARM_NOTE[cn[0] % 12];
+  const t3 = ((cn[1] - cn[0]) % 12 + 12) % 12;
+  const t5 = ((cn[2] - cn[0]) % 12 + 12) % 12;
+  if (cn.length === 3) {
+    if (t3===3&&t5===7) return r+'m';
+    if (t3===4&&t5===7) return r;
+    if (t3===3&&t5===6) return r+'dim';
+    if (t3===4&&t5===8) return r+'aug';
+    return r+'?';
+  }
+  const t7 = ((cn[3] - cn[0]) % 12 + 12) % 12;
+  if (t3===3&&t5===7&&t7===10) return r+'m7';
+  if (t3===4&&t5===7&&t7===11) return r+'maj7';
+  if (t3===4&&t5===7&&t7===10) return r+'7';
+  if (t3===3&&t5===6&&t7===10) return r+'m7b5';
+  if (t3===3&&t5===6&&t7===9)  return r+'dim7';
+  if (t3===4&&t5===8&&t7===10) return r+'aug7';
+  if (t3===3&&t5===7&&t7===11) return r+'mM7';
+  if (t3===4&&t5===8&&t7===11) return r+'maj7#5';
+  return r+'?';
+}
+
+function _findVoicing(chordNotes, invIdx) {
+  const bassNote = chordNotes[invIdx];
+  let best = null, bestScore = -Infinity;
+
+  for (let w = 0; w <= 9; w++) {
+    const wEnd = w + 3;
+    for (let bassSt = 0; bassSt <= Math.min(3, 5 - chordNotes.length + 1); bassSt++) {
+      for (let bf = 0; bf <= 12; bf++) {
+        if ((_CHD_OPEN[bassSt] + bf) % 12 !== bassNote) continue;
+        if (bf > 0 && (bf < w || bf > wEnd)) continue;
+
+        const headings = Array(6).fill('x');
+        const aDots = [];
+        const covered = new Set();
+
+        if (bf === 0) headings[bassSt] = 'o';
+        else { aDots.push({s: bassSt, f: bf}); headings[bassSt] = ''; }
+        covered.add(bassNote);
+
+        for (let st = bassSt + 1; st < 6; st++) {
+          let bF = null, bN = null, bPri = -1;
+          for (let f = 0; f <= wEnd; f++) {
+            if (f > 0 && f < w) continue;
+            const n = (_CHD_OPEN[st] + f) % 12;
+            if (!chordNotes.includes(n)) continue;
+            const pri = covered.has(n) ? 0 : 1;
+            if (pri > bPri || (pri === bPri && f < (bF ?? 999))) { bPri = pri; bF = f; bN = n; }
+          }
+          if (bF !== null) {
+            covered.add(bN);
+            if (bF === 0) headings[st] = 'o';
+            else { aDots.push({s: st, f: bF}); headings[st] = ''; }
+          }
+        }
+
+        if (!chordNotes.every(n => covered.has(n))) continue;
+        const fPos = aDots.map(d => d.f);
+        const minF = fPos.length ? Math.min(...fPos) : 1;
+        const maxF = fPos.length ? Math.max(...fPos) : 1;
+        if (maxF - minF > 4) continue;
+
+        const played = aDots.length + headings.filter(h => h === 'o').length;
+        const score  = played * 20 - minF * 15 - bassSt * 2;
+        if (score > bestScore) {
+          bestScore = score;
+          const sf = Math.max(1, minF);
+          best = {
+            dots: aDots.map(d => ({s: d.s, f: d.f - sf + 1})),
+            headings: [...headings], startFret: sf, numFrets: 5,
+            bassSt, bassAbsF: bf,
+          };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function _harmonizeScale(b, rootIdx, scaleIv, use7ths) {
+  const n = scaleIv.length;
+  const charts = [];
+  for (let deg = 0; deg < n; deg++) {
+    const numNotes = use7ths ? 4 : 3;
+    const chordNotes = Array.from({length: numNotes}, (_, k) =>
+      (rootIdx + scaleIv[(deg + k * 2) % n]) % 12
+    );
+    const baseName = _chordLabel(chordNotes);
+    for (let inv = 0; inv < chordNotes.length; inv++) {
+      const v = _findVoicing(chordNotes, inv);
+      if (!v) continue;
+      const bassName = _HARM_NOTE[chordNotes[inv] % 12];
+      const label = inv === 0 ? baseName : `${baseName}/${bassName}`;
+      let rootDot = null;
+      if (v.bassAbsF > 0) rootDot = {s: v.bassSt, f: v.bassAbsF - v.startFret + 1};
+      charts.push(mkChordChart({
+        label, startFret: v.startFret, numFrets: v.numFrets,
+        dots: v.dots, headings: v.headings, rootDot,
+      }));
+    }
+  }
+  b.chordCharts = charts;
+  pushHistory();
+  refreshChordChartsPanel(b.id);
+}
+
 function clearBoard(boardId) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
@@ -3384,10 +3510,47 @@ function _buildScaleRow(b) {
   });
   row.appendChild(fillBtn);
 
-  // Show/hide Fill Modes based on selected scale group
+  // Harmonize button + dropdown
+  const harmBtn  = document.createElement('button');
+  harmBtn.className = 'btn btn-outline btn-sm scale-harm-btn';
+  harmBtn.textContent = '↓ Harmonize';
+  harmBtn.title = 'Generate diatonic chord voicings for this scale';
+
+  const harmMenu = document.createElement('div');
+  harmMenu.className = 'scale-harm-menu';
+  harmMenu.style.display = 'none';
+
+  const _mkHOpt = (lbl, use7) => {
+    const o = document.createElement('button');
+    o.className = 'scale-harm-opt';
+    o.textContent = lbl;
+    o.addEventListener('click', e => {
+      e.stopPropagation();
+      harmMenu.style.display = 'none';
+      const sc = SCALE_DB.find(s => s.n === scaleSel.value);
+      if (!sc) return;
+      _harmonizeScale(b, +rootSel.value, sc.iv, use7);
+    });
+    harmMenu.appendChild(o);
+  };
+  _mkHOpt('Triads (3 notes)', false);
+  _mkHOpt('7th chords (4 notes)', true);
+  harmBtn.appendChild(harmMenu);
+
+  harmBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const sc = SCALE_DB.find(s => s.n === scaleSel.value);
+    if (!sc) return;
+    harmMenu.style.display = harmMenu.style.display === 'none' ? '' : 'none';
+  });
+  document.addEventListener('click', () => { harmMenu.style.display = 'none'; });
+  row.appendChild(harmBtn);
+
+  // Show/hide Fill Modes and Harmonize based on selected scale
   scaleSel.addEventListener('change', () => {
     const sc = SCALE_DB.find(s => s.n === scaleSel.value);
     fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
+    harmBtn.style.display = sc ? 'inline-flex' : 'none';
   });
 
   return row;
