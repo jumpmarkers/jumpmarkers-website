@@ -2088,9 +2088,10 @@ function _applyScale(b, rootIdx, intervals) {
   if (b.activeSlot === 0) {
     b.selectedNotes = notes;
     b.tonic = rootIdx;
+    b.visibleNotes = new Set(notes);
   } else {
     const s = b.extraSlots[b.activeSlot - 1];
-    if (s) { s.notes = notes; s.tonic = rootIdx; }
+    if (s) { s.notes = notes; s.tonic = rootIdx; s.visibleNotes = new Set(notes); }
   }
   pushHistory();
   refreshBoard(b.id);
@@ -2111,9 +2112,11 @@ function _fillModes(b, rootIdx, parentIntervals) {
     if (i === 0) {
       b.selectedNotes = new Set(parentNotes);
       b.tonic = modeRoot;
+      b.visibleNotes = new Set(parentNotes);
     } else {
       b.extraSlots[i - 1].notes = new Set(parentNotes);
       b.extraSlots[i - 1].tonic = modeRoot;
+      b.extraSlots[i - 1].visibleNotes = new Set(parentNotes);
     }
   });
   b.activeSlot = 0;
@@ -2883,6 +2886,11 @@ function _attachChordSvgClick(b, cc, svgEl) {
       if (cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === fi) cc.rootDot = null;
       cc.dots.splice(idx, 1);
     } else {
+      const sameStr = cc.dots.findIndex(d => d.s === si);
+      if (sameStr >= 0) {
+        if (cc.rootDot && cc.rootDot.s === si) cc.rootDot = null;
+        cc.dots.splice(sameStr, 1);
+      }
       cc.dots.push({s: si, f: fi});
     }
     pushHistory(); refreshOneChordSVG(b, cc);
@@ -3728,6 +3736,7 @@ function buildCard(b) {
     palette.appendChild(slotNav);
   }
 
+  card.appendChild(_buildScaleRow(b));
   card.appendChild(palette);
 
   if (totalSlots > 1) {
@@ -3750,8 +3759,6 @@ function buildCard(b) {
     pageBadgeRow.appendChild(slotNameInp);
     card.appendChild(pageBadgeRow);
   }
-
-  card.appendChild(_buildScaleRow(b));
 
   // ── Visibility row ────────────────────────────────────────────────────────
   const visRow = document.createElement('div');
@@ -4321,9 +4328,10 @@ document.addEventListener('keydown', e => {
   _crossfadeBoard(b.id);
 });
 
-let _lastMetroTs     = 0;
-let _lastMetroBeatTs = 0;
-let _beatModeActive  = false;
+let _lastMetroTs        = 0;
+let _lastMetroBeatTs    = 0;
+let _beatModeActive     = false;
+let _metroBeatsPerMeasure = 4;
 
 // ─── Progress ring helpers ────────────────────────────────────────────────────
 const _ringResizeObs = typeof ResizeObserver !== 'undefined'
@@ -4460,8 +4468,8 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
       }
     }
 
-    // Page change fires at beat 1 of next measure — correct sync for both metro and looper
-    setTimeout(() => {
+    // Page change (measure-only mode — when metro-beat events are not available)
+    if (!_beatModeActive) setTimeout(() => {
       if (count % sm === 0) {
         const pattern = _parsePattern(b);
         if (pattern) {
@@ -4478,8 +4486,31 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 
 function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
   _beatModeActive = true;
-  // Ring animation is a single long CSS transition driven by _onMetroMeasure;
-  // no per-beat ring updates needed here.
+  _metroBeatsPerMeasure = beatsPerMeasure || 4;
+  const delayMs = msUntilBeat > 0 ? msUntilBeat : 60000 / (bpm || 120);
+
+  boards.forEach(b => {
+    const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
+    if (totalSlots <= 1 || !b.slotMeasures || b.autoAdvance === false) return;
+
+    // Convert bar value to beat count: 0.25 bars × 4 beats/bar = 1 beat
+    const targetBeats = Math.max(1, Math.round(b.slotMeasures * _metroBeatsPerMeasure));
+    _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
+    const count = _slotBeatCounts[b.id];
+
+    setTimeout(() => {
+      if (count % targetBeats === 0) {
+        const pattern = _parsePattern(b);
+        if (pattern) {
+          b.patternPos = (b.patternPos + 1) % pattern.length;
+          b.activeSlot = pattern[b.patternPos];
+        } else {
+          b.activeSlot = (b.activeSlot + 1) % totalSlots;
+        }
+        _crossfadeBoard(b.id);
+      }
+    }, delayMs);
+  });
 }
 
 function _handleMetroMsg(data) {
