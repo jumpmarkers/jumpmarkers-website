@@ -750,6 +750,13 @@ let muted       = false;
 let isPlaying   = false;
 let vizMode     = 'circle';
 const _metroBc  = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('guitar-tools') : null;
+// When embedded as iframe, postMessage reaches the parent directly; when standalone,
+// BroadcastChannel reaches other same-origin tabs. Never use both — the fretboard
+// listens on both channels and would otherwise count every beat twice.
+function _send(msg) {
+  if (window.parent !== window) window.parent.postMessage(msg, '*');
+  else if (_metroBc)            _metroBc.postMessage(msg);
+}
 
 // Beat pattern: 'accent' | 'normal' | 'rest' for each beat position
 let beatPattern   = ['accent','normal','normal','normal']; // matches 4/4 default
@@ -833,8 +840,7 @@ function startMetronome(){
   if(ctx.state==='suspended') ctx.resume();
   currentNote  = 0;
   nextNoteTime = ctx.currentTime + 0.05;
-  if (_metroBc) _metroBc.postMessage({ type: 'metro-start' });
-  if (window.parent !== window) window.parent.postMessage({ type: 'metro-start' }, '*');
+  _send({ type: 'metro-start' });
   schedLoop();
 }
 
@@ -862,17 +868,14 @@ function schedLoop(){
           if (!isPlaying) return;
           const msUntilBeat = Math.max(0, (_beatFireAt - ctx.currentTime) * 1000);
           // Send metro-beat first so _beatModeActive is set before metro-measure is processed
-          if (_metroBc) _metroBc.postMessage({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat });
-          if (window.parent !== window) window.parent.postMessage({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat }, '*');
-          if (_metroBc) _metroBc.postMessage({ type: 'metro-measure', bpm, msUntilBeat1: msUntilBeat + _measureMs });
-          if (window.parent !== window) window.parent.postMessage({ type: 'metro-measure', bpm, msUntilBeat1: msUntilBeat + _measureMs }, '*');
+          _send({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat });
+          _send({ type: 'metro-measure', bpm, msUntilBeat1: msUntilBeat + _measureMs });
         }, 0);
       } else {
         setTimeout(() => {
           if (!isPlaying) return;
           const msUntilBeat = Math.max(0, (_beatFireAt - ctx.currentTime) * 1000);
-          if (_metroBc) _metroBc.postMessage({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat });
-          if (window.parent !== window) window.parent.postMessage({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat }, '*');
+          _send({ type: 'metro-beat', bpm, beatsPerMeasure: beats, msUntilBeat });
         }, 0);
       }
     }
