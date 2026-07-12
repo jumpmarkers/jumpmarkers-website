@@ -2025,6 +2025,8 @@ document.addEventListener('dragstart', e => {
   }
   _chordDragActive = true;
   _chordDragData   = { noteIndices: noteIdxs, tonic };
+  // Store in dataTransfer so drop targets can check types without global state
+  try { e.dataTransfer.setData('application/x-chord-notes', JSON.stringify({ noteIndices: noteIdxs, tonic })); } catch (_) {}
 }, true); // capture phase — fires before element handlers
 
 // Capture-phase dragend: always clean up chord drag state
@@ -2912,7 +2914,9 @@ function buildFbOuter(b) {
 
   // ── Chord chart → fretboard drop ─────────────────────────────────────────
   outer.addEventListener('dragover', e => {
-    if (!_chordDragData || _fbSelDragActive) return;
+    if (_fbSelDragActive) return;
+    const isChordDrag = _chordDragData != null || e.dataTransfer.types.includes('application/x-chord-notes');
+    if (!isChordDrag) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     outer.classList.add('fb-chord-drop-target');
@@ -2922,11 +2926,19 @@ function buildFbOuter(b) {
   });
   outer.addEventListener('drop', e => {
     outer.classList.remove('fb-chord-drop-target');
-    if (!_chordDragActive || _fbSelDragActive || !_chordDragData) return;
+    if (_fbSelDragActive) return;
+    // Read note data from dataTransfer (reliable) with global fallback
+    let noteIndices, tonic;
+    const raw = e.dataTransfer.getData('application/x-chord-notes');
+    if (raw) {
+      try { ({ noteIndices, tonic } = JSON.parse(raw)); } catch (_) {}
+    }
+    if (!noteIndices?.length && _chordDragData) {
+      ({ noteIndices, tonic } = _chordDragData);
+    }
+    if (!noteIndices?.length) return;
     e.preventDefault();
     e.stopPropagation();
-    const { noteIndices, tonic } = _chordDragData;
-    if (!noteIndices?.length) return;
     if (b.activeSlot === 0) {
       b.selectedNotes = new Set(noteIndices);
       b.visibleNotes  = new Set(noteIndices);
@@ -2995,24 +3007,28 @@ function chordSVG(cc) {
   }
   for (let f = 1; f <= cc.numFrets; f++)
     o += `<text class="cs-fretnum" x="${LP-5}" y="${fy(f-1)+FG/2+3}" text-anchor="end">${cc.startFret + f - 1}</text>`;
+  const _openDotStr = new Set(cc.dots.filter(d => d.f === 0).map(d => d.s));
   for (let i = 0; i < NS; i++) {
+    if (_openDotStr.has(i)) continue; // colored open-dot will render instead
     const h = cc.headings[i];
-    const lbl = h === 'x' ? '✕' : h === 'o' ? '○' : '·';
+    const lbl = h === 'x' ? '✕' : '·';
     const col = h ? 'var(--text)' : 'var(--muted)';
     o += `<text class="cs-head" x="${sx(i)}" y="${TP-8}" text-anchor="middle" fill="${col}" opacity="${h?1:.4}">${lbl}</text>`;
   }
-  const rootPitch = cc.rootDot
-    ? STD_PITCH[cc.rootDot.s] + (cc.startFret + cc.rootDot.f - 1)
-    : null;
+  const _dotPitch = (si, f) => f === 0 ? STD_PITCH[si] : STD_PITCH[si] + (cc.startFret + f - 1);
+  const rootPitch = cc.rootDot ? _dotPitch(cc.rootDot.s, cc.rootDot.f) : null;
   cc.dots.forEach(({s: si, f}) => {
     let fill = 'var(--accent2)';
-    if (rootPitch !== null) {
-      const dp = STD_PITCH[si] + (cc.startFret + f - 1);
-      fill = DEGREE_COL[DEG_MAP[(dp - rootPitch + 120) % 12]];
-    }
+    if (rootPitch !== null) fill = DEGREE_COL[DEG_MAP[(_dotPitch(si, f) - rootPitch + 120) % 12]];
     const isRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === f;
     const fillAttr = rootPitch !== null ? ` style="fill:${fill}"` : '';
-    o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}"${fillAttr}${isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : ''}/>`
+    const rootStroke = isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : '';
+    if (f === 0) {
+      const r = Math.round(SG * 0.28);
+      o += `<circle class="cs-dot" cx="${sx(si)}" cy="${TP-8}" r="${r}"${fillAttr}${rootStroke}/>`;
+    } else {
+      o += `<circle class="cs-dot" cx="${sx(si)}" cy="${fy(f-1)+FG/2}" r="${Math.round(SG*.34)}"${fillAttr}${rootStroke}/>`;
+    }
   });
   return o + '</svg>';
 }
@@ -3026,11 +3042,31 @@ function _attachChordSvgClick(b, cc, svgEl) {
     const py = (e.clientY - rect.top)  * (svgEl.viewBox.baseVal.height / rect.height);
     if (py < TP) {
       const si = Math.round((px - LP) / SG);
-      if (si >= 0 && si < NS) {
-        const cur = cc.headings[si];
-        cc.headings[si] = cur === '' ? 'x' : cur === 'x' ? 'o' : '';
+      if (si < 0 || si >= NS) return;
+      const openIdx = cc.dots.findIndex(d => d.s === si && d.f === 0);
+      if (e.ctrlKey || e.metaKey) {
+        if (openIdx < 0) return;
+        const alreadyRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === 0;
+        cc.rootDot = alreadyRoot ? null : { s: si, f: 0 };
         pushHistory(); refreshOneChordSVG(b, cc);
+        return;
       }
+      if (openIdx >= 0) {
+        if (cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === 0) cc.rootDot = null;
+        cc.dots.splice(openIdx, 1);
+        cc.headings[si] = '';
+      } else {
+        const cur = cc.headings[si];
+        if (cur !== 'x') {
+          cc.headings[si] = 'x';
+        } else {
+          cc.headings[si] = '';
+          const frettedIdx = cc.dots.findIndex(d => d.s === si);
+          if (frettedIdx >= 0) { if (cc.rootDot?.s === si) cc.rootDot = null; cc.dots.splice(frettedIdx, 1); }
+          cc.dots.push({ s: si, f: 0 });
+        }
+      }
+      pushHistory(); refreshOneChordSVG(b, cc);
       return;
     }
     const si = Math.round((px - LP) / SG);
@@ -3261,7 +3297,7 @@ function buildChordChartsPanel(b) {
       _chordDragActive = true;
       _ccDragId = cc.id;
       e.dataTransfer.setData('text/plain', String(cc.id));
-      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.effectAllowed = 'copyMove'; // 'move' for reorder, 'copy' for fretboard drop
       e.stopPropagation();
     });
     wrap.addEventListener('dragend', () => {
@@ -3656,21 +3692,21 @@ function buildCard(b) {
   }
   // dragenter fires instantly on entry — show line immediately
   card.addEventListener('dragenter', e => {
-    if (_chordDragActive) return;
+    if (_chordDragActive || e.dataTransfer.types.includes('application/x-chord-notes')) return;
     e.preventDefault();
     clearDropClasses();
     card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
   });
   // dragover keeps it updated as mouse moves within the card
   card.addEventListener('dragover', e => {
-    if (_chordDragActive) return;
+    if (_chordDragActive || e.dataTransfer.types.includes('application/x-chord-notes')) return;
     e.preventDefault();
     clearDropClasses();
     card.classList.add(getDropPosition(e) === 'above' ? 'drop-above' : 'drop-below');
   });
   card.addEventListener('dragleave', clearDropClasses);
   card.addEventListener('drop', e => {
-    if (_chordDragActive) return;
+    if (_chordDragActive || e.dataTransfer.types.includes('application/x-chord-notes')) return;
     e.preventDefault();
     const pos = getDropPosition(e);
     clearDropClasses();
