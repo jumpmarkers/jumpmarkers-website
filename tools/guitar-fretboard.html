@@ -3340,13 +3340,16 @@ function buildChordChartsPanel(b) {
         });
         if (!validCells.length) return;
         const fretsOnly = validCells.map(k => +k.split('-')[1]).filter(f => f > 0);
-        const minFret = fretsOnly.length ? Math.min(...fretsOnly) : 1;
-        const maxFret = fretsOnly.length ? Math.max(...fretsOnly) : 1;
-        cc.startFret = minFret;
-        cc.numFrets  = Math.max(5, maxFret - minFret + 1);
+        const minFret  = fretsOnly.length ? Math.min(...fretsOnly) : 1;
+        const maxFret  = fretsOnly.length ? Math.max(...fretsOnly) : 1;
+        const fretSpan = fretsOnly.length ? maxFret - minFret + 1 : 0;
+        const numFrets = Math.max(5, fretSpan + 2);
+        const topPad   = Math.min(Math.max(1, Math.round((numFrets - fretSpan) / 2)), Math.max(0, minFret - 1));
+        cc.startFret = Math.max(1, minFret - topPad);
+        cc.numFrets  = numFrets;
         cc.dots = validCells.map(key => {
           const [si, f] = key.split('-').map(Number);
-          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + 1 };
+          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
         });
         pushHistory();
         refreshChordChartsPanel(b.id);
@@ -3388,14 +3391,17 @@ function buildChordChartsPanel(b) {
     });
     if (!validCells.length) return;
     const fretsOnly = validCells.map(k => +k.split('-')[1]).filter(f => f > 0);
-    const minFret = fretsOnly.length ? Math.min(...fretsOnly) : 1;
-    const maxFret = fretsOnly.length ? Math.max(...fretsOnly) : 1;
+    const minFret  = fretsOnly.length ? Math.min(...fretsOnly) : 1;
+    const maxFret  = fretsOnly.length ? Math.max(...fretsOnly) : 1;
+    const fretSpan = fretsOnly.length ? maxFret - minFret + 1 : 0;
+    const numFrets = Math.max(5, fretSpan + 2);
+    const topPad   = Math.min(Math.max(1, Math.round((numFrets - fretSpan) / 2)), Math.max(0, minFret - 1));
     b.chordCharts.push(mkChordChart({
-      startFret: minFret,
-      numFrets: Math.max(5, maxFret - minFret + 1),
+      startFret: Math.max(1, minFret - topPad),
+      numFrets,
       dots: validCells.map(key => {
         const [si, f] = key.split('-').map(Number);
-        return { s: 5 - si, f: f === 0 ? 0 : f - minFret + 1 };
+        return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
       }),
     }));
     pushHistory();
