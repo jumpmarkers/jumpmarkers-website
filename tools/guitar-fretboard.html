@@ -601,6 +601,7 @@
 
     /* ── Fretboard ── */
     .fretboard-outer { padding: 14px 18px 2px; overflow-x: auto; position: relative; }
+    .fretboard-outer.fb-chord-drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: rgba(124,111,255,0.07); }
     /* Progress ring */
     .fb-ring-svg {
       position: absolute; inset: 0; width: 100%; height: 100%;
@@ -2875,6 +2876,44 @@ function buildFbOuter(b) {
   });
 
   outer.appendChild(fb);
+
+  // ── Chord chart → fretboard drop ─────────────────────────────────────────
+  outer.addEventListener('dragover', e => {
+    if (!_chordDragActive || _fbSelDragActive) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    outer.classList.add('fb-chord-drop-target');
+  });
+  outer.addEventListener('dragleave', e => {
+    if (!outer.contains(e.relatedTarget)) outer.classList.remove('fb-chord-drop-target');
+  });
+  outer.addEventListener('drop', e => {
+    outer.classList.remove('fb-chord-drop-target');
+    if (!_chordDragActive || _fbSelDragActive) return;
+    const raw = e.dataTransfer.getData('application/x-chord-notes');
+    if (!raw) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const { noteIndices, tonic } = JSON.parse(raw);
+    if (!noteIndices?.length) return;
+    if (b.activeSlot === 0) {
+      b.selectedNotes = new Set(noteIndices);
+      b.visibleNotes  = new Set(noteIndices);
+      b.tonic = tonic;
+      b.hiddenCells.clear();
+    } else {
+      const sl = b.extraSlots[b.activeSlot - 1];
+      if (sl) {
+        sl.notes = new Set(noteIndices);
+        sl.visibleNotes = new Set(noteIndices);
+        sl.tonic = tonic;
+        sl.hiddenCells = new Set();
+      }
+    }
+    pushHistory();
+    refreshBoard(b.id);
+  });
+
   return outer;
 }
 
@@ -3192,6 +3231,20 @@ function buildChordChartsPanel(b) {
       _chordDragActive = true;
       _ccDragId = cc.id;
       e.dataTransfer.setData('text/plain', String(cc.id));
+      const _noteIdxs = [...new Set(cc.dots.map(dot => {
+        const si = 5 - dot.s;
+        const af = dot.f === 0 ? 0 : (dot.f - 1) + cc.startFret;
+        return (OPEN[si] + af) % 12;
+      }))];
+      let _tonic = null;
+      if (cc.rootDot) {
+        const si = 5 - cc.rootDot.s;
+        const af = cc.rootDot.f === 0 ? 0 : (cc.rootDot.f - 1) + cc.startFret;
+        _tonic = (OPEN[si] + af) % 12;
+      } else if (_noteIdxs.length) {
+        _tonic = _noteIdxs[0];
+      }
+      e.dataTransfer.setData('application/x-chord-notes', JSON.stringify({ noteIndices: _noteIdxs, tonic: _tonic }));
       e.dataTransfer.effectAllowed = 'move';
       e.stopPropagation();
     });
