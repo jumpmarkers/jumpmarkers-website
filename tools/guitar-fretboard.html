@@ -1679,6 +1679,7 @@ const _slotBeatCounts      = {};
 const _slotFirstTriggered  = {}; // boardId → true after first page advance fires
 const _ringState         = {}; // boardId → { svg, rect }
 const _ringCycleDurMs    = {}; // boardId → full-cycle animation duration in ms
+const _ringCycleStartTs  = {}; // boardId → performance.now() when current ring cycle began
 let   _metroActive       = false;
 let   _lastActiveBoardId = null;
 
@@ -2774,16 +2775,25 @@ function _ringAfterRefresh(boardId) {
   if (!b) return;
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots <= 1 || !b.slotMeasures) return;
-  _attachRing(boardId); // new ring starts at dashoffset:1 (empty)
-  const cycleDurMs = _ringCycleDurMs[boardId] || 0;
+  _attachRing(boardId); // new ring element starts at dashoffset:1 (empty)
+  const cycleDurMs   = _ringCycleDurMs[boardId] || 0;
+  const cycleStartTs = _ringCycleStartTs[boardId] || 0;
   if (cycleDurMs > 0) {
     const s = _ringState[boardId];
     if (s) {
       const r = s.rect;
+      // Resume from wherever the ring currently is so an early page change doesn't
+      // reset the fill — the ring continues to 100% at the measure boundary.
+      const elapsed   = performance.now() - cycleStartTs;
+      const remaining = Math.max(0, cycleDurMs - elapsed);
+      const startOff  = remaining > 0 ? remaining / cycleDurMs : 0; // 1=empty, 0=full
       r.style.transition = 'none';
+      r.style.strokeDashoffset = String(startOff);
       void r.getBoundingClientRect();
-      r.style.transition = `stroke-dashoffset ${cycleDurMs}ms linear`;
-      r.style.strokeDashoffset = '0'; // fill 0%→100% over one full cycle
+      if (remaining > 0) {
+        r.style.transition = `stroke-dashoffset ${remaining}ms linear`;
+        r.style.strokeDashoffset = '0';
+      }
     }
   }
 }
@@ -3700,6 +3710,8 @@ function _buildScaleRow(b) {
   applyBtn.addEventListener('click', () => {
     const sc = SCALE_DB.find(s => s.n === scaleSel.value);
     if (!sc) return;
+    b.slotLabels = b.slotLabels || [];
+    b.slotLabels[b.activeSlot] = `${NOTES[+rootSel.value]} ${sc.n}`;
     _applyScale(b, +rootSel.value, sc.iv);
   });
   row.appendChild(applyBtn);
@@ -4224,15 +4236,22 @@ function buildCard(b) {
         if (b.autoAdvance) {
           if (totalSlots > 1 && b.slotMeasures > 0) {
             _attachRing(b.id);
-            const cycleDurMs = _ringCycleDurMs[b.id] || 0;
+            const cycleDurMs   = _ringCycleDurMs[b.id] || 0;
+            const cycleStartTs = _ringCycleStartTs[b.id] || 0;
             if (cycleDurMs > 0) {
               const s = _ringState[b.id];
               if (s) {
                 const r = s.rect;
+                const elapsed   = performance.now() - cycleStartTs;
+                const remaining = Math.max(0, cycleDurMs - elapsed);
+                const startOff  = remaining > 0 ? remaining / cycleDurMs : 0;
                 r.style.transition = 'none';
+                r.style.strokeDashoffset = String(startOff);
                 void r.getBoundingClientRect();
-                r.style.transition = `stroke-dashoffset ${cycleDurMs}ms linear`;
-                r.style.strokeDashoffset = '0';
+                if (remaining > 0) {
+                  r.style.transition = `stroke-dashoffset ${remaining}ms linear`;
+                  r.style.strokeDashoffset = '0';
+                }
               }
             }
           }
@@ -4795,6 +4814,7 @@ function _onMetroStart() {
     _slotMeasureCounts[b.id]  = 0;
     _slotBeatCounts[b.id]     = 0;
     _ringCycleDurMs[b.id]     = 0;
+    _ringCycleStartTs[b.id]   = 0;
     delete _slotFirstTriggered[b.id];
     const pattern = _parsePattern(b);
     if (pattern) {
@@ -4826,15 +4846,15 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
     const count      = _slotMeasureCounts[b.id];
     const posInCycle = (count - 1) % cycleLen;
 
-    // At the start of each cycle, kick off a single long CSS transition that fills
-    // the ring from 0% to 100% over the entire cycle duration. This avoids all the
-    // per-beat race conditions. Only starts if the ring hasn't already been animated
-    // by _ringAfterRefresh (which also fires at the same moment after a page change).
+    // At the start of each cycle, reset and kick off the ring animation from 0 → 100%
+    // over the full cycle duration. This is the authoritative ring restart; it always
+    // fires so the ring aligns with the measure boundary even after an early page change.
     if (posInCycle === 0) {
       const cycleDurMs = cycleLen * delayMs;
-      _ringCycleDurMs[b.id] = cycleDurMs;
+      _ringCycleDurMs[b.id]    = cycleDurMs;
+      _ringCycleStartTs[b.id]  = performance.now();
       const s = _ringState[b.id];
-      if (s && s.rect.style.strokeDashoffset !== '0') {
+      if (s) {
         const r = s.rect;
         r.style.transition = 'none';
         void r.getBoundingClientRect();
