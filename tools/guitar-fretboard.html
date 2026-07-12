@@ -2052,6 +2052,19 @@ function shiftNotes(boardId, delta) {
       if (s.visibleNotes) s.visibleNotes = new Set([...s.visibleNotes].map(n => (n + delta + 12) % 12));
     }
   }
+  // Shift physical cell positions: each semitone = 1 fret on the same string
+  const shiftCells = set => {
+    const out = new Set();
+    set.forEach(key => {
+      const [si, f] = key.split('-').map(Number);
+      const nf = f + delta;
+      if (nf >= 0 && nf <= b.totalFrets) out.add(`${si}-${nf}`);
+    });
+    return out;
+  };
+  if (b.pinnedCells.size)           b.pinnedCells = shiftCells(b.pinnedCells);
+  const _asd = getActiveSlotData(b);
+  if (_asd.hiddenCells?.size)       _asd.hiddenCells = shiftCells(_asd.hiddenCells);
   pushHistory();
   refreshBoard(boardId);
 }
@@ -3347,10 +3360,22 @@ function buildChordChartsPanel(b) {
         const topPad   = Math.min(Math.max(1, Math.round((numFrets - fretSpan) / 2)), Math.max(0, minFret - 1));
         cc.startFret = Math.max(1, minFret - topPad);
         cc.numFrets  = numFrets;
+        cc.headings  = ['', '', '', '', '', ''];
         cc.dots = validCells.map(key => {
           const [si, f] = key.split('-').map(Number);
           return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
         });
+        // Set rootDot from tonic so degree colors match the fretboard
+        cc.rootDot = (() => {
+          const t = sd.tonic;
+          if (t === null || t === undefined) return null;
+          for (const key of validCells) {
+            const [si, f] = key.split('-').map(Number);
+            if ((OPEN[si] + f) % 12 === t)
+              return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
+          }
+          return null;
+        })();
         pushHistory();
         refreshChordChartsPanel(b.id);
         return;
@@ -3396,6 +3421,16 @@ function buildChordChartsPanel(b) {
     const fretSpan = fretsOnly.length ? maxFret - minFret + 1 : 0;
     const numFrets = Math.max(5, fretSpan + 2);
     const topPad   = Math.min(Math.max(1, Math.round((numFrets - fretSpan) / 2)), Math.max(0, minFret - 1));
+    const _tonic = sd.tonic;
+    const _rootDot = (() => {
+      if (_tonic === null || _tonic === undefined) return null;
+      for (const key of validCells) {
+        const [si, f] = key.split('-').map(Number);
+        if ((OPEN[si] + f) % 12 === _tonic)
+          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
+      }
+      return null;
+    })();
     b.chordCharts.push(mkChordChart({
       startFret: Math.max(1, minFret - topPad),
       numFrets,
@@ -3403,6 +3438,7 @@ function buildChordChartsPanel(b) {
         const [si, f] = key.split('-').map(Number);
         return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
       }),
+      rootDot: _rootDot,
     }));
     pushHistory();
     refreshChordChartsPanel(b.id);
