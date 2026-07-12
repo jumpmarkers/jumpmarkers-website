@@ -1579,6 +1579,18 @@ document.getElementById('msg-send').addEventListener('click', async () => {
   } catch { btn.textContent = 'Error — try again'; btn.disabled = false; }
 });
 
+// ─── Receive toggle command from parent fretboard page ────────────────────────
+function _metroToggle() {
+  if (isPlaying) { stopMetronome(); setPlaying(false); }
+  else           { startMetronome(); setPlaying(true); }
+}
+window.addEventListener('message', e => {
+  if (e.data?.type === 'metro-play-toggle') _metroToggle();
+});
+if (_metroBc) _metroBc.addEventListener('message', e => {
+  if (e.data?.type === 'metro-play-toggle') _metroToggle();
+});
+
 // ─── Scroll hints ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
   const hints = document.querySelectorAll('.scroll-hint');
