@@ -858,7 +858,8 @@
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       nav, .page-header, .toolbar, .note-palette,
       .board-header, .range-wrap, .add-board-wrap, .fret-sticker, footer,
-      .vis-row, .support-banner, .msg-card { display: none !important; }
+      .vis-row, .support-banner, .msg-card,
+      .scroll-hint { display: none !important; }
 
       body, html {
         background: #fff !important; color: #000 !important; margin: 0; padding: 0;
@@ -1746,7 +1747,7 @@ function mkBoard(opts = {}) {
     })),
     activeSlot:    opts.activeSlot  || 0,
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
-    slotEarlyMs:       opts.slotEarlyMs       !== undefined ? opts.slotEarlyMs       : 0,
+    slotEarlyBeats:    opts.slotEarlyBeats     !== undefined ? opts.slotEarlyBeats     : 0,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
     autoAdvance:       opts.autoAdvance !== false,
@@ -1783,7 +1784,7 @@ function _serializeBoards() {
       })),
       activeSlot:    b.activeSlot,
       slotMeasures:      b.slotMeasures,
-      slotEarlyMs:       b.slotEarlyMs,
+      slotEarlyBeats:    b.slotEarlyBeats,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -2138,7 +2139,7 @@ function duplicateBoard(id) {
     selectedNotes:     [...src.selectedNotes],
     activeSlot:        src.activeSlot,
     slotMeasures:      src.slotMeasures,
-    slotEarlyMs:       src.slotEarlyMs,
+    slotEarlyBeats:    src.slotEarlyBeats,
     slotPattern:       src.slotPattern,
     crossfadeDuration: src.crossfadeDuration,
     autoAdvance:       src.autoAdvance,
@@ -2359,7 +2360,7 @@ function buildPresetData(name) {
       })),
       activeSlot:        b.activeSlot,
       slotMeasures:      b.slotMeasures,
-      slotEarlyMs:       b.slotEarlyMs,
+      slotEarlyBeats:    b.slotEarlyBeats,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -4276,10 +4277,12 @@ function buildCard(b) {
 
     const earlyGrp = document.createElement('div');
     earlyGrp.className = 'slot-sync';
-    earlyGrp.title = 'Show next page this many ms before the beat (first page is always on time)';
+    earlyGrp.title = 'Show next page N beats early (0.25 = 1 subbeat, 1 = 1 beat, 2 = 2 beats…). First page is always on time.';
     const earlyLbl = document.createElement('span');
     earlyLbl.textContent = 'early';
-    const earlyKnob = buildKnob(b.slotEarlyMs, 0, 1000, 10, v => { b.slotEarlyMs = v; });
+    const earlyKnob = buildKnob(b.slotEarlyBeats, 0, 4, 0.25,
+      v => { b.slotEarlyBeats = v; },
+      v => v === 0 ? '0' : (v % 1 === 0 ? String(v) : v.toFixed(2).replace(/0+$/, '')));
     earlyGrp.appendChild(earlyLbl);
     earlyGrp.appendChild(earlyKnob.el);
 
@@ -4865,7 +4868,8 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 
     // Page change (measure-only mode — when metro-beat events are not available)
     if (!_beatModeActive) {
-      const earlyMs    = _slotFirstTriggered[b.id] ? (b.slotEarlyMs    || 0) : 0;
+      const _beatMs    = 60000 / (bpm || 120);
+      const earlyMs    = _slotFirstTriggered[b.id] ? (b.slotEarlyBeats || 0) * _beatMs : 0;
       const fadeHalfMs = _slotFirstTriggered[b.id] ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
       const fireMs     = Math.max(0, delayMs - earlyMs - fadeHalfMs);
       setTimeout(() => {
@@ -4904,7 +4908,7 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     // at the early point rather than starting there. First advance always fires on time.
     const beatDurationMs = 60000 / (bpm || 120);
     const isFired     = !!_slotFirstTriggered[b.id];
-    const earlyMs     = isFired ? (b.slotEarlyMs    || 0) : 0;
+    const earlyMs     = isFired ? (b.slotEarlyBeats || 0) * beatDurationMs : 0;
     const fadeHalfMs  = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
     const delayMs     = Math.max(0, baseMs + beatDurationMs - earlyMs - fadeHalfMs);
 
