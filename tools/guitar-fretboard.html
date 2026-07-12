@@ -1083,6 +1083,30 @@
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(9px); }
   }
+  /* ── Custom alert dialog ────────────────────────────────────────────────── */
+  .gfv-dialog-backdrop {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.55); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gfv-dialog {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 28px 32px 20px;
+    min-width: 260px; max-width: 420px; width: max-content;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    display: flex; flex-direction: column; gap: 16px; align-items: center;
+    text-align: center; white-space: pre-line;
+    font-size: .93rem; color: var(--text);
+    animation: gfv-dlg-in .15s ease;
+  }
+  @keyframes gfv-dlg-in { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .gfv-dialog-msg { line-height: 1.5; }
+  .gfv-dialog-ok {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 6px; padding: 7px 28px; font-size: .9rem;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .gfv-dialog-ok:hover { opacity: .85; }
   </style>
   <script>
     /* Apply saved theme before first paint — prevents flash */
@@ -1620,6 +1644,31 @@ const PRESET_COLORS = [
   { label: 'Pink',    value: '#c0395a' },
   { label: 'White',   value: '#d0d0d0' },
 ];
+
+// ─── Custom alert (replaces browser native alert) ────────────────────────────
+function showAlert(msg) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'gfv-dialog-backdrop';
+  const dlg = document.createElement('div');
+  dlg.className = 'gfv-dialog';
+  const msgEl = document.createElement('div');
+  msgEl.className = 'gfv-dialog-msg';
+  msgEl.textContent = msg;
+  const ok = document.createElement('button');
+  ok.className = 'gfv-dialog-ok';
+  ok.textContent = 'OK';
+  const close = () => backdrop.remove();
+  ok.addEventListener('click', close);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', function esc(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+  });
+  dlg.appendChild(msgEl);
+  dlg.appendChild(ok);
+  backdrop.appendChild(dlg);
+  document.body.appendChild(backdrop);
+  ok.focus();
+}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let boards  = [];
@@ -2459,7 +2508,7 @@ function duplicatePreset(name) {
 function renamePreset(name) {
   const newName = prompt('New name:', name)?.trim();
   if (!newName || newName === name) return;
-  if (presets.find(x => x.name === newName)) { alert(`A preset named "${newName}" already exists.`); return; }
+  if (presets.find(x => x.name === newName)) { showAlert(`A preset named "${newName}" already exists.`); return; }
   const p = presets.find(x => x.name === name);
   if (!p) return;
   pushHistory();
@@ -4548,9 +4597,9 @@ document.getElementById('preset-file-input').addEventListener('change', e => {
       if (importedPresets.length) lines.push(`${importedPresets.length} preset(s) imported.`);
       if (importedSettings) lines.push('Settings (theme, note names) restored.');
       if (!lines.length) lines.push('File loaded — no changes applied.');
-      alert(lines.join('\n'));
+      showAlert(lines.join('\n'));
     } catch {
-      alert('Invalid file. Please select a valid fretboard config JSON file.');
+      showAlert('Invalid file. Please select a valid fretboard config JSON file.');
     }
     e.target.value = ''; // reset so same file can be re-imported
   };
@@ -5024,7 +5073,7 @@ async function _startMic() {
     _micPopulateDevices(); // refresh device list now that permission is granted
   } catch (err) {
     _micActive = false;
-    alert('Could not access microphone: ' + err.message);
+    showAlert('Could not access microphone: ' + err.message);
   }
 }
 
