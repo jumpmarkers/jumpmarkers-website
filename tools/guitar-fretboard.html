@@ -3225,8 +3225,7 @@ function buildChordChartsPanel(b) {
     ccDragHandle.className = 'chord-drag-handle';
     ccDragHandle.textContent = '⠿';
     ccDragHandle.title = 'Drag to reorder';
-    ccDragHandle.addEventListener('mousedown', () => { wrap.draggable = true; });
-    ccDragHandle.addEventListener('mouseup',   () => { wrap.draggable = false; });
+    wrap.draggable = true;
     wrap.addEventListener('dragstart', e => {
       _chordDragActive = true;
       _ccDragId = cc.id;
@@ -3250,7 +3249,6 @@ function buildChordChartsPanel(b) {
     });
     wrap.addEventListener('dragend', () => {
       _chordDragActive = false;
-      wrap.draggable = false;
       _ccDragId = null;
       row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
     });
