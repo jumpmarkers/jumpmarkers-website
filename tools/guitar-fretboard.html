@@ -1775,6 +1775,7 @@ function addBoard(opts) {
 let _dndOverlay = null;
 let _activeDragId    = null;
 let _chordDragActive = false;
+let _chordDragData   = null; // { noteIndices, tonic } — set during chord-chart drag
 let _noteClipboard   = null; // { selectedNotes, tonic, visibleNotes }
 let _ccClipboard     = null; // chord chart clipboard { label, startFret, numFrets, dots, headings, rootDot, borderColor }
 let _fbSelDragActive  = false;
@@ -1999,6 +2000,38 @@ document.addEventListener('mouseup', () => {
     else _attachFbSelDrag();
   }
 });
+
+// Capture-phase dragstart: detect chord-chart drags before any element handler runs
+document.addEventListener('dragstart', e => {
+  const wrap = e.target.closest?.('.chord-chart-wrap');
+  if (!wrap) return;
+  const bid   = +wrap.closest('.chord-charts-panel')?.dataset.bid;
+  const ccid  = +wrap.dataset.ccid;
+  const brd   = boards.find(x => x.id === bid);
+  const cc    = brd?.chordCharts.find(x => x.id === ccid);
+  if (!cc) return;
+  const noteIdxs = [...new Set(cc.dots.map(dot => {
+    const si = 5 - dot.s;
+    const af = dot.f === 0 ? 0 : (dot.f - 1) + cc.startFret;
+    return (OPEN[si] + af) % 12;
+  }))];
+  let tonic = null;
+  if (cc.rootDot) {
+    const si = 5 - cc.rootDot.s;
+    const af = cc.rootDot.f === 0 ? 0 : (cc.rootDot.f - 1) + cc.startFret;
+    tonic = (OPEN[si] + af) % 12;
+  } else if (noteIdxs.length) {
+    tonic = noteIdxs[0];
+  }
+  _chordDragActive = true;
+  _chordDragData   = { noteIndices: noteIdxs, tonic };
+}, true); // capture phase — fires before element handlers
+
+// Capture-phase dragend: always clean up chord drag state
+document.addEventListener('dragend', () => {
+  if (_chordDragData) { _chordDragActive = false; _chordDragData = null; }
+  document.querySelectorAll('.fb-chord-drop-target').forEach(el => el.classList.remove('fb-chord-drop-target'));
+}, true);
 
 function shiftNotes(boardId, delta) {
   const b = boards.find(b => b.id === boardId);
@@ -2879,7 +2912,7 @@ function buildFbOuter(b) {
 
   // ── Chord chart → fretboard drop ─────────────────────────────────────────
   outer.addEventListener('dragover', e => {
-    if (!_chordDragActive || _fbSelDragActive) return;
+    if (!_chordDragData || _fbSelDragActive) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     outer.classList.add('fb-chord-drop-target');
@@ -2889,12 +2922,10 @@ function buildFbOuter(b) {
   });
   outer.addEventListener('drop', e => {
     outer.classList.remove('fb-chord-drop-target');
-    if (!_chordDragActive || _fbSelDragActive) return;
-    const raw = e.dataTransfer.getData('application/x-chord-notes');
-    if (!raw) return;
+    if (!_chordDragActive || _fbSelDragActive || !_chordDragData) return;
     e.preventDefault();
     e.stopPropagation();
-    const { noteIndices, tonic } = JSON.parse(raw);
+    const { noteIndices, tonic } = _chordDragData;
     if (!noteIndices?.length) return;
     if (b.activeSlot === 0) {
       b.selectedNotes = new Set(noteIndices);
@@ -3230,25 +3261,12 @@ function buildChordChartsPanel(b) {
       _chordDragActive = true;
       _ccDragId = cc.id;
       e.dataTransfer.setData('text/plain', String(cc.id));
-      const _noteIdxs = [...new Set(cc.dots.map(dot => {
-        const si = 5 - dot.s;
-        const af = dot.f === 0 ? 0 : (dot.f - 1) + cc.startFret;
-        return (OPEN[si] + af) % 12;
-      }))];
-      let _tonic = null;
-      if (cc.rootDot) {
-        const si = 5 - cc.rootDot.s;
-        const af = cc.rootDot.f === 0 ? 0 : (cc.rootDot.f - 1) + cc.startFret;
-        _tonic = (OPEN[si] + af) % 12;
-      } else if (_noteIdxs.length) {
-        _tonic = _noteIdxs[0];
-      }
-      e.dataTransfer.setData('application/x-chord-notes', JSON.stringify({ noteIndices: _noteIdxs, tonic: _tonic }));
       e.dataTransfer.effectAllowed = 'move';
       e.stopPropagation();
     });
     wrap.addEventListener('dragend', () => {
       _chordDragActive = false;
+      _chordDragData   = null;
       _ccDragId = null;
       row.querySelectorAll('.chord-chart-wrap').forEach(w => w.classList.remove('chord-drop-before','chord-drop-after'));
     });
