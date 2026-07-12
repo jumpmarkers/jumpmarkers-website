@@ -378,6 +378,8 @@
     .chord-chart-wrap.chord-drop-before { box-shadow: -3px 0 0 0 var(--accent2); }
     .chord-chart-wrap.chord-drop-after  { box-shadow:  3px 0 0 0 var(--accent2); }
     .chord-chart-wrap.chord-drop-fb     { outline: 2px solid var(--accent); outline-offset: 2px; background: rgba(130,80,255,0.12); }
+    .chord-chart-wrap.chord-selected    { outline: 2px solid var(--accent2); outline-offset: 1px; background: rgba(70,160,230,0.1); }
+    .chord-chart-wrap.chord-selected .chord-chart-del { opacity: 1; }
     .chord-charts-panel.chord-panel-drop-fb { background: rgba(130,80,255,0.08); }
     .chord-charts-panel.chord-panel-drop-fb .chord-charts-row { outline: 2px dashed var(--accent2); outline-offset: -3px; border-radius: 4px; min-height: 80px; }
     .chord-color-menu {
@@ -1830,6 +1832,8 @@ let _chordDragData   = null; // { noteIndices, tonic } — set during chord-char
 let _noteClipboard   = null; // { selectedNotes, tonic, visibleNotes }
 let _ccClipboard     = null; // chord chart clipboard { label, startFret, numFrets, dots, headings, rootDot, borderColor }
 let _fbSelDragActive  = false;
+const _ccSelection   = {}; // boardId → Set of selected ccIds
+const _ccLastClick   = {}; // boardId → ccId of last ctrl/shift-click (for range select)
 let _selDragPending   = false; // true after mousedown on sel-active, until dragstart or mouseup
 
 function buildMiniThumb(b) {
@@ -3056,7 +3060,7 @@ function mkChordChart(opts = {}) {
     id, label: opts.label || '',
     startFret: opts.startFret || 1,
     numFrets:  opts.numFrets  || 5,
-    dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f})),
+    dots:      (opts.dots     || []).map(d => ({s: d.s, f: d.f, ...(d.color && {color: d.color})})),
     headings:  opts.headings  ? [...opts.headings] : ['','','','','',''],
     rootDot:     opts.rootDot   ? {s: opts.rootDot.s, f: opts.rootDot.f} : null,
     borderColor: opts.borderColor || null,
@@ -3090,11 +3094,11 @@ function chordSVG(cc) {
   }
   const _dotPitch = (si, f) => f === 0 ? STD_PITCH[si] : STD_PITCH[si] + (cc.startFret + f - 1);
   const rootPitch = cc.rootDot ? _dotPitch(cc.rootDot.s, cc.rootDot.f) : null;
-  cc.dots.forEach(({s: si, f}) => {
-    let fill = 'var(--accent2)';
+  cc.dots.forEach(({s: si, f, color: dotColor}) => {
+    let fill = dotColor || 'var(--accent2)';
     if (rootPitch !== null) fill = DEGREE_COL[DEG_MAP[(_dotPitch(si, f) - rootPitch + 120) % 12]];
     const isRoot = cc.rootDot && cc.rootDot.s === si && cc.rootDot.f === f;
-    const fillAttr = rootPitch !== null ? ` style="fill:${fill}"` : '';
+    const fillAttr = (rootPitch !== null || !!dotColor) ? ` style="fill:${fill}"` : '';
     const rootStroke = isRoot ? ' stroke="rgba(255,255,255,.5)" stroke-width="1.5"' : '';
     if (f === 0) {
       const r = Math.round(SG * 0.28);
@@ -3182,6 +3186,15 @@ function refreshOneChordSVG(b, cc) {
   oldSvg.replaceWith(newSvg);
 }
 
+function _ccSelSet(bid)  { if (!_ccSelection[bid]) _ccSelection[bid] = new Set(); return _ccSelection[bid]; }
+function _ccHasAny()    { return Object.values(_ccSelection).some(s => s.size > 0); }
+function _ccSelRefresh(bid) {
+  const sel = _ccSelection[bid] || new Set();
+  document.querySelectorAll(`.chord-charts-panel[data-bid="${bid}"] .chord-chart-wrap`).forEach(w => {
+    w.classList.toggle('chord-selected', sel.has(+w.dataset.ccid));
+  });
+}
+
 function buildChordChartsPanel(b) {
   const panel = document.createElement('div');
   panel.className = 'chord-charts-panel';
@@ -3201,7 +3214,55 @@ function buildChordChartsPanel(b) {
     saveAppSettings();
     applyChordControlsVisibility();
   });
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'chord-eye-btn'; exportBtn.title = 'Export chord charts as JSON';
+  exportBtn.textContent = '⬇';
+  exportBtn.addEventListener('click', () => {
+    const data = {
+      type: 'chord-charts', version: 1,
+      charts: b.chordCharts.map(cc => ({
+        label:       cc.label,
+        startFret:   cc.startFret,
+        numFrets:    cc.numFrets,
+        dots:        cc.dots.map(d => ({s: d.s, f: d.f, ...(d.color && {color: d.color})})),
+        headings:    cc.headings.slice(),
+        rootDot:     cc.rootDot ? {s: cc.rootDot.s, f: cc.rootDot.f} : null,
+        borderColor: cc.borderColor || null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (b.label || 'chords') + '-chords.json';
+    a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  const importInput = document.createElement('input');
+  importInput.type = 'file'; importInput.accept = '.json'; importInput.style.display = 'none';
+  importInput.addEventListener('change', () => {
+    const file = importInput.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.type !== 'chord-charts' || !Array.isArray(data.charts)) throw new Error('Invalid format');
+        data.charts.forEach(cc => b.chordCharts.push(mkChordChart(cc)));
+        pushHistory(); refreshChordChartsPanel(b.id);
+      } catch (err) { alert('Could not import chord charts: ' + err.message); }
+    };
+    reader.readAsText(file);
+    importInput.value = '';
+  });
+
+  const importBtn = document.createElement('button');
+  importBtn.className = 'chord-eye-btn'; importBtn.title = 'Import chord charts from JSON';
+  importBtn.textContent = '⬆';
+  importBtn.addEventListener('click', () => importInput.click());
+  panel.appendChild(importInput);
+
   hdr.appendChild(hdrLbl);
+  hdr.appendChild(exportBtn);
+  hdr.appendChild(importBtn);
   hdr.appendChild(eyeBtn);
   panel.appendChild(hdr);
 
@@ -3215,6 +3276,26 @@ function buildChordChartsPanel(b) {
     wrap.className = 'chord-chart-wrap';
     wrap.dataset.ccid = cc.id;
     if (cc.borderColor) { wrap.style.borderColor = cc.borderColor; wrap.style.borderWidth = '2px'; }
+    if (_ccSelSet(b.id).has(cc.id)) wrap.classList.add('chord-selected');
+
+    // Ctrl/Cmd+click → toggle selection; Shift+click → range select
+    wrap.addEventListener('mousedown', e => {
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+      if (e.target.closest('.chord-chart-del, .chord-chart-name, .chord-ctrl-btn, .chord-sf-btn, .chord-drag-handle')) return;
+      e.preventDefault();
+      const sel = _ccSelSet(b.id);
+      if (e.shiftKey && _ccLastClick[b.id] != null) {
+        const ids = b.chordCharts.map(c => c.id);
+        const from = ids.indexOf(_ccLastClick[b.id]);
+        const to   = ids.indexOf(cc.id);
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        for (let i = lo; i <= hi; i++) sel.add(ids[i]);
+      } else {
+        sel.has(cc.id) ? sel.delete(cc.id) : sel.add(cc.id);
+        _ccLastClick[b.id] = cc.id;
+      }
+      _ccSelRefresh(b.id);
+    });
 
     wrap.addEventListener('contextmenu', e => {
       e.preventDefault(); e.stopPropagation();
@@ -3423,7 +3504,9 @@ function buildChordChartsPanel(b) {
         cc.headings  = ['', '', '', '', '', ''];
         cc.dots = validCells.map(key => {
           const [si, f] = key.split('-').map(Number);
-          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
+          const noteIdx = (OPEN[si] + f) % 12;
+          const color = getDegreeColor(srcBoard, noteIdx, false, sd);
+          return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1, ...(color && {color}) };
         });
         // Set rootDot from tonic so degree colors match the fretboard
         cc.rootDot = (() => {
@@ -3456,6 +3539,13 @@ function buildChordChartsPanel(b) {
     wrap.appendChild(ccDragHandle);
 
     row.appendChild(wrap);
+  });
+
+  // Click on empty area of the row → clear chord selection
+  row.addEventListener('mousedown', e => {
+    if (e.target.closest('.chord-chart-wrap')) return;
+    const sel = _ccSelection[b.id];
+    if (sel?.size) { sel.clear(); _ccSelRefresh(b.id); }
   });
 
   // Drop fretboard selection onto panel empty area → create new chord
@@ -3496,7 +3586,9 @@ function buildChordChartsPanel(b) {
       numFrets,
       dots: validCells.map(key => {
         const [si, f] = key.split('-').map(Number);
-        return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1 };
+        const noteIdx = (OPEN[si] + f) % 12;
+        const color = getDegreeColor(srcBoard, noteIdx, false, sd);
+        return { s: 5 - si, f: f === 0 ? 0 : f - minFret + topPad + 1, ...(color && {color}) };
       }),
       rootDot: _rootDot,
     }));
@@ -3547,6 +3639,7 @@ function refreshChordChartsPanel(bid) {
   const savedScroll = existing?.querySelector('.chord-charts-row')?.scrollTop ?? 0;
   const panel = buildChordChartsPanel(b);
   if (existing) existing.replaceWith(panel); else card.appendChild(panel);
+  _ccSelRefresh(+bid);
   setTimeout(() => {
     syncAllChordRowMaxHeights(); // must run first — sets maxHeight, which creates the overflow
     if (savedScroll) {
@@ -4277,12 +4370,12 @@ function buildCard(b) {
 
     const earlyGrp = document.createElement('div');
     earlyGrp.className = 'slot-sync';
-    earlyGrp.title = 'Show next page N beats early (0.25 = 1 subbeat, 1 = 1 beat, 2 = 2 beats…). First page is always on time.';
+    earlyGrp.title = 'Beat on which the next page appears (0 = at the downbeat; 2 = at beat 2; 3 = at beat 3 of the last bar). First page is always on time.';
     const earlyLbl = document.createElement('span');
     earlyLbl.textContent = 'early';
-    const earlyKnob = buildKnob(b.slotEarlyBeats, 0, 4, 0.25,
+    const earlyKnob = buildKnob(b.slotEarlyBeats, 0, 8, 1,
       v => { b.slotEarlyBeats = v; },
-      v => v === 0 ? '0' : (v % 1 === 0 ? String(v) : v.toFixed(2).replace(/0+$/, '')));
+      v => v === 0 ? '0' : 'b' + v);
     earlyGrp.appendChild(earlyLbl);
     earlyGrp.appendChild(earlyKnob.el);
 
@@ -4633,11 +4726,30 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Escape') {
     clearBoxSelect();
+    if (_ccHasAny()) {
+      Object.keys(_ccSelection).forEach(bid => { _ccSelection[bid].clear(); _ccSelRefresh(+bid); });
+      return;
+    }
     document.getElementById('fb-settings-overlay').classList.remove('open');
     document.getElementById('fb-help-overlay').classList.remove('open');
     return;
   }
-  if (e.key === 'Delete') { applyBoxDelete(); return; }
+  if (e.key === 'Delete') {
+    if (_ccHasAny()) {
+      let deleted = false;
+      boards.forEach(brd => {
+        const sel = _ccSelection[brd.id];
+        if (!sel?.size) return;
+        brd.chordCharts = brd.chordCharts.filter(cc => !sel.has(cc.id));
+        sel.clear();
+        deleted = true;
+        refreshChordChartsPanel(brd.id);
+      });
+      if (deleted) { pushHistory(); return; }
+    }
+    applyBoxDelete();
+    return;
+  }
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
@@ -4869,7 +4981,10 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
     // Page change (measure-only mode — when metro-beat events are not available)
     if (!_beatModeActive) {
       const _beatMs    = 60000 / (bpm || 120);
-      const earlyMs    = _slotFirstTriggered[b.id] ? (b.slotEarlyBeats || 0) * _beatMs : 0;
+      const N          = _slotFirstTriggered[b.id] ? (b.slotEarlyBeats || 0) : 0;
+      // early=N → fire at beat N of the last bar → N beats before next downbeat means
+      // earlyMs = (beatsPerMeasure - N + 1) × beatDurationMs
+      const earlyMs    = N > 0 ? Math.max(0, (_metroBeatsPerMeasure - N + 1) * _beatMs) : 0;
       const fadeHalfMs = _slotFirstTriggered[b.id] ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
       const fireMs     = Math.max(0, delayMs - earlyMs - fadeHalfMs);
       setTimeout(() => {
@@ -4903,17 +5018,27 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
     const count = _slotBeatCounts[b.id];
 
-    // Fire at the START of the next beat after the trigger (= downbeat of next cycle).
-    // Subtract earlyMs for anticipation, and fadeHalfMs so the crossfade is centered
-    // at the early point rather than starting there. First advance always fires on time.
-    const beatDurationMs = 60000 / (bpm || 120);
-    const isFired     = !!_slotFirstTriggered[b.id];
-    const earlyMs     = isFired ? (b.slotEarlyBeats || 0) * beatDurationMs : 0;
-    const fadeHalfMs  = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
-    const delayMs     = Math.max(0, baseMs + beatDurationMs - earlyMs - fadeHalfMs);
+    // early=N means "fire page change at beat N of the last bar of the cycle".
+    // early=0 (default) fires at the downbeat of the new cycle (original behaviour).
+    // First page always fires on time regardless of early.
+    const beatDurationMs  = 60000 / (bpm || 120);
+    const isFired         = !!_slotFirstTriggered[b.id];
+    const N               = isFired ? (b.slotEarlyBeats || 0) : 0;
+    const fadeHalfMs      = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
+
+    // Which beat-count modulo fires the page change.
+    // N=0: last beat of the cycle (count % targetBeats === 0), delay = next downbeat.
+    // N>0: beat N of the last bar  (count % targetBeats === triggerOffset), delay = this beat.
+    const triggerOffset = N > 0
+      ? (targetBeats - _metroBeatsPerMeasure + N) % targetBeats
+      : 0;
+    const fireAtThisBeat = N > 0;
+    const delayMs = fireAtThisBeat
+      ? Math.max(0, baseMs - fadeHalfMs)
+      : Math.max(0, baseMs + beatDurationMs - fadeHalfMs);
 
     setTimeout(() => {
-      if (count % targetBeats === 0) {
+      if (count % targetBeats === triggerOffset) {
         _slotFirstTriggered[b.id] = true;
         const pattern = _parsePattern(b);
         if (pattern) {
@@ -4943,11 +5068,11 @@ if (typeof BroadcastChannel !== 'undefined') {
   _metroBC.addEventListener('message', e => _handleMetroMsg(e.data));
 }
 
-// Space bar → toggle metronome play/stop from anywhere (except text inputs)
+// Space bar → toggle metronome play/stop from anywhere.
+// Exception: when the looper panel is open, let the looper handle its own space key.
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space') return;
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (document.getElementById('looper-panel')?.classList.contains('open')) return;
   e.preventDefault();
   const iframe = document.getElementById('metro-iframe');
   if (iframe?.contentWindow) iframe.contentWindow.postMessage({ type: 'metro-play-toggle' }, '*');
