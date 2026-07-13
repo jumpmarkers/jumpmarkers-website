@@ -140,7 +140,12 @@ select{cursor:pointer}
 @keyframes rec-pulse{0%,100%{opacity:.55}50%{opacity:1}}
 
 /* ── Beat dots ── */
-.beat-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;min-height:44px}
+.beat-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:44px}
+#beat-row-wrap{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+#beat-row-wrap .beat-row{flex:1;min-width:0}
+.btn-x2{padding:2px 8px;font-size:.74rem;font-family:inherit;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text-sub);cursor:pointer;flex-shrink:0;line-height:1.6}
+.btn-x2:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+.btn-x2:disabled{opacity:.3;cursor:default}
 .m-group{display:flex;align-items:center;gap:7px;cursor:pointer;padding:4px 5px;border-radius:9px;border:2px solid transparent;transition:border-color .15s,background .15s}
 .m-group.selected{border-color:rgba(255,255,255,.35)}
 .m-group[data-color] .beat-dot.m1{border-color:var(--mc)}
@@ -243,6 +248,7 @@ select{cursor:pointer}
 .l-global-chk{appearance:none;-webkit-appearance:none;width:13px;height:13px;border:2px solid var(--red);border-radius:2px;cursor:pointer;flex-shrink:0;transition:background .12s;margin-left:4px}
 .l-global-chk:checked{background:var(--red)}
 .l-global-chk:hover:not(:checked){background:rgba(224,82,82,.18)}
+.l-global-chk:focus{outline:none;border-color:var(--red)}
 .pan-knob{cursor:ns-resize;display:block;user-select:none;flex-shrink:0}
 .btn-rr{color:var(--red)!important;opacity:.7}
 .btn-rr:hover{opacity:1;background:rgba(224,82,82,.12)!important}
@@ -439,7 +445,10 @@ select{cursor:pointer}
       <button class="btn-page" data-pg="7">8</button>
     </div>
     <div id="loop-progress"><div id="loop-fill"></div></div>
-    <div class="beat-row" id="beat-row"></div>
+    <div id="beat-row-wrap">
+      <div class="beat-row" id="beat-row"></div>
+      <button class="btn-x2" id="btn-x2" title="Double loop length (×2)" disabled>×2</button>
+    </div>
     <div id="mc-bar">
       <span>Section:</span>
       <button class="mc-swatch" data-c="blue"   style="background:#38bdf8" title="Blue"></button>
@@ -1091,7 +1100,7 @@ function startPlayback() {
   const offset = (actx.currentTime - loopT0) % loopDur;
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.src && !l.mediaEl) _play(l, offset); });
-  if (currentPage !== 0) globalLayers().filter(l => !l.muted).forEach(l => { if (!l.src && !l.mediaEl) _play(l, 0); });
+  globalLayers().filter(l => !l.muted).forEach(l => { if (!l.src && !l.mediaEl) _play(l, 0); });
   if (!schedId && mode === 'metro') startMetro(actx.currentTime);
   startPos();
 }
@@ -1200,7 +1209,7 @@ function applyRetime(rate) {
 
 function stopPlayback() {
   layers.forEach(stopLayerSrc);
-  if (currentPage !== 0) globalLayers().forEach(stopLayerSrc);
+  globalLayers().forEach(stopLayerSrc);
   stopMetro();
   stopPos();
 }
@@ -1443,6 +1452,7 @@ function setPhase(p) {
   const playBtn = document.getElementById('btn-play');
   playBtn.disabled = p === 'rec' || p === 'ovd' || p === 'cd' || (p === 'idle' && !layers.length);
   playBtn.textContent = p === 'play' ? '⏸ Pause' : '▶ Play';
+  _updateX2Btn();
 }
 
 function setPill(p, txt) {
@@ -1464,6 +1474,7 @@ function updateInfo() {
 function updateIO() {
   const has = layers.length > 0;
   document.getElementById('btn-wav').disabled = !has;
+  _updateX2Btn();
 }
 
 // ─── Project save / load (.lpr binary format) ─────────────────────────────────
@@ -1634,7 +1645,7 @@ async function loadProject(file) {
   measureColors = pages[currentPage].measureColors;
 
   layers.forEach(l => l.panner.connect(masterGain || actx.destination));
-  if (currentPage !== 0) pages[0].layers.filter(l => l.global).forEach(l => l.panner.connect(masterGain || actx.destination));
+  globalLayers().forEach(l => l.panner.connect(masterGain || actx.destination));
 
   if (layers.length > 0 && loopDur > 0) {
     loopT0 = actx.currentTime;
@@ -1735,7 +1746,7 @@ function resumePlayback() {
   loopT0 = actx.currentTime;
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.muted) _play(l, 0); });
-  if (currentPage !== 0) globalLayers().filter(l => !l.muted).forEach(l => _play(l, 0));
+  globalLayers().filter(l => !l.muted).forEach(l => _play(l, 0));
   if (mode === 'metro') {
     nextBeatT = loopT0;
     beatIdx = 0;
@@ -1775,7 +1786,7 @@ function handleClear() {
   setPhase('idle'); renderLayers(); updateIO(); stopPos(); updateInfo();
 }
 
-function globalLayers() { return pages[0].layers.filter(l => l.global); }
+function globalLayers() { return pages.flatMap((pg, i) => i !== currentPage ? pg.layers.filter(l => l.global) : []); }
 
 // ─── Scene utilities (copy / paste / clear) ───────────────────────────────────
 function clearScene(idx) {
@@ -1809,6 +1820,76 @@ function _cloneAudioBuffer(src) {
     nb.copyToChannel(ch, c);
   }
   return nb;
+}
+
+function _doubleBuffer(buf) {
+  const nCh = buf.numberOfChannels, n = buf.length, sr = buf.sampleRate;
+  const nb = actx.createBuffer(nCh, n * 2, sr);
+  for (let c = 0; c < nCh; c++) {
+    const src = buf.getChannelData(c);
+    nb.getChannelData(c).set(src, 0);
+    nb.getChannelData(c).set(src, n);
+  }
+  return nb;
+}
+
+function _updateX2Btn() {
+  const btn = document.getElementById('btn-x2');
+  if (btn) btn.disabled = !(layers.length > 0 && (phase === 'play' || phase === 'paused') && mode === 'metro');
+}
+
+function doubleMeasures() {
+  if (!actx || !layers.length || mode !== 'metro') return;
+  if (phase !== 'play' && phase !== 'paused') return;
+
+  const oldLoopDur = loopDur;
+  const playOffset = phase === 'play'
+    ? ((actx.currentTime - loopT0) % oldLoopDur + oldLoopDur) % oldLoopDur
+    : _pauseOffset;
+
+  // Double all layer buffers (second half = copy of first half)
+  layers.forEach(l => {
+    if (!l.buf) return;
+    const sameRef = l.origBuf === l.buf;
+    l.buf = _doubleBuffer(l.buf);
+    l.origBuf = sameRef ? l.buf : (l.origBuf ? _doubleBuffer(l.origBuf) : l.buf);
+  });
+
+  // Double measure count and duration
+  const origMeasures = numMeasures;
+  numMeasures *= 2;
+  loopDur = oldLoopDur * 2;
+  _dotTotal = numMeasures * bpMeasure;
+  document.getElementById('in-measures').value = numMeasures;
+
+  // Duplicate measure colors into second half
+  const newColors = {...measureColors};
+  for (let i = 0; i < origMeasures; i++) {
+    if (measureColors[i]) newColors[i + origMeasures] = measureColors[i];
+  }
+  measureColors = newColors;
+  pages[currentPage].measureColors = measureColors;
+
+  if (phase === 'play') {
+    loopT0 = actx.currentTime - playOffset;
+    layers.forEach(l => { stopLayerSrc(l); if (!l.muted) playLayer(l, playOffset); });
+    globalLayers().filter(l => !l.muted).forEach(l => playLayer(l, 0));
+    // Resync metro to current beat position
+    const beatDur = 60 / (bpm * retimeRate);
+    const beatsElapsed = Math.floor(playOffset / beatDur);
+    clearInterval(schedId); schedId = null;
+    nextBeatT = loopT0 + (beatsElapsed + 1) * beatDur;
+    beatIdx   = (beatsElapsed + 1) % _dotTotal;
+    scheduleTick();
+    schedId = setInterval(scheduleTick, SCHED_INT);
+    activateDot(beatsElapsed % _dotTotal);
+  } else {
+    // paused: update progress bar (playOffset now spans a halved fraction)
+    document.getElementById('loop-fill').style.width = (playOffset / loopDur * 100) + '%';
+  }
+
+  buildBeatRow();
+  updateInfo();
 }
 
 function copyScene(idx) {
@@ -1913,10 +1994,10 @@ function doPageSwitch(newIdx, intent = null) {
   pages[currentPage].loopT0  = loopT0;
   pages[currentPage].measureColors = measureColors;
 
-  // Stop current page audio + active global layers (if we were on a non-0 page)
+  // Stop current page audio + active global layers from other pages
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   layers.forEach(l => { stopLayerSrc(l); try { l.panner.disconnect(); } catch(e){} });
-  if (currentPage !== 0) globalLayers().forEach(l => { stopLayerSrc(l); try { l.panner.disconnect(); } catch(e){} });
+  globalLayers().forEach(l => { stopLayerSrc(l); try { l.panner.disconnect(); } catch(e){} });
   stopMetro(); stopPos();
 
   // Switch
@@ -1933,7 +2014,7 @@ function doPageSwitch(newIdx, intent = null) {
   history     = [];
   selMeasures.clear();
 
-  const gl = currentPage !== 0 ? globalLayers() : [];
+  const gl = globalLayers();
 
   // Reconnect new page layers + global layers to master output
   if (actx) {
@@ -2153,7 +2234,7 @@ function renderLayers() {
       <button class="btn-i btn-rr${rrActive?' rr-active':''}" data-rr="${l.id}" title="Re-record this layer">⏺</button>
       <button class="btn-i del" data-del="${l.id}" title="Delete">✕</button>
       <input type="checkbox" class="l-check" data-sel="${l.id}"${l.selected ? ' checked' : ''} title="Select for merge" style="margin-left:auto">
-      ${currentPage === 0 ? `<input type="checkbox" class="l-global-chk" data-glob="${l.id}" title="Keep on all pages"${l.global ? ' checked' : ''}>` : ''}`;
+      <input type="checkbox" class="l-global-chk" data-glob="${l.id}" title="Keep on all pages"${l.global ? ' checked' : ''}>`;
     wrap.appendChild(div);
   });
   updateMergeButton();
@@ -2377,7 +2458,11 @@ document.addEventListener('keydown', e => {
       && /^Digit[0-9]$/.test(e.code)) {
     const n = +e.code[5];
     const idx = n === 0 ? 9 : n - 1;
-    if (layers[idx]) { e.preventDefault(); toggleMute(layers[idx].id); }
+    if (e.shiftKey) {
+      if (layers[idx]) { e.preventDefault(); layers[idx].global = !layers[idx].global; renderLayers(); }
+    } else {
+      if (layers[idx]) { e.preventDefault(); toggleMute(layers[idx].id); }
+    }
   }
 }, true);
 
@@ -2466,6 +2551,7 @@ document.getElementById('btn-rec').addEventListener('click', () => handleRecord(
 document.getElementById('btn-play').addEventListener('click', handlePlay);
 document.getElementById('btn-stop').addEventListener('click', handleStop);
 document.getElementById('btn-clear').addEventListener('click', handleClear);
+document.getElementById('btn-x2').addEventListener('click', doubleMeasures);
 
 // Measure color selection
 document.getElementById('beat-row').addEventListener('click', e => {

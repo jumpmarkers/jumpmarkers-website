@@ -1749,7 +1749,6 @@ function mkBoard(opts = {}) {
     })),
     activeSlot:    opts.activeSlot  || 0,
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
-    slotEarlyBeats:    opts.slotEarlyBeats     !== undefined ? opts.slotEarlyBeats     : 0,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
     autoAdvance:       opts.autoAdvance !== false,
@@ -1786,7 +1785,6 @@ function _serializeBoards() {
       })),
       activeSlot:    b.activeSlot,
       slotMeasures:      b.slotMeasures,
-      slotEarlyBeats:    b.slotEarlyBeats,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -2143,7 +2141,6 @@ function duplicateBoard(id) {
     selectedNotes:     [...src.selectedNotes],
     activeSlot:        src.activeSlot,
     slotMeasures:      src.slotMeasures,
-    slotEarlyBeats:    src.slotEarlyBeats,
     slotPattern:       src.slotPattern,
     crossfadeDuration: src.crossfadeDuration,
     autoAdvance:       src.autoAdvance,
@@ -2386,7 +2383,6 @@ function buildPresetData(name) {
       })),
       activeSlot:        b.activeSlot,
       slotMeasures:      b.slotMeasures,
-      slotEarlyBeats:    b.slotEarlyBeats,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
       autoAdvance:       b.autoAdvance,
@@ -4430,22 +4426,10 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeKnob.el);
 
-    const earlyGrp = document.createElement('div');
-    earlyGrp.className = 'slot-sync';
-    earlyGrp.title = 'Beat on which the next page appears (0 = at the downbeat; 2 = at beat 2; 3 = at beat 3 of the last bar). First page is always on time.';
-    const earlyLbl = document.createElement('span');
-    earlyLbl.textContent = 'early';
-    const earlyKnob = buildKnob(b.slotEarlyBeats, 0, 8, 1,
-      v => { b.slotEarlyBeats = v; },
-      v => v === 0 ? '0' : 'b' + v);
-    earlyGrp.appendChild(earlyLbl);
-    earlyGrp.appendChild(earlyKnob.el);
-
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
     _visCtrlZone.appendChild(fadeGrp);
-    _visCtrlZone.appendChild(earlyGrp);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -5042,13 +5026,8 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 
     // Page change (measure-only mode — when metro-beat events are not available)
     if (!_beatModeActive) {
-      const _beatMs    = 60000 / (bpm || 120);
-      const N          = _slotFirstTriggered[b.id] ? (b.slotEarlyBeats || 0) : 0;
-      // early=N → fire at beat N of the last bar → N beats before next downbeat means
-      // earlyMs = (beatsPerMeasure - N + 1) × beatDurationMs
-      const earlyMs    = N > 0 ? Math.max(0, (_metroBeatsPerMeasure - N + 1) * _beatMs) : 0;
       const fadeHalfMs = _slotFirstTriggered[b.id] ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
-      const fireMs     = Math.max(0, delayMs - earlyMs - fadeHalfMs);
+      const fireMs     = Math.max(0, delayMs - fadeHalfMs);
       setTimeout(() => {
         if (count % sm === 0) {
           _slotFirstTriggered[b.id] = true;
@@ -5080,27 +5059,13 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     _slotBeatCounts[b.id] = (_slotBeatCounts[b.id] || 0) + 1;
     const count = _slotBeatCounts[b.id];
 
-    // early=N means "fire page change at beat N of the last bar of the cycle".
-    // early=0 (default) fires at the downbeat of the new cycle (original behaviour).
-    // First page always fires on time regardless of early.
-    const beatDurationMs  = 60000 / (bpm || 120);
-    const isFired         = !!_slotFirstTriggered[b.id];
-    const N               = isFired ? (b.slotEarlyBeats || 0) : 0;
-    const fadeHalfMs      = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
-
-    // Which beat-count modulo fires the page change.
-    // N=0: last beat of the cycle (count % targetBeats === 0), delay = next downbeat.
-    // N>0: beat N of the last bar  (count % targetBeats === triggerOffset), delay = this beat.
-    const triggerOffset = N > 0
-      ? (targetBeats - _metroBeatsPerMeasure + N) % targetBeats
-      : 0;
-    const fireAtThisBeat = N > 0;
-    const delayMs = fireAtThisBeat
-      ? Math.max(0, baseMs - fadeHalfMs)
-      : Math.max(0, baseMs + beatDurationMs - fadeHalfMs);
+    const beatDurationMs = 60000 / (bpm || 120);
+    const isFired        = !!_slotFirstTriggered[b.id];
+    const fadeHalfMs     = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
+    const delayMs        = Math.max(0, baseMs + beatDurationMs - fadeHalfMs);
 
     setTimeout(() => {
-      if (count % targetBeats === triggerOffset) {
+      if (count % targetBeats === 0) {
         _slotFirstTriggered[b.id] = true;
         const pattern = _parsePattern(b);
         if (pattern) {
@@ -5137,8 +5102,13 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('looper-panel')?.classList.contains('open')) return;
   e.preventDefault();
   const iframe = document.getElementById('metro-iframe');
-  if (iframe?.contentWindow) iframe.contentWindow.postMessage({ type: 'metro-play-toggle' }, '*');
-  if (_metroBC) _metroBC.postMessage({ type: 'metro-play-toggle' });
+  // Send to exactly one channel to avoid double-toggle:
+  // iframe postMessage when the metro panel is open; BroadcastChannel for standalone tab.
+  if (iframe?.contentWindow && iframe.offsetParent !== null) {
+    iframe.contentWindow.postMessage({ type: 'metro-play-toggle' }, '*');
+  } else if (_metroBC) {
+    _metroBC.postMessage({ type: 'metro-play-toggle' });
+  }
 });
 
 window.addEventListener('beforeprint', () => {
