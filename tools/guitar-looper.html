@@ -1747,12 +1747,7 @@ function resumePlayback() {
   const _play = Math.abs(retimeRate - 1) > 0.005 ? playLayerMedia : playLayer;
   layers.forEach(l => { if (!l.muted) _play(l, 0); });
   globalLayers().filter(l => !l.muted).forEach(l => _play(l, 0));
-  if (mode === 'metro') {
-    nextBeatT = loopT0;
-    beatIdx = 0;
-    scheduleTick();
-    schedId = setInterval(scheduleTick, SCHED_INT);
-  }
+  if (mode === 'metro') startMetro(loopT0); // sends metro-start → resets fretboard beat counts
   startPos();
   setPhase('play');
 }
@@ -2053,6 +2048,10 @@ function doPageSwitch(newIdx, intent = null) {
     clearInterval(schedId); schedId = null;
     nextBeatT = loopT0 + (beatsElapsed + 1) * beatDurSync;
     beatIdx   = (beatsElapsed + 1) % totalDots;
+    // Reset fretboard beat counters for the new scene
+    const _rstMsg = { type: 'metro-start' };
+    if (_bc) _bc.postMessage(_rstMsg);
+    if (window.parent !== window) window.parent.postMessage(_rstMsg, '*');
     scheduleTick();
     schedId = setInterval(scheduleTick, SCHED_INT);
     activateDot(beatsElapsed % totalDots);

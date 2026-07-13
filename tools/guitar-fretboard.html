@@ -5062,7 +5062,7 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
 function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
   _beatModeActive = true;
   _metroBeatsPerMeasure = beatsPerMeasure || 4;
-  const baseMs = msUntilBeat > 0 ? msUntilBeat : 60000 / (bpm || 120);
+  const baseMs = msUntilBeat; // 0 when beat has already passed — delayMs still adds one full beatDurationMs
 
   boards.forEach(b => {
     const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
