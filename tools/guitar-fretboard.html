@@ -3216,7 +3216,7 @@ function buildChordChartsPanel(b) {
   });
   const exportBtn = document.createElement('button');
   exportBtn.className = 'chord-eye-btn'; exportBtn.title = 'Export chord charts as JSON';
-  exportBtn.textContent = '⬇';
+  exportBtn.textContent = '⬆';
   exportBtn.addEventListener('click', () => {
     const data = {
       type: 'chord-charts', version: 1,
@@ -3256,7 +3256,7 @@ function buildChordChartsPanel(b) {
 
   const importBtn = document.createElement('button');
   importBtn.className = 'chord-eye-btn'; importBtn.title = 'Import chord charts from JSON';
-  importBtn.textContent = '⬆';
+  importBtn.textContent = '⬇';
   importBtn.addEventListener('click', () => importInput.click());
   panel.appendChild(importInput);
 
@@ -3275,7 +3275,8 @@ function buildChordChartsPanel(b) {
 <style>
   :root { --border2:#bbb; --text:#111; --muted:#888; --accent2:#333; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: monospace; background: #fff; color: #111; padding: 18px 20px; }
+  @page { margin: 14mm 18mm; }
+  body { font-family: monospace; background: #fff; color: #111; padding: 14px 18px; }
   h2 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 14px; letter-spacing: .04em; }
   .grid { display: flex; flex-wrap: wrap; gap: 18px 14px; align-items: flex-start; }
   .chart { display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -3287,7 +3288,7 @@ function buildChordChartsPanel(b) {
   .cs-dot    { fill: var(--accent2); }
   .cs-head   { font-family: monospace; font-size: 9px; }
   .cs-fretnum{ font-family: monospace; font-size: 8px; fill: var(--muted); }
-  @media print { @page { margin: 12mm; } body { padding: 0; } }
+  @media print { body { padding: 0; } }
 </style></head>
 <body>
   <h2>${title.replace(/</g,'&lt;')} — Chord Charts</h2>
@@ -3300,8 +3301,8 @@ function buildChordChartsPanel(b) {
 
   hdr.appendChild(hdrLbl);
   hdr.appendChild(printBtn);
-  hdr.appendChild(exportBtn);
   hdr.appendChild(importBtn);
+  hdr.appendChild(exportBtn);
   hdr.appendChild(eyeBtn);
   panel.appendChild(hdr);
 
@@ -5183,8 +5184,10 @@ let _micAnalyser   = null;
 let _micAnimId     = null;
 let _micGatePct    = appSettings.micGate ?? 15; // 0-100 %
 let _micCooldownTs = 0;
-const _MIC_MIN_COOLDOWN_MS = 200; // prevents double-detection of the same strum
-let _micArmed = true;             // re-armed when signal drops below 40% of gate
+const _MIC_MIN_COOLDOWN_MS  = 200; // prevents double-detection of the same strum
+const _MIC_DOUBLE_STRUM_MS  = 500; // two triggers within this window = double strum → go back
+let _micLastTriggerTs = 0;
+let _micArmed = true;              // re-armed when signal drops below 40% of gate
 let _micLevelFill  = null;
 let _micThreshLine = null;
 let _micPeakLabel  = null;
@@ -5201,19 +5204,37 @@ function _micTrigger() {
   if (!b) return;
   const totalSlots = 1 + (b.extraSlots ? b.extraSlots.length : 0);
   if (totalSlots < 2) return;
+
+  const now = Date.now();
+  const isDouble = (now - _micLastTriggerTs) < _MIC_DOUBLE_STRUM_MS;
+  _micLastTriggerTs = now;
+
   // Flash strum button + HUD as visual confirmation
   const btn = document.getElementById('btn-mic-input');
   btn?.classList.add('mic-flash');
   setTimeout(() => btn?.classList.remove('mic-flash'), 120);
   _micHudEl?.classList.add('mic-hud-flash');
   setTimeout(() => _micHudEl?.classList.remove('mic-hud-flash'), 120);
+
   const pattern = _parsePattern(b);
-  if (pattern) {
-    const pLen = pattern.length;
-    b.patternPos = b.patternPos < 0 ? 0 : (b.patternPos + 1) % pLen;
-    b.activeSlot = pattern[b.patternPos];
+  if (isDouble) {
+    // Double strum → go back: undo the +1 from first strum and step -1 more (net −1 from origin)
+    if (pattern) {
+      const pLen = pattern.length;
+      b.patternPos = ((b.patternPos - 2) % pLen + pLen) % pLen;
+      b.activeSlot = pattern[b.patternPos];
+    } else {
+      b.activeSlot = ((b.activeSlot - 2) % totalSlots + totalSlots) % totalSlots;
+    }
   } else {
-    b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    // Single strum → go forward
+    if (pattern) {
+      const pLen = pattern.length;
+      b.patternPos = b.patternPos < 0 ? 0 : (b.patternPos + 1) % pLen;
+      b.activeSlot = pattern[b.patternPos];
+    } else {
+      b.activeSlot = (b.activeSlot + 1) % totalSlots;
+    }
   }
   pushHistory();
   _crossfadeBoard(b.id);
