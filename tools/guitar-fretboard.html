@@ -2298,6 +2298,87 @@ function _fillKeepRoot(b, rootIdx, parentIntervals, scaleCtx = null) {
   refreshBoard(b.id);
 }
 
+// ─── Harmonize ────────────────────────────────────────────────────────────────
+function _chordLabel(root, noteSet, hasSeventh) {
+  const rootName = getNoteName(root);
+  const ivs = [...noteSet].map(n => (n - root + 12) % 12);
+  const has  = i => ivs.includes(i);
+  const minThird = has(3), majThird = has(4);
+  const dim5 = has(6), perf5 = has(7), aug5 = has(8);
+  const dim7 = has(9), min7 = has(10), maj7 = has(11);
+  if (!hasSeventh) {
+    if (majThird && aug5)  return `${rootName}+`;
+    if (minThird && dim5)  return `${rootName}°`;
+    if (minThird && perf5) return `${rootName}m`;
+    return rootName;
+  }
+  if (majThird && aug5  && maj7) return `${rootName}+Δ7`;
+  if (majThird && aug5  && min7) return `${rootName}+7`;
+  if (minThird && dim5  && dim7) return `${rootName}°7`;
+  if (minThird && dim5  && min7) return `${rootName}ø7`;
+  if (minThird && perf5 && maj7) return `${rootName}mΔ7`;
+  if (minThird && perf5 && min7) return `${rootName}m7`;
+  if (majThird && perf5 && maj7) return `${rootName}Δ7`;
+  if (majThird && perf5 && min7) return `${rootName}7`;
+  return `${rootName}7`;
+}
+
+function _harmonize(b, includeSevenths) {
+  const tonic = b.tonic;
+  if (tonic === null || tonic === undefined) {
+    showAlert('Set a tonic first — apply a scale with a root note selected.');
+    return;
+  }
+  const scaleAll = [...b.selectedNotes].sort((a, z) => a - z);
+  if (scaleAll.length < 3) {
+    showAlert('Need at least 3 highlighted notes to harmonize.');
+    return;
+  }
+  const tonicIdx = scaleAll.indexOf(tonic);
+  if (tonicIdx < 0) {
+    showAlert('The tonic must be among the highlighted notes.');
+    return;
+  }
+  // Rotate so the array starts at the tonic
+  const scale   = [...scaleAll.slice(tonicIdx), ...scaleAll.slice(0, tonicIdx)];
+  const n       = scale.length;
+  const visNotes = new Set(scaleAll);
+
+  b.extraSlots  = b.extraSlots || [];
+  // Ensure enough slots exist
+  while (1 + b.extraSlots.length < n)
+    b.extraSlots.push({ notes: new Set(), tonic: undefined, visibleNotes: null, hiddenCells: new Set() });
+  b.extraSlots.length = n - 1; // trim any excess
+  b.slotLabels = [];
+
+  for (let i = 0; i < n; i++) {
+    const chordRoot  = scale[i];
+    const third      = scale[(i + 2) % n];
+    const fifth      = scale[(i + 4) % n];
+    const seventh    = scale[(i + 6) % n];
+    const chordNotes = includeSevenths
+      ? new Set([chordRoot, third, fifth, seventh])
+      : new Set([chordRoot, third, fifth]);
+
+    b.slotLabels[i] = _chordLabel(chordRoot, chordNotes, includeSevenths);
+
+    if (i === 0) {
+      b.selectedNotes = chordNotes;
+      b.tonic         = chordRoot;
+      b.visibleNotes  = new Set(visNotes);
+    } else {
+      const s = b.extraSlots[i - 1];
+      s.notes        = chordNotes;
+      s.tonic        = chordRoot;
+      s.visibleNotes = new Set(visNotes);
+      s.hiddenCells  = s.hiddenCells || new Set();
+    }
+  }
+  b.activeSlot = 0;
+  pushHistory();
+  refreshBoard(b.id);
+}
+
 function clearBoard(boardId) {
   const b = boards.find(b => b.id === boardId);
   if (!b) return;
@@ -3921,6 +4002,39 @@ function _buildScaleRow(b) {
     const sc = SCALE_DB.find(s => s.n === b.scaleSelected);
     fillBtn.style.display = (sc && SCALE_MODAL_GROUPS.has(sc.g)) ? 'inline-flex' : 'none';
   }
+
+  // ── Harmonize button ─────────────────────────────────────────────────────
+  const harmBtn = document.createElement('button');
+  harmBtn.className = 'btn btn-outline btn-sm scale-harm-btn';
+  harmBtn.style.display = 'inline-flex';
+  harmBtn.textContent = '⊛ Harmonize';
+  harmBtn.title = 'Create a chord page for each scale degree';
+
+  const harmMenu = document.createElement('div');
+  harmMenu.className = 'scale-harm-menu';
+  harmMenu.style.display = 'none';
+
+  const _mkHOpt = (lbl, sevenths) => {
+    const o = document.createElement('button');
+    o.className = 'scale-harm-opt';
+    o.textContent = lbl;
+    o.addEventListener('click', e => {
+      e.stopPropagation();
+      harmMenu.style.display = 'none';
+      _harmonize(b, sevenths);
+    });
+    harmMenu.appendChild(o);
+  };
+  _mkHOpt('1  3  5  ·  Triads', false);
+  _mkHOpt('1  3  5  7  ·  Sevenths', true);
+  harmBtn.appendChild(harmMenu);
+
+  harmBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    harmMenu.style.display = harmMenu.style.display === 'none' ? '' : 'none';
+  });
+  document.addEventListener('click', () => { harmMenu.style.display = 'none'; });
+  row.appendChild(harmBtn);
 
   return row;
 }
