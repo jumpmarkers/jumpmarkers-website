@@ -250,6 +250,9 @@ select{cursor:pointer}
 .l-global-chk:hover:not(:checked){background:rgba(224,82,82,.18)}
 .l-global-chk:focus{outline:none;border-color:var(--red)}
 .pan-knob{cursor:ns-resize;display:block;user-select:none;flex-shrink:0}
+.lpf-knob{cursor:ns-resize;display:block;user-select:none;flex-shrink:0}
+.knob-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.knob-label{font-size:9px;color:var(--text-sub);user-select:none;line-height:1}
 .btn-rr{color:var(--red)!important;opacity:.7}
 .btn-rr:hover{opacity:1;background:rgba(224,82,82,.12)!important}
 .btn-rr.rr-active{opacity:1;animation:blink .8s infinite}
@@ -618,6 +621,7 @@ let _discardRec = false;
 let _replaceTarget = null; // layer id being re-recorded, or null
 let _pgClipboard = null;   // { loopDur, measureColors, layers:[…] } snapshot for scene copy/paste
 let _draggingPan = null;  // { id, startY, startVal } during knob drag
+let _draggingLpf = null;  // { id, startY, startVal } during LPF knob drag
 let micStream   = null;
 
 // ─── Worklet code (inlined as blob) ──────────────────────────────────────────
@@ -1284,9 +1288,10 @@ function addLayer(buf, wasOvd, imported = false) {
   history = [];
   const id = nextId++;
   const gain = actx.createGain();
+  const filter = actx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 20000;
   const panner = actx.createStereoPanner();
-  gain.connect(panner); panner.connect(masterGain || actx.destination);
-  const l = {id, name:'Layer '+id, buf, origBuf:buf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, global:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
+  gain.connect(filter); filter.connect(panner); panner.connect(masterGain || actx.destination);
+  const l = {id, name:'Layer '+(layers.length+1), buf, origBuf:buf, gain, filter, panner, src:null, vol:1, pan:0, lpfFreq:20000, muted:false, solo:false, global:false, color:COLORS[(id-1)%COLORS.length], imported, selected:false};
   layers.push(l);
   if (wasOvd) {
     const offset = (actx.currentTime - loopT0) % loopDur;
@@ -1300,6 +1305,7 @@ function removeLayer(id) {
   if (i < 0) return;
   stopLayerSrc(layers[i]);
   layers[i].gain.disconnect();
+  try { layers[i].filter?.disconnect(); } catch(e){}
   try { layers[i].panner?.disconnect(); } catch(e){}
   layers.splice(i, 1);
   refreshSolo();
@@ -1315,6 +1321,7 @@ function doUndo(overdubOnly = false) {
   const l = layers.pop();
   stopLayerSrc(l);
   l.gain.disconnect();
+  try { l.filter?.disconnect(); } catch(e){}
   try { l.panner?.disconnect(); } catch(e){}
   history.push(l);
   refreshSolo();
@@ -1424,6 +1431,63 @@ function setPan(id, v) {
   updateKnobDisplay(id, v);
 }
 
+function lpfKnobSVG(freq, id) {
+  const r = 13, ri = 11;
+  const norm = (Math.max(200, Math.min(20000, freq)) - 200) / 19800;
+  const angle = (-240 + norm * 300) * Math.PI / 180;
+  const ix = (18 + ri * Math.cos(angle)).toFixed(2);
+  const iy = (18 + ri * Math.sin(angle)).toFixed(2);
+  let fill = '';
+  if (norm > 0.01) {
+    const ex = (18 + r * Math.cos(angle)).toFixed(2);
+    const ey = (18 + r * Math.sin(angle)).toFixed(2);
+    const large = norm > 0.6 ? 1 : 0;
+    fill = `<path class="lpf-fill" d="M 11.5 29.26 A ${r} ${r} 0 ${large} 1 ${ex} ${ey}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  return `<svg class="lpf-knob" viewBox="0 0 36 36" width="34" height="34" data-lpf="${id}" title="Low-pass filter · drag ↕ · scroll · dbl-click=open">
+  <circle cx="18" cy="18" r="15" fill="var(--bg2)" stroke="var(--border)" stroke-width="1.5"/>
+  <path d="M 11.5 29.26 A ${r} ${r} 0 1 1 24.5 29.26" fill="none" stroke="var(--bg3)" stroke-width="3" stroke-linecap="round"/>
+  ${fill}
+  <line class="lpf-line" x1="18" y1="18" x2="${ix}" y2="${iy}" stroke="var(--text-sub)" stroke-width="2.5" stroke-linecap="round"/>
+</svg>`;
+}
+
+function updateLpfKnobDisplay(id, freq) {
+  const svg = document.querySelector(`svg.lpf-knob[data-lpf="${id}"]`);
+  if (!svg) return;
+  const r = 13, ri = 11;
+  const norm = (Math.max(200, Math.min(20000, freq)) - 200) / 19800;
+  const angle = (-240 + norm * 300) * Math.PI / 180;
+  const ix = 18 + ri * Math.cos(angle);
+  const iy = 18 + ri * Math.sin(angle);
+  const line = svg.querySelector('.lpf-line');
+  if (line) { line.setAttribute('x2', ix.toFixed(2)); line.setAttribute('y2', iy.toFixed(2)); }
+  let fill = svg.querySelector('.lpf-fill');
+  if (norm > 0.01) {
+    const ex = 18 + r * Math.cos(angle);
+    const ey = 18 + r * Math.sin(angle);
+    const large = norm > 0.6 ? 1 : 0;
+    const d = `M 11.5 29.26 A ${r} ${r} 0 ${large} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+    if (fill) { fill.setAttribute('d', d); }
+    else {
+      fill = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      fill.setAttribute('class', 'lpf-fill'); fill.setAttribute('d', d);
+      fill.setAttribute('stroke', 'var(--blue)'); fill.setAttribute('fill', 'none');
+      fill.setAttribute('stroke-width', '3'); fill.setAttribute('stroke-linecap', 'round');
+      const lpfLine = svg.querySelector('.lpf-line');
+      if (lpfLine) svg.insertBefore(fill, lpfLine); else svg.appendChild(fill);
+    }
+  } else { if (fill) fill.remove(); }
+}
+
+function setLpf(id, freq) {
+  const l = layers.find(l => l.id === id); if (!l) return;
+  freq = Math.max(200, Math.min(20000, freq));
+  l.lpfFreq = freq;
+  if (l.filter) l.filter.frequency.setTargetAtTime(freq, actx?.currentTime || 0, 0.01);
+  updateLpfKnobDisplay(id, freq);
+}
+
 // ─── Phase helpers ────────────────────────────────────────────────────────────
 const PHASE_LABELS = {idle:'Idle', cd:'Countdown', rec:'Recording', play:'Playing', paused:'Paused', ovd:'Overdubbing'};
 const PHASE_CSS    = {idle:'s-idle', cd:'s-cd', rec:'s-rec', play:'s-play', paused:'s-paused', ovd:'s-ovd'};
@@ -1493,7 +1557,7 @@ function saveProject() {
     layers: pg.layers.map(l => {
       const bi = bufList.length;
       bufList.push(l.buf);
-      return { name: l.name, vol: l.vol, pan: l.pan,
+      return { name: l.name, vol: l.vol, pan: l.pan, lpfFreq: l.lpfFreq ?? 20000,
                muted: l.muted, solo: l.solo, global: l.global,
                color: l.color, bi };
     })
@@ -1622,14 +1686,15 @@ async function loadProject(file) {
     pg.layers = (snap.layers || []).map(ld => {
       const id = nextId++;
       const gain   = actx.createGain();
+      const filter = actx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = ld.lpfFreq ?? 20000;
       const panner = actx.createStereoPanner();
       gain.gain.value   = ld.vol ?? 1;
       panner.pan.value  = ld.pan ?? 0;
-      gain.connect(panner);
+      gain.connect(filter); filter.connect(panner);
       const buf = audioBufs[ld.bi];
       return { id, name: ld.name || ('Layer ' + id), buf, origBuf: buf,
-               gain, panner, src: null,
-               vol: ld.vol ?? 1, pan: ld.pan ?? 0,
+               gain, filter, panner, src: null,
+               vol: ld.vol ?? 1, pan: ld.pan ?? 0, lpfFreq: ld.lpfFreq ?? 20000,
                muted: ld.muted ?? false, solo: ld.solo ?? false,
                global: ld.global ?? false, color: ld.color || COLORS[(id-1) % COLORS.length],
                imported: false, selected: false };
@@ -1774,7 +1839,7 @@ function handleClear() {
   if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
   _replaceTarget = null;
   stopPlayback();
-  [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
+  [...layers, ...history].forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.filter?.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
   layers.splice(0); history = []; loopDur = 0;
   pages[currentPage].loopDur = 0; pages[currentPage].loopT0 = 0;
   measureColors = pages[currentPage].measureColors = {}; selectMeasure(null);
@@ -1789,7 +1854,7 @@ function clearScene(idx) {
   const pg = pages[idx];
   if (isActive) {
     if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
-    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.filter?.disconnect(); } catch(e){} try { l.panner.disconnect(); } catch(e){} });
     stopMetro(); stopPos();
     history = []; selMeasures.clear();
     layers = []; pg.layers = [];
@@ -1799,7 +1864,7 @@ function clearScene(idx) {
     setPhase('idle');
     buildBeatRow(); renderLayers(); updateInfo(); updateIO();
   } else {
-    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.filter?.disconnect(); } catch(e){} try { l.panner.disconnect(); } catch(e){} });
     pg.layers = []; pg.loopDur = 0; pg.loopT0 = 0; pg.measureColors = {};
   }
   updatePageBar();
@@ -1898,7 +1963,7 @@ function copyScene(idx) {
     measureColors: {...pg.measureColors},
     color: pg.color,
     layers: pg.layers.map(l => ({
-      name: l.name, vol: l.vol, pan: l.pan,
+      name: l.name, vol: l.vol, pan: l.pan, lpfFreq: l.lpfFreq ?? 20000,
       muted: l.muted, solo: l.solo, global: l.global, color: l.color,
       buf: l.buf, origBuf: l.origBuf
     }))
@@ -1916,26 +1981,27 @@ function pasteScene(idx) {
   // Tear down existing layers on target page
   if (isActive) {
     if (phase === 'rec' || phase === 'ovd') { _discardRec = true; worklet?.port.postMessage({cmd:'stop'}); }
-    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.filter?.disconnect(); } catch(e){} try { l.panner.disconnect(); } catch(e){} });
     stopMetro(); stopPos();
     history = []; selMeasures.clear();
   } else {
-    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.panner.disconnect(); } catch(e){} });
+    pg.layers.forEach(l => { stopLayerSrc(l); l.gain.disconnect(); try { l.filter?.disconnect(); } catch(e){} try { l.panner.disconnect(); } catch(e){} });
   }
 
   // Build cloned layers (new audio nodes + deep-copied buffers)
   const newLayers = _pgClipboard.layers.map(cl => {
     const id = nextId++;
     const gain = actx.createGain();
+    const filter = actx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = cl.lpfFreq ?? 20000;
     const panner = actx.createStereoPanner();
     gain.gain.value = cl.vol ?? 1;
     panner.pan.value = cl.pan ?? 0;
-    gain.connect(panner);
+    gain.connect(filter); filter.connect(panner);
     if (isActive) panner.connect(masterGain || actx.destination);
     const buf     = _cloneAudioBuffer(cl.buf);
     const origBuf = cl.origBuf && cl.origBuf !== cl.buf ? _cloneAudioBuffer(cl.origBuf) : buf;
-    return { id, name: cl.name, buf, origBuf, gain, panner, src: null,
-             vol: cl.vol ?? 1, pan: cl.pan ?? 0,
+    return { id, name: cl.name, buf, origBuf, gain, filter, panner, src: null,
+             vol: cl.vol ?? 1, pan: cl.pan ?? 0, lpfFreq: cl.lpfFreq ?? 20000,
              muted: cl.muted, solo: cl.solo, global: cl.global,
              color: cl.color, imported: false, selected: false };
   });
@@ -2005,6 +2071,13 @@ function doPageSwitch(newIdx, intent = null) {
   if (loopDur === 0 && layers.length > 0) loopDur = layers[0].buf?.duration ?? 0;
   // For ovd context: inherit loopDur from source so recording snaps to correct boundary
   if (loopDur === 0 && intent === 'ovd' && srcLoopDur > 0) loopDur = srcLoopDur;
+  // Recalculate numMeasures from this page's actual loop length so ×2 stays page-local
+  if (mode === 'metro' && loopDur > 0) {
+    const _beatDur = 60 / ((bpm || 120) * (retimeRate || 1));
+    numMeasures = Math.max(1, Math.round(loopDur / (bpMeasure * _beatDur)));
+    document.getElementById('in-measures').value = numMeasures;
+  }
+  _dotTotal = mode === 'instant' ? bpMeasure : numMeasures * bpMeasure;
   pendingPage = null;
   history     = [];
   selMeasures.clear();
@@ -2185,19 +2258,21 @@ async function doMerge() {
     src.buffer = l.buf;
     src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
     const g = off.createGain(); g.gain.value = l.vol;
+    const f = off.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = l.lpfFreq ?? 20000;
     const p = off.createStereoPanner(); p.pan.value = l.pan ?? 0;
-    src.connect(g); g.connect(p); p.connect(off.destination);
+    src.connect(g); g.connect(f); f.connect(p); p.connect(off.destination);
     src.start(0, l.imported ? 0 : offset);
   });
   const mergedBuf = await off.startRendering();
   const insertIdx = layers.indexOf(sel[0]);
-  sel.forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
+  sel.forEach(l => { stopLayerSrc(l); try { l.gain.disconnect(); } catch(e){} try { l.filter?.disconnect(); } catch(e){} try { l.panner?.disconnect(); } catch(e){} });
   layers = layers.filter(l => !l.selected);
   const id = nextId++;
   const gain = actx.createGain();
+  const filter = actx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 20000;
   const panner = actx.createStereoPanner();
-  gain.connect(panner); panner.connect(masterGain || actx.destination);
-  const ml = {id, name:'Merged', buf:mergedBuf, gain, panner, src:null, vol:1, pan:0, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported:true, selected:false};
+  gain.connect(filter); filter.connect(panner); panner.connect(masterGain || actx.destination);
+  const ml = {id, name:'Merged', buf:mergedBuf, gain, filter, panner, src:null, vol:1, pan:0, lpfFreq:20000, muted:false, solo:false, color:COLORS[(id-1)%COLORS.length], imported:true, selected:false};
   layers.splice(Math.min(insertIdx, layers.length), 0, ml);
   history = [];
   if (phase === 'play') playLayer(ml, (actx.currentTime - loopT0) % loopDur);
@@ -2227,7 +2302,8 @@ function renderLayers() {
       <input class="l-name" type="text" value="${safeName}" data-rename="${l.id}" spellcheck="false" title="Click to rename">
       <span class="l-dur">${l.buf ? l.buf.duration.toFixed(2)+'s' : '–'}</span>
       <input type="range" class="l-vol" min="0" max="1" step="0.01" value="${l.vol}" data-id="${l.id}" title="Volume">
-      ${panKnobSVG(l.pan ?? 0, l.id)}
+      <div class="knob-group">${panKnobSVG(l.pan ?? 0, l.id)}<span class="knob-label">P</span></div>
+      <div class="knob-group">${lpfKnobSVG(l.lpfFreq ?? 20000, l.id)}<span class="knob-label">LPF</span></div>
       <button class="btn-i${l.muted?' muted':''}" data-mute="${l.id}" title="${l.muted?'Unmute':'Mute'}">M</button>
       <button class="btn-i${l.solo?' solo-on':''}" data-solo="${l.id}" title="Solo">S</button>
       <button class="btn-i btn-rr${rrActive?' rr-active':''}" data-rr="${l.id}" title="Re-record this layer">⏺</button>
@@ -2286,31 +2362,32 @@ document.getElementById('layers-wrap').addEventListener('change', e => {
   }
 });
 document.getElementById('layers-wrap').addEventListener('dblclick', e => {
-  const knob = e.target.closest('svg.pan-knob');
-  if (knob) setPan(+knob.dataset.pan, 0);
+  const panKnob = e.target.closest('svg.pan-knob');
+  if (panKnob) setPan(+panKnob.dataset.pan, 0);
+  const lpfKnob = e.target.closest('svg.lpf-knob');
+  if (lpfKnob) setLpf(+lpfKnob.dataset.lpf, 20000);
 });
 document.getElementById('layers-wrap').addEventListener('mousedown', e => {
-  const knob = e.target.closest('svg.pan-knob');
-  if (!knob) return;
+  const panKnob = e.target.closest('svg.pan-knob');
+  const lpfKnob = e.target.closest('svg.lpf-knob');
+  if (!panKnob && !lpfKnob) return;
   e.preventDefault();
-  const id = +knob.dataset.pan;
-  const l = layers.find(x => x.id === id);
-  if (l) _draggingPan = { id, startY: e.clientY, startVal: l.pan };
+  if (panKnob) { const id = +panKnob.dataset.pan; const l = layers.find(x => x.id === id); if (l) _draggingPan = { id, startY: e.clientY, startVal: l.pan }; }
+  if (lpfKnob) { const id = +lpfKnob.dataset.lpf; const l = layers.find(x => x.id === id); if (l) _draggingLpf = { id, startY: e.clientY, startVal: l.lpfFreq ?? 20000 }; }
 }, { passive: false });
 document.getElementById('layers-wrap').addEventListener('wheel', e => {
-  const knob = e.target.closest('svg.pan-knob');
-  if (!knob) return;
+  const panKnob = e.target.closest('svg.pan-knob');
+  const lpfKnob = e.target.closest('svg.lpf-knob');
+  if (!panKnob && !lpfKnob) return;
   e.preventDefault();
-  const id = +knob.dataset.pan;
-  const l = layers.find(x => x.id === id);
-  if (l) setPan(id, Math.max(-1, Math.min(1, l.pan - e.deltaY / 500)));
+  if (panKnob) { const id = +panKnob.dataset.pan; const l = layers.find(x => x.id === id); if (l) setPan(id, Math.max(-1, Math.min(1, l.pan - e.deltaY / 500))); }
+  if (lpfKnob) { const id = +lpfKnob.dataset.lpf; const l = layers.find(x => x.id === id); if (l) setLpf(id, (l.lpfFreq ?? 20000) - e.deltaY * 40); }
 }, { passive: false });
 document.addEventListener('mousemove', e => {
-  if (!_draggingPan) return;
-  const v = Math.max(-1, Math.min(1, _draggingPan.startVal + (_draggingPan.startY - e.clientY) / 100));
-  setPan(_draggingPan.id, v);
+  if (_draggingPan) { const v = Math.max(-1, Math.min(1, _draggingPan.startVal + (_draggingPan.startY - e.clientY) / 100)); setPan(_draggingPan.id, v); }
+  if (_draggingLpf) { setLpf(_draggingLpf.id, _draggingLpf.startVal + (_draggingLpf.startY - e.clientY) * 80); }
 });
-document.addEventListener('mouseup', () => { _draggingPan = null; });
+document.addEventListener('mouseup', () => { _draggingPan = null; _draggingLpf = null; });
 document.getElementById('layers-wrap').addEventListener('focusin', e => {
   if (e.target.dataset.rename) e.target.dataset.pre = e.target.value;
 });
@@ -2342,8 +2419,9 @@ async function mixDown() {
     src.buffer = l.buf;
     src.loop = true; src.loopStart = 0; src.loopEnd = l.buf.duration;
     const g = off.createGain(); g.gain.value = l.vol;
+    const f = off.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = l.lpfFreq ?? 20000;
     const p = off.createStereoPanner(); p.pan.value = l.pan ?? 0;
-    src.connect(g); g.connect(p); p.connect(off.destination);
+    src.connect(g); g.connect(f); f.connect(p); p.connect(off.destination);
     src.start(0, l.imported ? 0 : offset);
   });
   return off.startRendering();
@@ -2459,9 +2537,19 @@ document.addEventListener('keydown', e => {
     const idx = n === 0 ? 9 : n - 1;
     if (e.shiftKey) {
       if (layers[idx]) { e.preventDefault(); layers[idx].global = !layers[idx].global; renderLayers(); }
+    } else if (e.altKey) {
+      if (layers[idx]) { e.preventDefault(); handleReRecord(layers[idx].id); }
     } else {
       if (layers[idx]) { e.preventDefault(); toggleMute(layers[idx].id); }
     }
+  }
+  // Ctrl+digit → solo
+  if (!e.repeat && e.ctrlKey && !e.shiftKey && !e.altKey && !inRename && ae?.id !== 'fb-text'
+      && /^Digit[0-9]$/.test(e.code)) {
+    e.preventDefault();
+    const n = +e.code[5];
+    const idx = n === 0 ? 9 : n - 1;
+    if (layers[idx]) toggleSolo(layers[idx].id);
   }
 }, true);
 
