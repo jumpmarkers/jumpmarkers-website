@@ -938,8 +938,8 @@ function scheduleTick() {
       setTimeout(() => {
         const msUntilBeat1 = Math.max(0, (_t - actx.currentTime) * 1000) + _msDur;
         const msg = { type: 'metro-measure', bpm: effectiveBpm, msUntilBeat1 };
-        if (_bc) _bc.postMessage(msg);
         if (window.parent !== window) window.parent.postMessage(msg, '*');
+        else if (_bc) _bc.postMessage(msg);
       }, 0);
     }
     // Broadcast metro-beat at every beat (skip countdown) — enables sub-bar page changes
@@ -948,8 +948,8 @@ function scheduleTick() {
       setTimeout(() => {
         const msUntilBeat = Math.max(0, (_t - actx.currentTime) * 1000);
         const msg = { type: 'metro-beat', bpm: effectiveBpm, beatsPerMeasure: bpMeasure, msUntilBeat };
-        if (_bc) _bc.postMessage(msg);
         if (window.parent !== window) window.parent.postMessage(msg, '*');
+        else if (_bc) _bc.postMessage(msg);
       }, 0);
     }
     setTimeout(() => activateDot(li), Math.max(0, (t - actx.currentTime) * 1000));
@@ -962,8 +962,8 @@ function startMetro(startT) {
   stopMetro();
   nextBeatT = startT; beatIdx = 0;
   const msg = { type: 'metro-start' };
-  if (_bc) _bc.postMessage(msg);
   if (window.parent !== window) window.parent.postMessage(msg, '*');
+  else if (_bc) _bc.postMessage(msg);
   scheduleTick();
   schedId = setInterval(scheduleTick, SCHED_INT);
 }
@@ -2050,8 +2050,8 @@ function doPageSwitch(newIdx, intent = null) {
     beatIdx   = (beatsElapsed + 1) % totalDots;
     // Reset fretboard beat counters for the new scene
     const _rstMsg = { type: 'metro-start' };
-    if (_bc) _bc.postMessage(_rstMsg);
     if (window.parent !== window) window.parent.postMessage(_rstMsg, '*');
+    else if (_bc) _bc.postMessage(_rstMsg);
     scheduleTick();
     schedId = setInterval(scheduleTick, SCHED_INT);
     activateDot(beatsElapsed % totalDots);
