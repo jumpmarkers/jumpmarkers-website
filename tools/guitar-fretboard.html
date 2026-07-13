@@ -3260,7 +3260,46 @@ function buildChordChartsPanel(b) {
   importBtn.addEventListener('click', () => importInput.click());
   panel.appendChild(importInput);
 
+  const printBtn = document.createElement('button');
+  printBtn.className = 'chord-eye-btn'; printBtn.title = 'Print / Export chord charts as PDF';
+  printBtn.textContent = '⎙';
+  printBtn.addEventListener('click', () => {
+    const title = (b.label || 'Chord Charts').trim();
+    const svgs  = b.chordCharts.map(cc => `
+      <div class="chart">
+        ${chordSVG(cc)}
+        <div class="lbl">${cc.label ? cc.label.replace(/</g,'&lt;') : ''}</div>
+      </div>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${title.replace(/</g,'&lt;')} — Chords</title>
+<style>
+  :root { --border2:#bbb; --text:#111; --muted:#888; --accent2:#333; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #fff; color: #111; padding: 18px 20px; }
+  h2 { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 14px; letter-spacing: .04em; }
+  .grid { display: flex; flex-wrap: wrap; gap: 18px 14px; align-items: flex-start; }
+  .chart { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .chart svg { display: block; width: 80px; height: auto; }
+  .lbl { font-size: 10px; color: #333; text-align: center; min-height: 13px; }
+  .cs-string { stroke: var(--border2); stroke-width: 1; }
+  .cs-fret   { stroke: var(--border2); stroke-width: .8; }
+  .cs-nut    { stroke: var(--text);    stroke-width: 3; }
+  .cs-dot    { fill: var(--accent2); }
+  .cs-head   { font-family: monospace; font-size: 9px; }
+  .cs-fretnum{ font-family: monospace; font-size: 8px; fill: var(--muted); }
+  @media print { @page { margin: 12mm; } body { padding: 0; } }
+</style></head>
+<body>
+  <h2>${title.replace(/</g,'&lt;')} — Chord Charts</h2>
+  <div class="grid">${svgs}</div>
+  <script>window.addEventListener('load', () => { window.print(); });<\/script>
+</body></html>`;
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (w) { w.document.write(html); w.document.close(); }
+  });
+
   hdr.appendChild(hdrLbl);
+  hdr.appendChild(printBtn);
   hdr.appendChild(exportBtn);
   hdr.appendChild(importBtn);
   hdr.appendChild(eyeBtn);
