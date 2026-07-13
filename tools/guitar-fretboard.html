@@ -1751,6 +1751,7 @@ function mkBoard(opts = {}) {
     slotMeasures:      opts.slotMeasures      !== undefined ? opts.slotMeasures      : 1,
     slotPattern:       opts.slotPattern       || '',
     crossfadeDuration: opts.crossfadeDuration !== undefined ? opts.crossfadeDuration : 0,
+    slotEarlyMs:       opts.slotEarlyMs       !== undefined ? opts.slotEarlyMs       : 0,
     autoAdvance:       opts.autoAdvance !== false,
     slotLabels:        opts.slotLabels  || [],
     patternPos:        -1,
@@ -1787,6 +1788,7 @@ function _serializeBoards() {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
+      slotEarlyMs:       b.slotEarlyMs,
       autoAdvance:       b.autoAdvance,
       slotLabels:        b.slotLabels,
     })),
@@ -2143,6 +2145,7 @@ function duplicateBoard(id) {
     slotMeasures:      src.slotMeasures,
     slotPattern:       src.slotPattern,
     crossfadeDuration: src.crossfadeDuration,
+    slotEarlyMs:       src.slotEarlyMs,
     autoAdvance:       src.autoAdvance,
     slotLabels:        [...(src.slotLabels || [])],
     chordCharts:       src.chordCharts.map(cc => ({
@@ -2385,6 +2388,7 @@ function buildPresetData(name) {
       slotMeasures:      b.slotMeasures,
       slotPattern:       b.slotPattern,
       crossfadeDuration: b.crossfadeDuration,
+      slotEarlyMs:       b.slotEarlyMs,
       autoAdvance:       b.autoAdvance,
       slotLabels:        b.slotLabels,
     })),
@@ -4426,10 +4430,19 @@ function buildCard(b) {
     fadeGrp.appendChild(fadeLbl);
     fadeGrp.appendChild(fadeKnob.el);
 
+    const earlyGrp = document.createElement('div');
+    earlyGrp.className = 'slot-sync';
+    const earlyLbl = document.createElement('span');
+    earlyLbl.textContent = 'early';
+    const earlyKnob = buildKnob(b.slotEarlyMs, 0, 2000, 50, v => { b.slotEarlyMs = v; });
+    earlyGrp.appendChild(earlyLbl);
+    earlyGrp.appendChild(earlyKnob.el);
+
     const _visCtrlZone = document.createElement('div');
     _visCtrlZone.className = 'slot-ctrl-zone';
     _visCtrlZone.appendChild(syncGrp);
     _visCtrlZone.appendChild(fadeGrp);
+    _visCtrlZone.appendChild(earlyGrp);
     visRow.appendChild(_visCtrlZone);
   }
 
@@ -5027,7 +5040,8 @@ function _onMetroMeasure(bpm, msUntilBeat1) {
     // Page change (measure-only mode — when metro-beat events are not available)
     if (!_beatModeActive) {
       const fadeHalfMs = _slotFirstTriggered[b.id] ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
-      const fireMs     = Math.max(0, delayMs - fadeHalfMs);
+      const earlyMs    = fadeHalfMs + (b.slotEarlyMs || 0);
+      const fireMs     = Math.max(0, delayMs - earlyMs);
       setTimeout(() => {
         if (count % sm === 0) {
           _slotFirstTriggered[b.id] = true;
@@ -5062,7 +5076,8 @@ function _onMetroBeat(bpm, beatsPerMeasure, msUntilBeat) {
     const beatDurationMs = 60000 / (bpm || 120);
     const isFired        = !!_slotFirstTriggered[b.id];
     const fadeHalfMs     = isFired ? Math.round((b.crossfadeDuration || 0) / 2) : 0;
-    const delayMs        = Math.max(0, baseMs + beatDurationMs - fadeHalfMs);
+    const earlyMs        = fadeHalfMs + (b.slotEarlyMs || 0);
+    const delayMs        = Math.max(0, baseMs + beatDurationMs - earlyMs);
 
     setTimeout(() => {
       if (count % targetBeats === 0) {
