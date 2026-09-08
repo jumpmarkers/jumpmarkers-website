@@ -672,9 +672,52 @@
     .plan.featured { outline: none; border: 2px solid var(--gold); }
     footer { flex-direction: column; align-items: flex-start; }
   }
+  /* ─── PRICE-CHANGE ANNOUNCEMENT BAR ─────────────────── */
+  :root { --ann-h: 42px; }
+  .announce {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 101;
+    height: var(--ann-h); display: flex; align-items: center; justify-content: center;
+    padding: 0 5vw;
+    background: rgba(13,17,48,.95);
+    border-bottom: 1px solid var(--gold);
+    backdrop-filter: blur(14px);
+  }
+  .announce-in { display: flex; align-items: center; gap: 16px; max-width: 1000px; width: 100%; justify-content: center; }
+  .announce-txt { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .announce-txt strong { color: var(--gold); font-weight: 600; }
+  .announce-txt b { color: var(--gold-lt); font-weight: 600; }
+  .announce-cd {
+    font-family: var(--mono); font-size: 13px; color: var(--gold-lt);
+    white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: .5px; flex-shrink: 0;
+  }
+  .announce-cta {
+    font-family: var(--mono); font-size: 12px; font-weight: 500; flex-shrink: 0;
+    background: var(--gold); color: #0d1130; padding: 5px 12px; border-radius: 8px;
+    white-space: nowrap; transition: background .15s, transform .15s;
+  }
+  .announce-cta:hover { background: var(--gold-lt); transform: translateY(-1px); }
+  .announce-cta:focus-visible { outline: 2px solid var(--gold-lt); outline-offset: 2px; }
+  /* push the fixed nav below the bar + keep the hero clear of both + fix anchor offsets */
+  nav { top: var(--ann-h); }
+  #hero { padding-top: calc(110px + var(--ann-h)); }
+  html { scroll-padding-top: calc(var(--ann-h) + 64px); }
+  @media (max-width: 680px) {
+    .announce-txt { display: none; }               /* on phones the countdown + button carry it */
+    .announce-in { gap: 12px; }
+    .announce-cd { font-size: 12.5px; }
+  }
   </style>
 </head>
 <body>
+
+<!-- PRICE-CHANGE ANNOUNCEMENT BAR -->
+<div class="announce" id="announce" role="region" aria-label="Limited-time price">
+  <div class="announce-in">
+    <span class="announce-txt" id="announce-txt"><strong>Founding price ends soon.</strong> Lock in <b>$5 lifetime</b> before it rises to $16.99.</span>
+    <span class="announce-cd" id="announce-cd" aria-live="polite"><span id="a-d">20</span>d <span id="a-h">00</span>h <span id="a-m">00</span>m <span id="a-s">00</span>s</span>
+    <a class="announce-cta" id="announce-cta" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/5579f948-679c-4b0d-b187-26b5bb498d55" target="_blank" rel="noopener">Lock in $5 →</a>
+  </div>
+</div>
 
 <video id="bg-video" src="bg-video.mp4" preload="auto" muted playsinline></video>
 <div class="bg-overlay"></div>
@@ -1319,6 +1362,32 @@
       h1.classList.remove('fading');
     }, 560);
   }, 20000);
+})();
+
+// ── Price-change announcement countdown ──────────────
+(function(){
+  var TARGET = new Date('2026-09-28T23:59:59'); // founding price ends — change this to reschedule
+  var elD=document.getElementById('a-d'), elH=document.getElementById('a-h'),
+      elM=document.getElementById('a-m'), elS=document.getElementById('a-s'),
+      cd=document.getElementById('announce-cd'),
+      txt=document.getElementById('announce-txt'),
+      cta=document.getElementById('announce-cta');
+  if(!elD) return;
+  function pad(n){ return (n<10?'0':'')+n; }
+  function tick(){
+    var left = TARGET - new Date();
+    if(left<=0){                                   // deadline reached — switch banner only (prices stay as-is in HTML)
+      if(cd)  cd.style.display='none';
+      if(txt) txt.innerHTML='<strong>New pricing is live.</strong> $16.99 lifetime · $7.99/year.';
+      if(cta) cta.textContent='Get JumpMarkers →';
+      return;
+    }
+    elD.textContent=Math.floor(left/864e5);
+    elH.textContent=pad(Math.floor(left%864e5/36e5));
+    elM.textContent=pad(Math.floor(left%36e5/6e4));
+    elS.textContent=pad(Math.floor(left%6e4/1e3));
+  }
+  tick(); setInterval(tick,1000);
 })();
 </script>
 </body>
