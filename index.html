@@ -546,6 +546,18 @@
     background: var(--gold-lt); transform: translateY(-1px);
     box-shadow: 0 8px 28px rgba(222,184,135,.35);
   }
+  .plan-alt {
+    margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+  .plan-alt-label { font-size: .8rem; color: var(--muted); margin-bottom: 9px; }
+  .plan-alt-label strong { color: var(--text); font-weight: 600; }
+  .btn-get-annual {
+    background: transparent; color: var(--gold);
+    border: 1px solid var(--gold);
+  }
+  .btn-get-annual:hover { background: rgba(222,184,135,.12); color: var(--gold-lt); }
   .pricing-foot {
     text-align: center; margin-top: 18px;
     font-family: var(--mono); font-size: 11px; color: var(--muted);
@@ -702,20 +714,18 @@
   #hero { padding-top: calc(110px + var(--ann-h)); }
   html { scroll-padding-top: calc(var(--ann-h) + 64px); }
   @media (max-width: 680px) {
-    .announce-txt { display: none; }               /* on phones the countdown + button carry it */
-    .announce-in { gap: 12px; }
-    .announce-cd { font-size: 12.5px; }
+    .announce-txt { font-size: 11.5px; }           /* show the pricing text on phones too */
+    .announce-in { gap: 10px; }
   }
   </style>
 </head>
 <body>
 
 <!-- PRICE-CHANGE ANNOUNCEMENT BAR -->
-<div class="announce" id="announce" role="region" aria-label="Limited-time price">
+<div class="announce" id="announce" role="region" aria-label="JumpMarkers Premium pricing">
   <div class="announce-in">
-    <span class="announce-txt" id="announce-txt"><strong>Founding price ends soon.</strong> Lock in <b>$5 lifetime</b> before it rises to $16.99.</span>
-    <span class="announce-cd" id="announce-cd" aria-live="polite"><span id="a-d">20</span>d <span id="a-h">00</span>h <span id="a-m">00</span>m <span id="a-s">00</span>s</span>
-    <a class="announce-cta" id="announce-cta" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/5579f948-679c-4b0d-b187-26b5bb498d55" target="_blank" rel="noopener">Lock in $5 →</a>
+    <span class="announce-txt" id="announce-txt"><strong>JumpMarkers Premium</strong> — <b>$16.99 lifetime</b> or <b>$7.99/year</b> · free 7-day trial on install.</span>
+    <a class="announce-cta" id="announce-cta" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/5579f948-679c-4b0d-b187-26b5bb498d55" target="_blank" rel="noopener">Get Premium →</a>
   </div>
 </div>
 
@@ -758,7 +768,7 @@
       ⬇&ensp;Add to Chrome — Free
     </a>
     <a class="btn-secondary" href="#pricing">
-      View Premium → $5 lifetime
+      View Premium plans
     </a>
   </div>
 
@@ -879,7 +889,7 @@
     <div class="feat">
       <div class="feat-icon">📱</div>
       <h3>YouTube Shorts</h3>
-      <p>Mark and organize YouTube Shorts just like regular videos. Premium feature — included in the $5 lifetime plan.</p>
+      <p>Mark and organize YouTube Shorts just like regular videos. A Premium feature — on both the lifetime and annual plans.</p>
     </div>
   </div>
 </section>
@@ -949,7 +959,7 @@
     <div class="plan featured">
       <div class="plan-badge">BEST VALUE</div>
       <div class="plan-tier">Premium</div>
-      <div class="plan-price">$5 <sub>one-time</sub></div>
+      <div class="plan-price">$16.99 <sub>one-time</sub></div>
       <div class="plan-note">Lifetime license. Pay once, keep forever.</div>
       <ul class="plan-list">
         <li class="on"><span class="ic-yes">✓</span> <strong>Unlimited</strong> markers</li>
@@ -964,8 +974,14 @@
         <li class="on"><span class="ic-yes">✓</span> Priority support</li>
       </ul>
       <a class="btn-get btn-get-prem" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/5579f948-679c-4b0d-b187-26b5bb498d55" target="_blank">
-        Get Premium — $5 lifetime
+        Get Lifetime — $16.99
       </a>
+      <div class="plan-alt">
+        <div class="plan-alt-label">Prefer to pay yearly? <strong>$7.99/year</strong></div>
+        <a class="btn-get btn-get-annual" href="https://jumpmarkers.lemonsqueezy.com/checkout/buy/ANNUAL_VARIANT_ID" target="_blank" rel="noopener">
+          Get Annual — $7.99/year
+        </a>
+      </div>
     </div>
   </div>
   <p class="pricing-foot">🔒 Secure payment via Lemon Squeezy · Instant license key delivery by email</p>
@@ -1366,31 +1382,7 @@
   }, 20000);
 })();
 
-// ── Price-change announcement countdown ──────────────
-(function(){
-  var TARGET = new Date('2026-09-28T23:59:59'); // founding price ends — change this to reschedule
-  var elD=document.getElementById('a-d'), elH=document.getElementById('a-h'),
-      elM=document.getElementById('a-m'), elS=document.getElementById('a-s'),
-      cd=document.getElementById('announce-cd'),
-      txt=document.getElementById('announce-txt'),
-      cta=document.getElementById('announce-cta');
-  if(!elD) return;
-  function pad(n){ return (n<10?'0':'')+n; }
-  function tick(){
-    var left = TARGET - new Date();
-    if(left<=0){                                   // deadline reached — switch banner only (prices stay as-is in HTML)
-      if(cd)  cd.style.display='none';
-      if(txt) txt.innerHTML='<strong>New pricing is live.</strong> $16.99 lifetime · $7.99/year.';
-      if(cta) cta.textContent='Get JumpMarkers →';
-      return;
-    }
-    elD.textContent=Math.floor(left/864e5);
-    elH.textContent=pad(Math.floor(left%864e5/36e5));
-    elM.textContent=pad(Math.floor(left%36e5/6e4));
-    elS.textContent=pad(Math.floor(left%6e4/1e3));
-  }
-  tick(); setInterval(tick,1000);
-})();
+// (Founding-price countdown removed — new pricing is now permanent: $16.99 lifetime · $7.99/year.)
 </script>
 </body>
 </html>
